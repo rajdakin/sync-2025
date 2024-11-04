@@ -328,6 +328,16 @@ End translation.
 
 Section example.
 
+  Ltac prove_uniq_locals :=
+    lazymatch goal with
+    | _: ?x = ?x |- _ => fail "The identifier" x "is not unique"
+    | H: _ = _ |- _ => inversion H
+
+    | H: In _ _ |- _ => inversion H; prove_uniq_locals
+    | |- ~ _ => inversion 1; prove_uniq_locals
+    | |- NoDup _ => constructor; prove_uniq_locals
+    end.
+
   Section source.
 
     Import source.
@@ -349,7 +359,8 @@ Section example.
       ];
     |}.
     Next Obligation.
-    Admitted.
+      prove_uniq_locals.
+    Qed.
 
   End source.
 
