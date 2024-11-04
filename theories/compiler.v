@@ -1,4 +1,4 @@
-From Coq Require Export List.
+From Coq Require Export List Nat.
 From Coq Require Export BinNums FMapPositive PArith.
 
 Import ListNotations.
@@ -7,11 +7,39 @@ Open Scope positive.
 
 Definition ident := positive.
 
+
+Module Stream.
+
+  CoInductive t (A: Type) :=
+    | Cons: A -> t A -> t A.
+
+  Arguments Cons {_} _ _.
+
+
+  CoFixpoint from {A: Type} (x: A) : t A := Cons x (from x).
+
+  CoFixpoint merge {A B C: Type} (f: A -> B -> C) (x: t A) (y: t B): t C :=
+    match x, y with
+    | Cons x xs, Cons y ys => Cons (f x y) (merge f xs ys)
+    end.
+
+  CoFixpoint map {A B: Type} (f: A -> B) (x: t A): t B :=
+    match x with
+    | Cons x xs => Cons (f x) (map f xs)
+    end.
+
+  Definition hd {A: Type} (s: t A): A :=
+    match s with
+    | Cons x _ => x
+    end.
+
+End Stream.
+
+
 Module source.
 
   Inductive type :=
     | TBool.
-
 
   Definition binder := prod ident type.
 
@@ -26,65 +54,49 @@ Module source.
     | EOr : exp -> exp -> exp
     | EXor : exp -> exp -> exp.
 
-  Definition equation := prod (list ident) (list exp).
+  Definition equation := prod ident exp.
 
 
   Record node := mk_node {
     n_name: ident;
 
     n_in: list binder;
-    n_out: list binder;
-    n_vars: list binder;
+    n_out: binder;
+    n_locals: list binder;
 
     n_body: list equation;
+
+    n_vars: list binder := n_in ++ n_out :: n_locals;
+    n_ident_uniq: NoDup (map fst n_vars);
   }.
 
-  CoInductive Stream (A: Type) :=
-    | Cons: A -> Stream A -> Stream A.
-
-  Arguments Cons {_} _ _.
-
-
-  CoFixpoint from {A: Type} (x: A) : Stream A := Cons x (from x).
-
-  CoFixpoint merge {A B C: Type} (f: A -> B -> C) (x: Stream A) (y: Stream B): Stream C :=
-    match x, y with
-    | Cons x xs, Cons y ys => Cons (f x y) (merge f xs ys)
-    end.
-
-  CoFixpoint map {A B: Type} (f: A -> B) (x: Stream A): Stream B :=
-    match x with
-    | Cons x xs => Cons (f x) (map f xs)
-    end.
-
-
   Definition value := const.
-  Definition history := PositiveMap.t (Stream value).
+  Definition history := PositiveMap.t (Stream.t value).
 
   Definition sem_const (c: const): value := c.
 
-  Inductive sem_exp: history -> exp -> Stream const -> Prop :=
-    | SeConst (h: history) (c: const) (s: Stream const):
-        sem_exp h (EConst c) (from (sem_const c))
+  Inductive sem_exp: history -> exp -> Stream.t const -> Prop :=
+    | SeConst (h: history) (c: const):
+        sem_exp h (EConst c) (Stream.from (sem_const c))
 
-    | SeVar (h: history) (b: binder) (s: Stream const):
+    | SeVar (h: history) (b: binder) (s: Stream.t const):
         PositiveMap.MapsTo (fst b) s h ->
         sem_exp h (EVar b) s
 
-    | SeAnd (h: history) (e1 e2: exp) (s1 s2 s: Stream bool):
-        sem_exp h e1 (map (fun x => CBool x) s1) ->
-        sem_exp h e2 (map (fun x => CBool x) s2) ->
-        sem_exp h (EAnd e1 e2) (map (fun x => CBool x) (merge (fun x y => andb x y) s1 s2))
+    | SeAnd (h: history) (e1 e2: exp) (s1 s2 s: Stream.t bool):
+        sem_exp h e1 (Stream.map (fun x => CBool x) s1) ->
+        sem_exp h e2 (Stream.map (fun x => CBool x) s2) ->
+        sem_exp h (EAnd e1 e2) (Stream.map (fun x => CBool x) (Stream.merge (fun x y => andb x y) s1 s2))
 
-    | SeOr (h: history) (e1 e2: exp) (s1 s2 s: Stream bool):
-        sem_exp h e1 (map (fun x => CBool x) s1) ->
-        sem_exp h e2 (map (fun x => CBool x) s2) ->
-        sem_exp h (EOr e1 e2) (map (fun x => CBool x) (merge (fun x y => orb x y) s1 s2))
+    | SeOr (h: history) (e1 e2: exp) (s1 s2 s: Stream.t bool):
+        sem_exp h e1 (Stream.map (fun x => CBool x) s1) ->
+        sem_exp h e2 (Stream.map (fun x => CBool x) s2) ->
+        sem_exp h (EOr e1 e2) (Stream.map (fun x => CBool x) (Stream.merge (fun x y => orb x y) s1 s2))
 
-    | SeXor (h: history) (e1 e2: exp) (s1 s2 s: Stream bool):
-        sem_exp h e1 (map (fun x => CBool x) s1) ->
-        sem_exp h e2 (map (fun x => CBool x) s2) ->
-        sem_exp h (EXor e1 e2) (map (fun x => CBool x) (merge (fun x y => xorb x y) s1 s2)).
+    | SeXor (h: history) (e1 e2: exp) (s1 s2 s: Stream.t bool):
+        sem_exp h e1 (Stream.map (fun x => CBool x) s1) ->
+        sem_exp h e2 (Stream.map (fun x => CBool x) s2) ->
+        sem_exp h (EXor e1 e2) (Stream.map (fun x => CBool x) (Stream.merge (fun x y => xorb x y) s1 s2)).
 
 End source.
 
@@ -108,7 +120,7 @@ Module target.
     | EXor : exp -> exp -> exp.
 
   Inductive stmt :=
-    | SAssign: binder -> exp -> stmt
+    | SAssign: ident -> exp -> stmt
     | SSeq : stmt -> stmt -> stmt
     | SReturn : exp -> stmt
     | SNop : stmt.
@@ -118,10 +130,10 @@ Module target.
     m_name: ident;
 
     m_in: list binder;
-    m_out: list binder;
+    m_out: type;
     m_vars: list binder;
 
-    m_body: list stmt;
+    m_body: stmt;
   }.
 
 
@@ -153,7 +165,7 @@ Module target.
   Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
     | SeAssign (s: stack) (b: binder) (e: exp) (v: const):
         sem_exp s e v ->
-        sem_stmt s (SAssign b e) (PositiveMap.add (fst b) v s)
+        sem_stmt s (SAssign (fst b) e) (PositiveMap.add (fst b) v s)
 
     | SeSeq (s1 s2 s3: stack) (st1 st2: stmt):
         sem_stmt s1 st1 s2 ->
@@ -170,27 +182,190 @@ Module target.
 End target.
 
 
-Section source_example.
+Section translation.
 
-  Import source.
+  Definition translate_const (c: source.const): target.const :=
+    match c with
+    | source.CBool b => target.CBool b
+    end.
 
-  Notation "a ⊕ b" := (EXor a b) (at level 0).
-  Notation "a ∧ b" := (EAnd a b) (at level 0).
-  Notation "a ∨ b" := (EOr a b) (at level 0).
+  Definition translate_type (t: source.type): target.type :=
+    match t with
+    | source.TBool => target.TBool
+    end.
 
-  Notation "( x ~ T )" := (EVar (x, T)) (at level 0).
+  Definition translate_binder (b: source.binder): target.binder :=
+    (fst b, translate_type (snd b)).
 
-  Program Definition full_add: node := {|
-    n_name := 1;
+  Fixpoint translate_exp (e: source.exp): target.exp :=
+    match e with
+    | source.EConst c => target.EConst (translate_const c)
+    | source.EVar b => target.EVar (translate_binder b)
+    | source.EAnd e1 e2 => target.EAnd (translate_exp e1) (translate_exp e2)
+    | source.EOr e1 e2 => target.EOr (translate_exp e1) (translate_exp e2)
+    | source.EXor e1 e2 => target.EXor (translate_exp e1) (translate_exp e2)
+    end.
 
-    n_in := [(1, TBool); (2, TBool); (3, TBool)];
-    n_out := [(4, TBool); (5, TBool)];
-    n_vars := [];
+  Fixpoint translate_equation (eq: source.equation): target.stmt :=
+    match fst eq with
+    | 1 => target.SReturn (translate_exp (snd eq))
+    | _ => target.SAssign (fst eq) (translate_exp (snd eq))
+    end.
 
-    n_body := [
-      ([5], [((1 ~ TBool) ⊕ (2 ~ TBool)) ⊕ (3 ~ TBool)]);
-      ([4], [(((1 ~ TBool) ∧ (2 ~ TBool)) ∨ ((1 ~ TBool) ∧ (3 ~ TBool))) ∨ ((2 ~ TBool) ∧ (3 ~ TBool))])
-    ];
-  |}.
+  Definition translate_history (h: source.history): target.stack :=
+    PositiveMap.map (fun x => translate_const (Stream.hd x)) h.
 
-End source_example.
+  Definition translate_node (n: source.node): option target.method :=
+    let return_eq := List.find (fun eq => (fst eq) =? 1) (source.n_body n) in
+    let remaining_eqs := List.filter (fun eq => negb ((fst eq) =? 1)) (source.n_body n) in
+
+    match return_eq with
+    | None => None
+    | Some return_eq => Some {|
+        target.m_name := source.n_name n;
+
+        target.m_in := map translate_binder (source.n_in n);
+        target.m_out := translate_type (snd (source.n_out n));
+        target.m_vars := map translate_binder (source.n_vars n);
+
+        target.m_body := fold_left
+                           (fun acc x => target.SSeq acc x)
+                           (map translate_equation remaining_eqs)
+                           (translate_equation return_eq)
+      |}
+    end.
+
+  Lemma correctness_exp (e: source.exp) (h: source.history) (out: Stream.t source.const):
+    source.sem_exp h e out ->
+      target.sem_exp (translate_history h) (translate_exp e) (translate_const (Stream.hd out)).
+  Proof.
+    induction 1.
+
+    - (* EConst *)
+      apply target.SeConst.
+
+    - (* EVar *)
+      apply target.SeVar; simpl.
+
+      set (f := fun e => translate_const (Stream.hd e)).
+      now apply PositiveMap.map_1 with (f := f).
+
+    - (* EAnd *)
+      replace (Stream.hd _) with (source.CBool (Stream.hd s1 && Stream.hd s2)); simpl.
+      2: { now destruct s1, s2. }
+
+      apply target.SeAnd.
+      + replace (target.CBool (Stream.hd s1)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s1))).
+        2: { now destruct s1. }
+        apply IHsem_exp1.
+
+      + replace (target.CBool (Stream.hd s2)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s2))).
+        2: { now destruct s2. }
+        apply IHsem_exp2.
+
+    - (* EOr *)
+      replace (Stream.hd _) with (source.CBool (Stream.hd s1 || Stream.hd s2)); simpl.
+      2: { now destruct s1, s2. }
+
+      apply target.SeOr.
+      + replace (target.CBool (Stream.hd s1)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s1))).
+        2: { now destruct s1. }
+        apply IHsem_exp1.
+
+      + replace (target.CBool (Stream.hd s2)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s2))).
+        2: { now destruct s2. }
+        apply IHsem_exp2.
+
+    - (* EXor *)
+      replace (Stream.hd _) with (source.CBool (xorb (Stream.hd s1) (Stream.hd s2))); simpl.
+      2: { now destruct s1, s2. }
+
+      apply target.SeXor.
+      + replace (target.CBool (Stream.hd s1)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s1))).
+        2: { now destruct s1. }
+        apply IHsem_exp1.
+
+      + replace (target.CBool (Stream.hd s2)) with
+          (translate_const (Stream.hd (Stream.map (fun x : bool => source.CBool x) s2))).
+        2: { now destruct s2. }
+        apply IHsem_exp2.
+  Qed.
+
+  Lemma correctness_node (n: source.node) (h: source.history) (ret: PositiveMap.t source.const):
+    forall (m: target.method), translate_node n = Some m ->
+      forall (ret': PositiveMap.t source.const),
+        (forall (k: positive) (v: source.const),
+           PositiveMap.MapsTo k v ret ->
+           PositiveMap.MapsTo k v ret'
+        )
+    ->
+      (forall (s: Stream.t source.const) (e: source.equation),
+           In e (source.n_body n) ->
+           PositiveMap.MapsTo (fst e) (Stream.hd s) ret ->
+           source.sem_exp h (snd e) s
+      ) -> (
+        target.sem_stmt (@PositiveMap.empty target.const) (target.m_body m)
+          (PositiveMap.map translate_const ret')
+      ).
+  Proof.
+    intros m Hsuccess ret' Hweak Hsource.
+    destruct n.
+
+    induction (n_body).
+    { discriminate. }
+
+    simpl in IHl.
+    unfold translate_node in Hsuccess. simpl in Hsuccess.
+  Admitted.
+
+End translation.
+
+
+Section example.
+
+  Section source.
+
+    Import source.
+    Notation "a ⊕ b" := (source.EXor a b) (at level 40).
+    Notation "a ∧ b" := (source.EAnd a b) (at level 40).
+    Notation "a ∨ b" := (source.EOr a b) (at level 40).
+    Notation "( x ~ T )" := (source.EVar (x, T)) (at level 0).
+
+    Program Definition full_add: node := {|
+      n_name := 1;
+
+      n_in := [(2, TBool); (3, TBool); (4, TBool)];
+      n_out := (1, TBool);
+      n_locals := [(5, TBool)];
+
+      n_body := [
+        (1, (((2 ~ TBool) ⊕ (3 ~ TBool)) ⊕ (4 ~ TBool)));
+        (5, (((2 ~ TBool) ∧ (3 ~ TBool)) ∨ ((2 ~ TBool) ∧ (4 ~ TBool))) ∨ ((3 ~ TBool) ∧ (4 ~ TBool)))
+      ];
+    |}.
+    Next Obligation.
+    Admitted.
+
+  End source.
+
+  Section target.
+
+    Notation "a ⊕ b" := (target.EXor a b) (at level 40).
+    Notation "a ∧ b" := (target.EAnd a b) (at level 40).
+    Notation "a ∨ b" := (target.EOr a b) (at level 40).
+    Notation "( x ~ T )" := (target.EVar (x, T)) (at level 0).
+
+    Notation "a <- b" := (target.SAssign a b) (at level 40).
+    Notation "'return' a" := (target.SReturn a) (at level 40).
+    Notation "a ; b" := (target.SSeq a b) (at level 40).
+
+    Eval compute in (translate_node full_add).
+
+  End target.
+
+End example.
