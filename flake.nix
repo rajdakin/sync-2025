@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-24.05";
+    nixpkgs.url = "nixpkgs/nixos-24.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -14,7 +14,8 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
-        coqPackages = pkgs.coqPackages_8_19;
+        coqPackages = pkgs.coqPackages_8_20;
+        ocamlPackages = coqPackages.coq.ocamlPackages;
       in
       rec {
         packages = {
@@ -32,7 +33,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = with packages; [ theories ];
-          packages = with coqPackages; [ vscoq-language-server ];
+          packages = [ coqPackages.vscoq-language-server ocamlPackages.ocamlformat ];
         };
 
         formatter = pkgs.nixfmt-rfc-style;
