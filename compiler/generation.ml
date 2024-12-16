@@ -33,6 +33,6 @@ let rec pp_stmt fmt stmt =
   | SNop -> fprintf fmt ""
 
 let pp_coq_method cm =
-  fprintf Format.std_formatter "bool %a() { @[<h4>%a@] \n}" pp_fun_name
+  fprintf Format.std_formatter "char %a() { @[<h4>%a@] \n}" pp_fun_name
     (m_name cm) pp_stmt (m_body cm)
 (* TODO: add return *)
