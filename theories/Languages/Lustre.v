@@ -1,5 +1,5 @@
 From Reactive Require Import Base.
-From Reactive.Datatypes Require Stream.
+From Reactive.Datatypes Require Dict Stream.
 
 From Coq Require Import Permutation.
 
@@ -96,7 +96,7 @@ Proof.
   contradiction.
 Defined.
 
-Definition binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
+Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
 Proof.
   unfold binder_eqb, andb.
   destruct (fst x =? fst y) eqn:Heq; [| discriminate ].
@@ -109,7 +109,7 @@ Proof.
   now destruct t, t0.
 Qed.
 
-Definition binder_eq_to_eqb (x y : binder): x = y -> binder_eqb x y = true.
+Lemma binder_eq_to_eqb (x y : binder): x = y -> binder_eqb x y = true.
 Proof.
   unfold binder_eqb, andb.
   destruct x, y; simpl.
@@ -135,14 +135,40 @@ Definition const_eqb (x y: const): bool := false.
 
 Definition exp_eqb (x y: exp): bool := false.
 
-Definition exp_eqb_to_eq (x y : exp): exp_eqb x y = true -> x = y.
+Lemma exp_eqb_to_eq (x y: exp): exp_eqb x y = true -> x = y.
 Proof. Admitted.
 
 Definition equation_eqb (x y: equation): bool :=
   andb (fst x =? fst y) (exp_eqb (snd x) (snd y)).
 
-Definition equation_eqb_to_eq (x y : equation): equation_eqb x y = true -> x = y.
+Lemma equation_eqb_to_eq (x y: equation): equation_eqb x y = true -> x = y.
 Proof. Admitted.
 
-Definition equation_eq_to_eqb (x y : equation): x = y -> equation_eqb x y = true.
+Lemma equation_eq_to_eqb (x y: equation): x = y -> equation_eqb x y = true.
 Proof. Admitted.
+
+
+(** ** Semantics *)
+
+Inductive value :=
+  | VConst : const -> value
+  | VInput : binder -> value
+  | VBinop : binop -> value -> value -> value.
+
+Definition history := Dict.t value.
+
+Inductive sem_exp: history -> exp -> value -> Prop :=
+  | SeConst (h: history) (c: const):
+      sem_exp h (EConst c) (VConst c)
+
+  | SeInput (h: history) (b: binder):
+      sem_exp h (EInput b) (VInput b)
+
+  | SeVar (h: history) (b: binder) (v: value):
+      Dict.maps_to (fst b) v h ->
+      sem_exp h (EVar b) v
+
+  | SeBinop (h: history) (op: binop) (e1 e2: exp) (v1 v2: value):
+      sem_exp h e1 v1 ->
+      sem_exp h e2 v2 ->
+      sem_exp h (EBinop op e1 e2) (VBinop op v1 v2).
