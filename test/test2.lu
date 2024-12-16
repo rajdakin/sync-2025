@@ -1,7 +1,0 @@
-node test return a : bool 
-var b : bool; c: bool;
-let
-	b = c;
-	c = false;
-	a = true ;
-tel
