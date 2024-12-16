@@ -1,3 +1,6 @@
+From Reactive Require Export Base.
+
+
 CoInductive t (A: Type) :=
   | Cons: A -> t A -> t A.
 

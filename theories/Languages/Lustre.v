@@ -1,6 +1,8 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Stream.
 
+From Coq Require Import Permutation.
+
 
 Inductive type :=
   | TBool.
@@ -46,6 +48,13 @@ Record node := mk_node {
   n_inputs_equations: incl (List.map (fun b => (fst b, EInput b)) n_in) n_body;
   n_no_einputs_in_other: Forall (fun '(name, exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
 }.
+
+Definition node_eq (n1 n2: node) :=
+  n_name n1 = n_name n2 /\
+  Permutation (n_in n1) (n_in n2) /\
+  n_out n1 = n_out n2 /\
+  Permutation (n_locals n1) (n_locals n2) /\
+  Permutation (n_body n1) (n_body n2).
 
 Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
   match e with

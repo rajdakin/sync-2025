@@ -1,0 +1,4 @@
+(coq.theory
+ (name Reactive.Translations)
+ (package Reactive)
+ (theories Reactive Reactive.Datatypes Reactive.Languages))

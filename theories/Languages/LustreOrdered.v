@@ -5,7 +5,9 @@ From Reactive.Languages Require Lustre.
 Module Lustre := Lustre.
 
 
-Fixpoint equations_to_dag (equations: list Lustre.equation): list (prod ident (list ident)) :=
+Definition dag := list (prod ident (list ident)).
+
+Fixpoint equations_to_dag (equations: list Lustre.equation): dag :=
   match equations with
     | [] => []
     | (name, exp) :: remaining_eqs => (name, Lustre.var_of_exp exp) :: equations_to_dag remaining_eqs

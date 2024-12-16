@@ -1,4 +1,5 @@
-From Reactive Require Import Base.
+From Reactive Require Export Base.
+
 
 Inductive t {A: Type}: list (A * list A) -> Prop :=
   | nil : t []
