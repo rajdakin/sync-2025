@@ -2,7 +2,7 @@
  (prelude Extractor)
  (extracted_modules
   Ascii List Mergesort Nat Orders String
-  Base Datatypes Dict Result Stream
+  Base Datatypes Dict Result Sorted Stream
   Lustre LustreOrdered
   LustreOrdering)
  (theories Reactive Reactive.Datatypes Reactive.Translations))

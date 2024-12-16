@@ -6,6 +6,8 @@ From Reactive.Languages Require Lustre LustreOrdered.
 From Coq Require Import Sorting Permutation.
 
 
+Open Scope string_scope.
+
 Module Source := Lustre.
 Module Target := LustreOrdered.
 

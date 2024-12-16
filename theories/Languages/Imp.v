@@ -80,6 +80,9 @@ Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
   | SeNop (s: stack):
       sem_stmt s SNop s.
 
+
+(** ** Properties *)
+
 Fixpoint eval_exp (e: exp) (s: stack): option value :=
   match e with
     | EConst c => Some (VConst c)
@@ -93,3 +96,41 @@ Fixpoint eval_exp (e: exp) (s: stack): option value :=
 
 Definition is_evaluable (e: exp) (s: stack): Prop :=
   exists v: value, eval_exp e s = Some v.
+
+
+(** ** Lemmas *)
+
+Fixpoint has_var (e: exp): bool :=
+  match e with
+    | EConst _ => false
+    | EInput _ => false
+    | EVar _ => true
+    | EBinop _ e1 e2 => orb (has_var e1) (has_var e2)
+  end.
+
+Lemma exp_no_var_is_const (e: exp):
+  has_var e = false ->
+  forall (s: stack), is_evaluable e s.
+Proof.
+  intros H.
+  induction e as [ c | | | op e1 IHe1 e2 IHe2].
+  - exists (VConst c).
+    simpl.
+    reflexivity.
+  - exists (VInput b).
+    reflexivity.
+  - simpl in H.
+    discriminate.
+  - intros s.
+    simpl in H.
+    apply Bool.orb_false_iff in H.
+    destruct H as [ H1 H2 ].
+    apply IHe1 with (s := s) in H1.
+    apply IHe2 with (s := s) in H2.
+    destruct H1 as [ v1 H1 ].
+    destruct H2 as [ v2 H2 ].
+    exists (VBinop op v1 v2).
+    simpl.
+    rewrite H1, H2.
+    reflexivity.
+Qed.
