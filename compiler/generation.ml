@@ -32,5 +32,5 @@ let rec pp_stmt fmt stmt =
   | SNop -> fprintf fmt ""
 
 let pp_coq_method cm =
-  fprintf Format.std_formatter "char %a() {@[<h4>@a\n return %a;\n@]}"
+  fprintf Format.std_formatter "char %a() {@[<h4>%a\n return %a;\n@]}"
     pp_fun_name (m_name cm) pp_stmt (m_body cm) pp_var (m_out cm)

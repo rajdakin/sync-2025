@@ -10,7 +10,7 @@ Inductive type :=
 Definition binder := prod ident type.
 
 Inductive const :=
-  | CBool: Stream.t bool -> const.
+  | CBool: bool -> const.
 
 Inductive binop :=
   | Bop_and : binop
@@ -80,6 +80,13 @@ Definition type_eqb (x y: type): bool :=
     | TBool, TBool => true
   end.
 
+Lemma type_eqb_refl (t: type):
+  type_eqb t t = true.
+Proof.
+  destruct t.
+  reflexivity.
+Qed.
+
 Definition binder_eqb (x y: binder): bool :=
   andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
 
@@ -96,6 +103,16 @@ Proof.
   inversion 1.
   contradiction.
 Defined.
+
+Lemma binder_eqb_refl (b: binder):
+  binder_eqb b b = true.
+Proof.
+  destruct b as (i, t).
+  apply andb_true_intro.
+  split.
+  - apply PeanoNat.Nat.eqb_refl.
+  - apply type_eqb_refl.
+Qed.
 
 Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
 Proof.
@@ -132,21 +149,130 @@ Definition binop_eqb (x y: binop): bool :=
     | _, _ => false
   end.
 
-Definition const_eqb (x y: const): bool := false.
+Definition const_eqb (c1 c2: const): bool :=
+  match c1, c2 with
+    | CBool b1, CBool b2 => Bool.eqb b1 b2
+  end.
 
-Definition exp_eqb (x y: exp): bool := false.
+Fixpoint exp_eqb (e1 e2: exp): bool :=
+  match e1, e2 with
+    | EConst c1, EConst c2 => const_eqb c1 c2
+    | EInput b1, EInput b2 => binder_eqb b1 b2
+    | EVar b1, EVar b2 => binder_eqb b1 b2
+    | EBinop op1 e11 e12, EBinop op2 e21 e22 =>
+      (binop_eqb op1 op2) && (exp_eqb e11 e21) && (exp_eqb e12 e22)
+    | _, _ => false
+  end.
 
-Lemma exp_eqb_to_eq (x y: exp): exp_eqb x y = true -> x = y.
-Proof. Admitted.
+Lemma binop_eqb_refl (op: binop):
+  binop_eqb op op = true.
+Proof.
+  destruct op; reflexivity.
+Qed.
 
-Definition equation_eqb (x y: equation): bool :=
-  andb (fst x =? fst y) (exp_eqb (snd x) (snd y)).
+Lemma binop_eqb_to_eq (op1 op2: binop):
+  binop_eqb op1 op2 = true -> op1 = op2.
+Proof.
+  intros H.
+  destruct op1, op2; try reflexivity; try inversion H.
+Qed.
 
-Lemma equation_eqb_to_eq (x y: equation): equation_eqb x y = true -> x = y.
-Proof. Admitted.
+Lemma const_eqb_refl (c: const):
+  const_eqb c c = true.
+Proof.
+  destruct c.
+  simpl.
+  destruct b; reflexivity.
+Qed.
 
-Lemma equation_eq_to_eqb (x y: equation): x = y -> equation_eqb x y = true.
-Proof. Admitted.
+Lemma const_eqb_to_eq (c1 c2: const):
+  const_eqb c1 c2 = true -> c1 = c2.
+Proof.
+  intros H.
+  revert c2 H.
+  induction c1 as [ b1 ]; intros c2 H.
+  destruct c2.
+  inversion H.
+  apply Bool.eqb_prop in H1.
+  subst.
+  reflexivity.
+Qed.
+
+Lemma exp_eqb_refl (e: exp):
+  exp_eqb e e = true.
+Proof.
+  induction e.
+  - apply const_eqb_refl.
+  - apply binder_eqb_refl.
+  - apply binder_eqb_refl.
+  - apply andb_true_intro.
+    split; [ | assumption ].
+    apply andb_true_intro.
+    split; [ | assumption ].
+    apply binop_eqb_refl.
+Qed.
+
+Lemma exp_eqb_to_eq (e1 e2: exp):
+  exp_eqb e1 e2 = true -> e1 = e2.
+Proof.
+  intros H.
+  revert e2 H.
+  induction e1 as [ c1 | b1 | b1 | op1 e11 IH1 e12 IH2 ]; intros e2 H.
+  - destruct e2; try inversion H.
+    apply const_eqb_to_eq in H1.
+    subst.
+    reflexivity.
+  - destruct e2; try inversion H.
+    apply binder_eqb_to_eq in H1.
+    subst.
+    reflexivity.
+  - destruct e2; try inversion H.
+    apply binder_eqb_to_eq in H1.
+    subst.
+    reflexivity.
+  - destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply andb_prop in H1 as [ H3 H1 ].
+    apply IH1 in H1.
+    apply IH2 in H2.
+    apply binop_eqb_to_eq in H3.
+    rewrite H1, H2, H3.
+    reflexivity.
+Qed.
+
+Definition equation_eqb (eq1 eq2: equation): bool :=
+  (fst eq1 =? fst eq2) && (exp_eqb (snd eq1) (snd eq2)).
+
+Lemma equation_eqb_to_eq (eq1 eq2: equation):
+  equation_eqb eq1 eq2 = true -> eq1 = eq2.
+Proof.
+  intros H.
+  destruct eq1, eq2.
+  apply andb_prop in H as [ H1 H2 ].
+  apply PeanoNat.Nat.eqb_eq in H1.
+  apply exp_eqb_to_eq in H2.
+  simpl in H1, H2.
+  rewrite H1, H2.
+  reflexivity.
+Qed.
+
+Lemma equation_eqb_refl (eq: equation):
+  equation_eqb eq eq = true.
+Proof.
+  destruct eq as (i, e).
+  apply andb_true_intro.
+  split.
+  - apply PeanoNat.Nat.eqb_refl.
+  - apply exp_eqb_refl.
+Qed.
+
+Lemma equation_eq_to_eqb (eq1 eq2: equation):
+  eq1 = eq2 -> equation_eqb eq1 eq2 = true.
+Proof.
+  intros H.
+  rewrite H.
+  apply equation_eqb_refl.
+Qed.
 
 
 (** ** Semantics *)
@@ -156,7 +282,7 @@ Inductive value :=
   | VInput : binder -> value
   | VBinop : binop -> value -> value -> value.
 
-Definition history := Dict.t value.
+Definition history := Dict.t (Stream.t value).
 
 Inductive sem_exp: history -> exp -> value -> Prop :=
   | SeConst (h: history) (c: const):
@@ -165,9 +291,9 @@ Inductive sem_exp: history -> exp -> value -> Prop :=
   | SeInput (h: history) (b: binder):
       sem_exp h (EInput b) (VInput b)
 
-  | SeVar (h: history) (b: binder) (v: value):
+  | SeVar (h: history) (b: binder) (v: Stream.t value):
       Dict.maps_to (fst b) v h ->
-      sem_exp h (EVar b) v
+      sem_exp h (EVar b) (Stream.hd v)
 
   | SeBinop (h: history) (op: binop) (e1 e2: exp) (v1 v2: value):
       sem_exp h e1 v1 ->
@@ -181,7 +307,7 @@ Fixpoint eval_exp (e: exp) (h: history): option value :=
   match e with
     | EConst c => Some (VConst c)
     | EInput b => Some (VInput b)
-    | EVar (name, typ) => Dict.find name h
+    | EVar (name, typ) => option_map Stream.hd (Dict.find name h)
     | EBinop op e1 e2 => match eval_exp e1 h, eval_exp e2 h with
       | Some v1, Some v2 => Some (VBinop op v1 v2)
       | _, _ => None
@@ -372,8 +498,10 @@ Proof.
     reflexivity.
   - apply Forall_inv in H.
     destruct H as [ v Hv ].
-    exists v.
-    assumption.
+    exists (Stream.hd v).
+    simpl.
+    rewrite Hv.
+    reflexivity.
   - rewrite var_of_exp_binop_eq in H.
     apply Forall_app in H as [ H1 H2 ].
     specialize (IH1 H1) as [ v1 Hv1 ].
@@ -395,7 +523,8 @@ Proof.
   - constructor.
   - constructor; [ | constructor ].
     simpl in H.
-    exists c.
+    destruct (Dict.find b h) as [ s | ] eqn: Heq; [ | discriminate ].
+    exists s.
     assumption.
   - simpl in H.
     destruct (eval_exp e1 h) as [ v1 | ]; [ | discriminate ].
@@ -420,6 +549,8 @@ Proof.
       subst.
       apply SeInput.
     + inversion H.
+      destruct (Dict.find v h) as [ s | ] eqn: Heq; [ | discriminate ].
+      inversion H1.
       apply SeVar.
       assumption.
     + simpl in H.
@@ -439,7 +570,8 @@ Proof.
       reflexivity.
     + inversion H; subst.
       simpl.
-      assumption.
+      rewrite H2.
+      reflexivity.
     + inversion H.
       subst.
       simpl.

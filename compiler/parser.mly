@@ -65,8 +65,8 @@ var:
   | id = ident { id }
 
 const:
-  | TRUE { Stream.from true }
-  | FALSE { Stream.from false }
+  | TRUE { true }
+  | FALSE { false }
 
 expr:
   | LPAREN e = expr RPAREN { e }

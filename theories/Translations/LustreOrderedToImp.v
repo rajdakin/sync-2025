@@ -8,7 +8,7 @@ Module Target := Imp.
 
 Definition translate_const (c: Source.const): Target.const :=
   match c with
-  | Source.CBool b => Target.CBool (Stream.hd b)
+  | Source.CBool b => Target.CBool b
   end.
 
 Definition translate_type (t: Source.type): Target.type :=
@@ -45,7 +45,7 @@ Definition translate_equation (eq: Source.equation): Target.stmt :=
   Target.SAssign (fst eq) (translate_exp (snd eq)).
 
 Definition translate_history (h: Source.history): Target.stack :=
-  Dict.map (fun x => translate_value x) h.
+  Dict.map (fun x => translate_value (Stream.hd x)) h.
 
 Definition translate_node_body (body: list Source.equation): Target.stmt :=
   fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
@@ -126,7 +126,7 @@ Proof.
     apply Target.SeVar; simpl.
 
     pose (fun e => translate_const (Stream.hd e)) as f.
-    now apply Dict.maps_to_map.
+    now apply Dict.maps_to_map with (f := fun x => translate_value (Stream.hd x)).
 
   - (* EAnd *)
     simpl.
@@ -196,8 +196,8 @@ Qed.
 
 Lemma ordered_equations_are_evaluable (h: Source.history) (l: list Source.equation):
   (Forall (fun eq =>
-      exists (v': Source.value),
-      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) v'
+      exists (v': Stream.t Source.value),
+      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')
     ) l
   ) ->
   Ordered.t (LustreOrdered.equations_to_dag l) -> evaluable_equations (translate_history h) l.
@@ -223,9 +223,9 @@ Proof.
       apply Source.sem_eval_exp.
       assumption.
     + apply Forall_inv_tail in Hhist.
-      apply Forall_impl with (P := fun eq => exists v', Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) v'); [ | assumption ].
+      apply Forall_impl with (P := fun eq => exists v', Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')); [ | assumption ].
       intros (name, exp) [ v' [ Hmaps Hsem ] ].
-      exists (translate_value v').
+      exists (translate_value (Stream.hd v')).
       apply correctness_exp.
       assumption.
   - destruct l as [ | eq l ]; [ constructor | ].
@@ -247,9 +247,9 @@ Proof.
         apply Source.sem_eval_exp.
         assumption.
     + apply Forall_inv_tail in Hhist.
-      apply Forall_impl with (P := fun eq => exists v', Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) v'); [ | assumption ].
+      apply Forall_impl with (P := fun eq => exists v', Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')); [ | assumption ].
       intros (name, exp) [ v' [ Hmaps Hsem ] ].
-      exists (translate_value v').
+      exists (translate_value (Stream.hd v')).
       apply correctness_exp.
       assumption.
 Qed.
@@ -257,8 +257,8 @@ Qed.
 Lemma translation_ordered_body (body: list Source.equation) (h: Source.history):
   Ordered.t (LustreOrdered.equations_to_dag body) ->
   (Forall (fun eq =>
-      exists (v': Source.value),
-      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) v'
+      exists (v': Stream.t Source.value),
+      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')
   ) body ) ->
   Forall (fun '(name, exp) => exists (v: Target.value), Target.sem_exp (translate_history h) (translate_exp exp) v) body.
 Proof.
@@ -323,8 +323,8 @@ Proof.
         assumption.
 Qed.
 
-Lemma correctness_translation_equation (h: Source.history) (name: ident) (exp: Source.exp) (v: Source.value):
-  Source.sem_exp h exp v ->
+Lemma correctness_translation_equation (h: Source.history) (name: ident) (exp: Source.exp) (v: Stream.t Source.value):
+  Source.sem_exp h exp (Stream.hd v) ->
   Dict.maps_to name v h ->
   ~ In name (Source.var_of_exp exp) ->
   Target.sem_stmt (translate_history (Dict.remove name h)) (translate_equation (name, exp)) (translate_history h).
@@ -332,20 +332,20 @@ Proof.
   intros Hexp Hmaps Hnin.
   unfold translate_equation.
   simpl.
-  rewrite Dict.remove_then_add_same_elt with (i := name) (x := translate_value v).
+  rewrite Dict.remove_then_add_same_elt with (i := name) (x := translate_value (Stream.hd v)).
   - rewrite translation_history_element_removal.
     apply Target.SeAssign.
     apply correctness_exp.
     apply sem_exp_without_useless_var; assumption.
-  - apply Dict.maps_to_map.
+  - apply Dict.maps_to_map with (f := fun x => translate_value (Stream.hd x)).
     assumption.
 Qed.
 
 Theorem correctness_node (n: LustreOrdered.node_ordered) (m: Target.method) (h: Source.history) (v: Stream.t Source.const):
   (forall (i: ident), Dict.is_in i h <-> In i (map fst (Source.n_body (LustreOrdered.node_ordered_is_node n)))) ->
   (Forall (fun eq =>
-      exists (v': Source.value),
-      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) v'
+      exists (v': Stream.t Source.value),
+      Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')
     ) (Source.n_body (LustreOrdered.node_ordered_is_node n))
   ) ->
     Target.sem_stmt (Dict.empty _) (Target.m_body (translate_node n)) (translate_history h).
