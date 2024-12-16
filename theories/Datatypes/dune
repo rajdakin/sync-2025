@@ -1,0 +1,4 @@
+(coq.theory
+  (name Reactive.Datatypes)
+  (package Reactive)
+  (theories Reactive))
