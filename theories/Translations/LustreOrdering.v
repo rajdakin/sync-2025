@@ -9,8 +9,8 @@ From Coq Require Import Sorting Permutation.
 Module Source := Lustre.
 Module Target := LustreOrdered.
 
-
 Parameter node_ordering: Source.node -> Result.t (Source.node).
+
 
 Scheme Equality for list.
 
@@ -35,48 +35,11 @@ End EquationOrder.
 Module Import EquationSort := Sort EquationOrder.
 
 
-Lemma binder_dec (x y: Source.binder): {x = y} + {x <> y}.
-Proof.
-  destruct x, y.
-  destruct t, t0.
+Definition list_eq_dec_binder :=
+  list_eq_dec _ Source.binder_eqb Source.binder_eqb_to_eq Source.binder_eq_to_eqb.
 
-  pose proof (PeanoNat.Nat.eq_dec i i0).
-  destruct H.
-  { now left; f_equal. }
-
-  right.
-  intros H.
-  inversion H.
-  contradiction.
-Qed.
-
-Definition binder_eqb (x y: Source.binder) := fst x =? fst y.
-
-Definition binder_eqb_to_eq (x y : Source.binder): binder_eqb x y = true -> x = y.
-Proof. Admitted.
-
-Definition binder_eq_to_eqb (x y : Source.binder): x = y -> binder_eqb x y = true.
-Proof. Admitted.
-
-
-Lemma equation_dec (x y: Source.equation): {x = y} + {x <> y}.
-Proof.
-  destruct x, y.
-  destruct e, e0.
-  all: try (right; inversion 1; fail).
-
-  all: pose proof (PeanoNat.Nat.eq_dec i i0) as []; subst.
-  all: try (right; inversion 1; contradiction).
-Admitted.
-
-Definition equation_eqb (x y: Source.equation) := true.
-
-Definition equation_eqb_to_eq (x y : Source.equation): equation_eqb x y = true -> x = y.
-Proof. Admitted.
-
-Definition equation_eq_to_eqb (x y : Source.equation): x = y -> equation_eqb x y = true.
-Proof. Admitted.
-
+Definition list_eq_dec_equation :=
+  list_eq_dec _ Source.equation_eqb Source.equation_eqb_to_eq Source.equation_eq_to_eqb.
 
 Definition check_eq_node (source guess: Source.node): Result.t (Source.node_eq source guess).
 Proof.
@@ -87,16 +50,16 @@ Proof.
   destruct (PeanoNat.Nat.eq_dec name1 name2).
   2: { apply Result.Err, "Node names are not equal". }
 
-  destruct (list_eq_dec _ binder_eqb binder_eqb_to_eq binder_eq_to_eqb in1 in2).
+  destruct (list_eq_dec_binder in1 in2).
   2: { apply Result.Err, "Node inputs are not equal". }
 
-  destruct (binder_dec out1 out2).
+  destruct (Source.binder_dec out1 out2).
   2: { apply Result.Err, "Node outputs are not equal". }
 
-  destruct (list_eq_dec _ binder_eqb binder_eqb_to_eq binder_eq_to_eqb locals1 locals2).
+  destruct (list_eq_dec_binder locals1 locals2).
   2: { apply Result.Err, "Node locals are not equal". }
 
-  destruct (list_eq_dec _ equation_eqb equation_eqb_to_eq equation_eq_to_eqb (sort body1) (sort body2)).
+  destruct (list_eq_dec_equation (sort body1) (sort body2)).
   2: { apply Result.Err, "Node equations are not permutations". }
 
   apply Result.Ok; subst.

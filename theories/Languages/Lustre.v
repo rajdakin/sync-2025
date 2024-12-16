@@ -70,3 +70,79 @@ Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
 
 Definition var_of_exp (e: exp): list ident :=
   var_of_exp_aux e [].
+
+
+(** ** Equality of binders *)
+
+Definition type_eqb (x y: type): bool :=
+  match x, y with
+    | TBool, TBool => true
+  end.
+
+Definition binder_eqb (x y: binder): bool :=
+  andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
+
+Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
+Proof.
+  destruct x, y.
+  destruct t, t0.
+
+  pose proof (PeanoNat.Nat.eq_dec i i0).
+  destruct H.
+  { now left; f_equal. }
+
+  right.
+  inversion 1.
+  contradiction.
+Defined.
+
+Definition binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
+Proof.
+  unfold binder_eqb, andb.
+  destruct (fst x =? fst y) eqn:Heq; [| discriminate ].
+
+  rewrite PeanoNat.Nat.eqb_eq in Heq.
+  destruct x, y; simpl in Heq |- *.
+  rewrite Heq.
+
+  intros _.
+  now destruct t, t0.
+Qed.
+
+Definition binder_eq_to_eqb (x y : binder): x = y -> binder_eqb x y = true.
+Proof.
+  unfold binder_eqb, andb.
+  destruct x, y; simpl.
+
+  inversion 1.
+
+  rewrite PeanoNat.Nat.eqb_refl.
+  now destruct t, t0.
+Qed.
+
+
+(** ** Equality of equations *)
+
+Definition binop_eqb (x y: binop): bool :=
+  match x, y with
+    | Bop_and, Bop_and => true
+    | Bop_or, Bop_or => true
+    | Bop_xor, Bop_xor => true
+    | _, _ => false
+  end.
+
+Definition const_eqb (x y: const): bool := false.
+
+Definition exp_eqb (x y: exp): bool := false.
+
+Definition exp_eqb_to_eq (x y : exp): exp_eqb x y = true -> x = y.
+Proof. Admitted.
+
+Definition equation_eqb (x y: equation): bool :=
+  andb (fst x =? fst y) (exp_eqb (snd x) (snd y)).
+
+Definition equation_eqb_to_eq (x y : equation): equation_eqb x y = true -> x = y.
+Proof. Admitted.
+
+Definition equation_eq_to_eqb (x y : equation): x = y -> equation_eqb x y = true.
+Proof. Admitted.
