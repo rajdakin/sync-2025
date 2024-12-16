@@ -35,9 +35,6 @@ let () =
 
   let node = parse_file !input_file in
 
-  match Ordered.node_ordering node with
-  | Ok ordered_node -> (
-      match LustreOrdering.translate_node ordered_node with
-      | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
-      | Err x -> Printf.printf "Error lustre ordering translate: %s\n" x)
-  | Err x -> Printf.printf "Error node ordering: %s\n" x
+  match LustreOrdering.translate_node node with
+  | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
+  | Err x -> Printf.printf "Error lustre ordering translate: %s\n" x
