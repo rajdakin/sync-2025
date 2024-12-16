@@ -56,6 +56,9 @@ Definition node_eq (n1 n2: node) :=
   Permutation (n_locals n1) (n_locals n2) /\
   Permutation (n_body n1) (n_body n2).
 
+
+Definition var_bool := (0, TBool).
+
 Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
   match e with
     | EConst _ => acc

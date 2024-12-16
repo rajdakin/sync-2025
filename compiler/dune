@@ -1,0 +1,26 @@
+(coq.extraction
+ (prelude Extractor)
+ (extracted_modules
+  Ascii
+  Nat
+  List
+  Orders
+  String
+  Base
+  Datatypes
+  Mergesort
+  Result
+  Stream
+  Lustre
+  LustreOrdered
+  LustreOrdering)
+ (theories Reactive Reactive.Datatypes Reactive.Translations))
+
+(executable
+ (name main)
+ (public_name reactive))
+
+(env
+ (dev
+  (flags
+   (:standard -w -33))))
