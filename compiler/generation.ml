@@ -29,10 +29,8 @@ let rec pp_stmt fmt stmt =
   match stmt with
   | SAssign (x, e) -> fprintf fmt "%s %a =@ %a;" "char" pp_ident x pp_expr e
   | SSeq (s1, s2) -> fprintf fmt "%a \n %a" pp_stmt s1 pp_stmt s2
-  | SReturn r -> fprintf fmt "return %a;" pp_expr r
   | SNop -> fprintf fmt ""
 
 let pp_coq_method cm =
-  fprintf Format.std_formatter "char %a() { @[<h4>%a@] \n}" pp_fun_name
-    (m_name cm) pp_stmt (m_body cm)
-(* TODO: add return *)
+  fprintf Format.std_formatter "char %a() {@[<h4>@a\n return %a;\n@]}"
+    pp_fun_name (m_name cm) pp_stmt (m_body cm) pp_var (m_out cm)

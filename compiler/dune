@@ -1,23 +1,10 @@
 (coq.extraction
  (prelude Extractor)
  (extracted_modules
-  Ascii
-  List
-  Mergesort
-  Nat
-  Orders
-  String
-  Base
-  Datatypes
-  Dict
-  Result
-  Sorted
-  Stream
-  Lustre
-  LustreOrdered
-  LustreOrdering
-  LustreOrderedToImp
-  Imp)
+  Ascii Bool List Mergesort Nat Orders String
+  Base Datatypes Dict Result Sorted Stream 
+  Lustre LustreOrdered Imp
+  LustreOrdering LustreOrderedToImp)
  (theories Reactive Reactive.Datatypes Reactive.Translations))
 
 (executable
