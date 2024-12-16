@@ -135,13 +135,6 @@ Fixpoint has_var (e: exp): bool :=
     | EBinop _ e1 e2 => has_var e1 || has_var e2
   end.
 
-Fixpoint has_einput (e: exp): bool :=
-  match e with
-    | EInput _ => true
-    | EConst _ | EVar _ => false
-    | EBinop _ e1 e2 => has_einput e1 || has_einput e2
-  end.
-
 Fixpoint eval_exp (e: exp) (s: stack): option value :=
   match e with
     | EConst c => Some (VConst c)
@@ -198,8 +191,7 @@ Qed.
 Lemma type_eqb_refl (typ: type):
   type_eqb typ typ = true.
 Proof.
-  destruct typ.
-  - reflexivity.
+  destruct typ; reflexivity.
 Qed.
 
 Lemma binop_eqb_refl (op: binop):

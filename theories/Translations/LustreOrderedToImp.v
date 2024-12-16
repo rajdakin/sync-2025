@@ -50,26 +50,10 @@ Definition translate_history (h: Source.history): Target.stack :=
 Definition translate_node_body (body: list Source.equation): Target.stmt :=
   fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
 
-Lemma in_fst_has_snd {A B: Type} (x: A) (l: list (A * B)):
-  In x (map fst l) ->
-    exists y: B, In (x, y) l.
-Proof.
-  intros Hin.
-  induction l as [ | (y, ly) l IH ]; [ inversion Hin | ].
-  destruct Hin as [ Heq | Hin ].
-  - subst.
-    exists ly.
-    left.
-    reflexivity.
-  - specialize (IH Hin) as [ lx Hlx ].
-    exists lx.
-    right.
-    assumption.
-Qed.
-
 Lemma lustre_assignment_is_substmt (n: LustreOrdered.node_ordered) (name: ident) (exp: Source.exp):
-  In (name, exp) (Source.n_body (LustreOrdered.node_ordered_is_node n)) ->
-  Target.is_substmt (Target.SAssign name (translate_exp exp)) (translate_node_body (Source.n_body (LustreOrdered.node_ordered_is_node n))) = true.
+  let body := Source.n_body (LustreOrdered.node_ordered_is_node n) in
+  In (name, exp) body ->
+  Target.is_substmt (Target.SAssign name (translate_exp exp)) (translate_node_body body) = true.
 Proof.
   destruct n.
   destruct node_ordered_is_node.
@@ -115,7 +99,7 @@ Proof.
     Target.m_body := translate_node_body n_body
   |}).
 
-  apply in_fst_has_snd in n_assigned_out as Hexp.
+  apply Sorted.in_map_fst in n_assigned_out as Hexp.
   destruct Hexp as [ exp Hexp ].
   exists (translate_exp exp).
   replace n_body with (Source.n_body (LustreOrdered.node_ordered_is_node n')); [ | reflexivity ].

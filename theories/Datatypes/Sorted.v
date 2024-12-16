@@ -57,6 +57,25 @@ Fixpoint remove {A: Type} (i: nat) (l: list (nat * A)): list (nat * A) :=
 
 (** *** Relations between elements *)
 
+Lemma in_map_fst {A B} (y: A) (xs: list (A * B)):
+  In y (List.map fst xs) ->
+    exists ys, In (y, ys) xs.
+Proof.
+  induction xs as [| x xs IHxs ].
+  { inversion 1. }
+
+  intros [ | HIn ].
+  - subst.
+    exists (snd x).
+    left.
+    destruct x.
+    reflexivity.
+  - destruct (IHxs HIn) as [ ys HIn' ].
+    exists ys.
+    right.
+    assumption.
+Qed.
+
 Lemma fst_smaller_than_snd {A: Type} (p1 p2: nat * A) (l: list (nat * A)):
   t (p1 :: p2 :: l) -> fst p1 < fst p2.
 Proof.

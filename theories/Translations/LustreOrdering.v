@@ -1,6 +1,6 @@
 From Reactive Require Import Base.
 
-From Reactive.Datatypes Require List Result.
+From Reactive.Datatypes Require Result Sorted.
 From Reactive.Languages Require Lustre LustreOrdered.
 
 From Coq Require Import Sorting Permutation.
@@ -100,7 +100,7 @@ Proof.
   { assumption. }
 
   constructor.
-  { now apply List.in_map_fst. }
+  { now apply Sorted.in_map_fst. }
 
   inversion IHl'.
   + constructor.
