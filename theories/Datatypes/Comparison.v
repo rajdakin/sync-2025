@@ -5,7 +5,6 @@ Lemma lt_n_S_stt (n m: nat):
   n < m -> S n < S m.
 Proof. lia. Qed.
 
-
 Lemma refl (n: nat):
   n ?= n = Eq.
 Proof.

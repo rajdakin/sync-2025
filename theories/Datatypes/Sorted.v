@@ -130,26 +130,18 @@ Lemma not_twice {A: Type} (i: nat) (x: A) (l: list (nat * A)):
   ~ In i (List.map fst l).
 Proof.
   intros H.
-  induction l as [ | (j, y) l IH ].
-  - inversion 1.
-  - intros [ Heq | Hin ].
-    + subst.
-      apply fst_smaller_than_snd in H.
-      simpl in H.
-      apply PeanoNat.Nat.lt_irrefl with (x := j).
-      assumption.
-    + apply IH; [ | assumption ].
-      inversion H.
-      subst.
-      destruct l as [ | (k, z) l ]; [ constructor | ].
-      constructor.
-      * do 2 apply cons in H.
-        assumption.
-      * apply fst_smaller_than_snd in H as Hlt1.
-        apply cons in H.
-        apply fst_smaller_than_snd in H as Hlt2.
-        simpl in Hlt1, Hlt2.
-        apply PeanoNat.Nat.lt_trans with (m := j); assumption.
+
+  induction l as [| (j, y) l IH ].
+  { inversion 1. }
+
+  intros [ <- | Hin ].
+  { apply fst_smaller_than_snd in H.
+    simpl in H.
+    lia. }
+
+  apply IH; [| assumption ].
+  inversion H; subst.
+  now apply cons_cons with (j, y).
 Qed.
 
 (** *** Find *)
@@ -158,46 +150,42 @@ Lemma find_some_is_in {A: Type} (i: nat) (x: A) (l: list (nat * A)):
   find i l = Some x -> In (i, x) l.
 Proof.
   intros H.
-  induction l as [ | (j, y) l IH ].
-  - inversion H.
-  - simpl in *.
-    destruct (i =? j) eqn: Hcomp.
-    + inversion H.
-      apply PeanoNat.Nat.eqb_eq in Hcomp.
-      left.
-      subst.
-      reflexivity.
-    + right.
-      apply IH.
-      assumption.
+
+  induction l as [| (j, y) l IH ].
+  { inversion H. }
+
+  simpl in *.
+  destruct (i =? j) eqn: Hcomp.
+  - left.
+    inversion H.
+    f_equal; symmetry.
+    now apply PeanoNat.Nat.eqb_eq.
+
+  - right.
+    now apply IH.
 Qed.
 
 Lemma in_find_some {A: Type} (i: nat) (x: A) (l: list (nat * A)):
   t l ->
   In (i, x) l ->
-    find i l = Some x.
+  find i l = Some x.
 Proof.
   intros Hsort Hin.
-  induction l as [ | (j, y) l IH ]; [ inversion Hin | ].
-  destruct Hin as [ Heq | Hin ].
-  - inversion Heq.
-    subst.
-    simpl.
-    rewrite PeanoNat.Nat.eqb_refl.
-    reflexivity.
-  - simpl.
-    destruct (i =? j) eqn: Hcomp.
-    + exfalso.
-      apply PeanoNat.Nat.eqb_eq in Hcomp.
-      subst.
-      apply not_twice with (i := j) (x := y) (l := l); [ assumption | ].
-      change (In (fst (j, x)) (List.map fst l)).
-      apply in_map with (f := fst).
-      assumption.
-    + apply IH.
-      * apply cons in Hsort.
-        assumption.
-      * assumption.
+
+  induction l as [| (j, y) l IH ].
+  { inversion Hin. }
+
+  destruct Hin as [ -> | Hin ]; simpl.
+  { now rewrite PeanoNat.Nat.eqb_refl. }
+
+  destruct (i =? j) eqn: Hcomp.
+  2: { apply cons in Hsort. now apply IH. }
+
+  exfalso.
+  apply PeanoNat.Nat.eqb_eq in Hcomp; subst.
+  apply not_twice with (i := j) (x := y) (l := l); [ assumption |].
+  change (In (fst (j, x)) (List.map fst l)).
+  now apply in_map with (f := fst).
 Qed.
 
 (** *** Add *)
@@ -287,48 +275,46 @@ Qed.
 Lemma find_other_added_element {A: Type} (i j: nat) (x y: A) (l: list (nat * A)):
   find i l = Some x ->
   i <> j ->
-    find i (add j y l) = Some x.
+  find i (add j y l) = Some x.
 Proof.
   intros Hfind Hne.
   apply PeanoNat.Nat.eqb_neq in Hne.
-  induction l as [ | (k, z) l IH ]; [ discriminate | ].
-  simpl in *.
-  destruct (j ?= k) eqn: Hcomp.
-  - simpl.
-    apply Comparison.eq_is_eq in Hcomp.
-    subst.
-    rewrite Hne in *.
-    assumption.
-  - simpl.
-    rewrite Hne.
-    assumption.
-  - simpl.
-    destruct (i =? k); [ assumption | ].
-    apply IH.
-    assumption.
+
+  induction l as [| (k, z) l IH ].
+  { discriminate. }
+
+  simpl in Hfind |- *.
+  destruct (j ?= k) eqn: Hcomp; simpl.
+  - apply Comparison.eq_is_eq in Hcomp; subst.
+    now rewrite Hne in Hfind |- *.
+  - now rewrite Hne.
+  - destruct (i =? k); [ assumption |].
+    now apply IH.
 Qed.
 
 (** *** Remove *)
 
 Lemma remove_sorted {A: Type} (i: nat) (l: list (nat * A)):
-  Sorted.t l ->
-  Sorted.t (Sorted.remove i l).
+  t l ->
+  t (remove i l).
 Proof.
   intros H.
   revert i.
-  induction l as [ | (j, x) l IH ]; intros i; [ constructor | ].
-  apply Sorted.cons in H as Hinner.
-  simpl.
-  destruct (i =? j); [ assumption | ].
-  destruct l as [ | (k, z) l ]; [ constructor | ].
-  specialize (IH Hinner i).
-  simpl in *.
+
+  induction l as [| (j, x) l IH ]; intros i.
+  { constructor. }
+
+  apply cons in H as Hinner; simpl.
+  destruct (i =? j); [ assumption |].
+
+  destruct l as [| (k, z) l ].
+  { constructor. }
+
+  specialize (IH Hinner i); simpl in *.
   destruct (i =? k).
-  - apply Sorted.cons_cons in H.
-    assumption.
-  - constructor; [ assumption | ].
-    apply Sorted.fst_smaller_than_snd in H.
-    assumption.
+  - now apply cons_cons in H.
+  - constructor; [ assumption |].
+    now apply fst_smaller_than_snd in H.
 Defined.
 
 (** *** Map *)
@@ -337,16 +323,17 @@ Lemma map_sorted {A B: Type} (f: A -> B) (l: list (nat * A)):
   t l -> t (map f l).
 Proof.
   intros Hsort.
-  simpl.
-  induction l as [ | (i, x) l IH ]; [ constructor | ].
-  destruct l as [ | (j, y) l ]; [ constructor | ].
-  simpl.
+
+  induction l as [| (i, x) l IH ].
+  { constructor. }
+
+  destruct l as [| (j, y) l ]; simpl.
+  { constructor. }
+
   constructor.
-  - apply IH.
-    apply Sorted.cons in Hsort.
-    assumption.
-  - apply Sorted.fst_smaller_than_snd in Hsort.
-    assumption.
+  + apply IH.
+    now apply cons in Hsort.
+  + now apply fst_smaller_than_snd in Hsort.
 Defined.
 
 (** *** Minimum *)
@@ -355,28 +342,27 @@ Lemma sorted_min {A: Type} (i: nat) (x: A) (l: list (nat * A)):
   t ((i, x) :: l) ->
   min ((i, x) :: l) = Some i.
 Proof.
-  intros Hsort.
-  revert i x Hsort.
-  induction l as [ | (j, y) l IH ]; intros i x Hsort; [ reflexivity | ].
+  revert i x.
+
+  induction l as [| (j, y) l IH ]; intros i x Hsort.
+  { reflexivity. }
+
   simpl in *.
   destruct (min l).
-  - f_equal.
-    assert (Some (Nat.min j n) = Some j).
-    + apply IH with (x := y).
-      apply cons in Hsort.
-      assumption.
-    + inversion H.
-      rewrite H1.
-      rewrite H1.
-      apply PeanoNat.Nat.min_l.
-      apply PeanoNat.Nat.lt_le_incl.
-      apply fst_smaller_than_snd in Hsort.
-      assumption.
-  - apply fst_smaller_than_snd in Hsort.
+  - assert (Some (Nat.min j n) = Some j).
+    { apply IH with (x := y).
+      now apply cons in Hsort. }
+
+    inversion H.
+    apply fst_smaller_than_snd in Hsort.
+    simpl in Hsort.
     f_equal.
-    apply PeanoNat.Nat.min_l.
-    apply PeanoNat.Nat.lt_le_incl.
-    assumption.
+    lia.
+
+  - apply fst_smaller_than_snd in Hsort.
+    simpl in Hsort.
+    f_equal.
+    lia.
 Qed.
 
 (** *** Inclusion in sorted lists *)
@@ -392,37 +378,37 @@ Lemma incl_cons_same_elt {A: Type} (i: nat) (x: A) (l1 l2: list (nat * A)):
   incl l1 l2.
 Proof.
   intros Hincl Hsort1 Hsort2 (j, y) Hin.
-  destruct l1 as [ | (k, z) l1 ]; [ inversion Hin | ].
+
+  destruct l1 as [| (k, z) l1 ].
+  { inversion Hin. }
+
   pose proof Hincl as H.
-  specialize (H (j, y) (in_cons _ _ _ Hin)) as [ Heq | H ]; [ | assumption ].
+  specialize (H (j, y) (in_cons _ _ _ Hin)) as [ Heq | H ]; [| assumption ].
+
   exfalso.
-  inversion Heq.
-  subst.
-  clear Heq.
+  inversion Heq; subst.
   apply lt_not_le_stt with (n := j) (m := k).
-  - apply Sorted.fst_smaller_than_snd in Hsort1.
-    assumption.
-  - apply in_le in Hin; [ assumption | ].
-    apply cons in Hsort1.
-    assumption.
+  - now apply fst_smaller_than_snd in Hsort1.
+  - apply in_le in Hin; [ assumption |].
+    now apply cons in Hsort1.
 Qed.
 
 (** *** No duplicate *)
 
 Lemma no_dup_left_handside {A: Type} (l: list (nat * A)):
-  Sorted.t l ->
+  t l ->
   NoDup (List.map fst l).
 Proof.
   intros Hsort.
-  simpl.
-  induction l as [ | (i, x) l IH ]; [ constructor | ].
+
+  induction l as [| (i, x) l IH ].
+  { constructor. }
+
   simpl.
   constructor.
-  - apply Sorted.not_twice with (x := x).
-    assumption.
-  - apply IH.
-    apply Sorted.cons in Hsort.
-    assumption.
+  - now apply not_twice with (x := x).
+  - apply cons in Hsort.
+    now apply IH.
 Qed.
 
 (** *** Equivalence *)
@@ -430,60 +416,56 @@ Qed.
 Lemma equivalence_head {A: Type} (i j: nat) (x y: A) (l1 l2: list (nat * A)):
   incl ((i, x) :: l1) ((j, y) :: l2) ->
   incl ((j, y) :: l2) ((i, x) :: l1) ->
-  Sorted.t ((i, x) :: l1) ->
-  Sorted.t ((j, y) :: l2) ->
+  t ((i, x) :: l1) ->
+  t ((j, y) :: l2) ->
     (i, x) = (j, y).
 Proof.
   intros Hincl1 Hincl2 Hsort1 Hsort2.
-  apply Sorted.sorted_min in Hsort1 as Hmin1.
-  apply Sorted.sorted_min in Hsort2 as Hmin2.
+  apply sorted_min in Hsort1 as Hmin1.
+  apply sorted_min in Hsort2 as Hmin2.
+
   specialize (Hincl1 (i, x) (in_eq _ _)).
-  pose proof (Sorted.in_le _ _ _ _ _ Hsort2 Hincl1) as Hle1.
+  pose proof (in_le _ _ _ _ _ Hsort2 Hincl1) as Hle1.
   specialize (Hincl2 (j, y) (in_eq _ _)).
-  pose proof (Sorted.in_le _ _ _ _ _ Hsort1 Hincl2) as Hle2.
+  pose proof (in_le _ _ _ _ _ Hsort1 Hincl2) as Hle2.
   pose proof (PeanoNat.Nat.le_antisymm i j Hle2 Hle1).
   subst.
-  destruct Hincl1 as [ Heq | Hin ]; [ auto | ].
+
+  destruct Hincl1 as [ Heq | Hin ]; [ now symmetry |].
   exfalso.
   pose proof (no_dup_left_handside ((j, y) :: l2) Hsort2).
   simpl in H.
   apply NoDup_cons_iff in H as [ H _ ].
   apply H.
-  apply in_map with (f := fst) in Hin.
-  assumption.
+  now apply in_map with (f := fst) in Hin.
 Qed.
 
 Lemma equivalence_is_eq {A: Type} (l1 l2: list (nat * A)):
   incl l1 l2 ->
   incl l2 l1 ->
-  Sorted.t l1 ->
-  Sorted.t l2 ->
+  t l1 ->
+  t l2 ->
     l1 = l2.
 Proof.
-  intros Hincl1 Hincl2 Hsort1 Hsort2.
-  revert l2 Hincl1 Hincl2 Hsort2.
-  induction l1 as [ | (i, x) l1 IH ]; intros l2 Hincl1 Hincl2 Hsort2.
-  - symmetry.
-    apply incl_l_nil.
-    assumption.
-  - destruct l2 as [ | (j, y) l2 ].
-    + apply incl_l_nil in Hincl1.
-      discriminate.
-    + f_equal.
-      * apply equivalence_head with (l1 := l1) (l2 := l2); assumption.
-      * apply IH.
-        -- apply Sorted.cons in Hsort1.
-           assumption.
-        -- assert ((i, x)  = (j, y)) as H.
-           { apply equivalence_head with (l1 := l1) (l2 := l2); assumption. }
-           inversion H.
-           subst.
-           apply Sorted.incl_cons_same_elt with (i := j) (x := y); assumption.
-        -- assert ((i, x)  = (j, y)) as H.
-           { apply equivalence_head with (l1 := l1) (l2 := l2); assumption. }
-           inversion H.
-           subst.
-           apply Sorted.incl_cons_same_elt with (i := j) (x := y); assumption.
-        -- apply Sorted.cons in Hsort2.
-           assumption.
+  intros Hincl1 Hincl2 Hsort1.
+  revert l2 Hincl1 Hincl2.
+
+  induction l1 as [| (i, x) l1 IH ]; intros l2 Hincl1 Hincl2 Hsort2.
+  { symmetry. now apply incl_l_nil. }
+
+  destruct l2 as [| (j, y) l2 ].
+  { now apply incl_l_nil in Hincl1. }
+
+  f_equal.
+  { now apply equivalence_head with (l1 := l1) (l2 := l2). }
+
+  assert ((i, x) = (j, y)) as H.
+  { now apply equivalence_head with (l1 := l1) (l2 := l2). }
+  inversion H; subst.
+
+  apply IH.
+  - now apply cons in Hsort1.
+  - now apply incl_cons_same_elt with (i := j) (x := y).
+  - now apply incl_cons_same_elt with (i := j) (x := y).
+  - now apply cons in Hsort2.
 Qed.

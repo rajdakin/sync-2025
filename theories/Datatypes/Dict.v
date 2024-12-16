@@ -52,8 +52,6 @@ Definition inclusion {A: Type} (d1 d2: t A): Prop :=
 Definition equivalence {A: Type} (d1 d2: t A): Prop :=
   inclusion d1 d2 /\ inclusion d2 d1.
 
-Definition ForAll {A: Type} (P: ident -> A -> Prop) (d: t A): Prop :=
-  forall (i: ident) (x: A), Dict.maps_to i x d -> P i x.
 
 (** ** Proofs *)
 
@@ -72,35 +70,35 @@ Lemma maps_to_add {A: Type} (i j: nat) (x y: A) (d: t A):
   i <> j ->
     maps_to i x (add j y d).
 Proof.
-  intros Hmaps Hne.
   destruct d as [ l Hsort ].
-  unfold maps_to, find in *.
-  simpl in *.
+  unfold maps_to, find; simpl.
+
+  intros Hmaps Hne.
   apply Sorted.find_some_is_in in Hmaps.
+
   apply Sorted.in_find_some.
-  - apply Sorted.add_sorted.
-    assumption.
-  - induction l as [ | (k, z) l IH ]; [ inversion Hmaps | ].
-    simpl.
-    destruct (j ?= k) eqn: Hcomp.
-    + apply Comparison.eq_is_eq in Hcomp.
-      subst.
-      destruct Hmaps as [ Heq | Hin ].
-      * exfalso.
-        apply Hne.
-        inversion Heq.
-        reflexivity.
-      * right.
-        assumption.
-    + right.
-      assumption.
-    + destruct Hmaps as [ Heq | Hin ].
-      * left.
-        assumption.
-      * right.
-        apply IH; [ | assumption ].
-        apply Sorted.cons in Hsort.
-        assumption.
+  { now apply Sorted.add_sorted. }
+
+  induction l as [| (k, z) l IH ]; simpl.
+  { inversion Hmaps. }
+
+  destruct (j ?= k) eqn: Hcomp.
+  - apply Comparison.eq_is_eq in Hcomp; subst.
+    destruct Hmaps as [ Heq | Hin ].
+    2: { now right. }
+
+    exfalso.
+    apply Hne.
+    now inversion Heq.
+
+  - now right.
+
+  - destruct Hmaps as [ Heq | Hin ].
+    { now left. }
+
+    right.
+    apply IH; [| assumption ].
+    now apply Sorted.cons in Hsort.
 Qed.
 
 (** *** Map *)
@@ -109,17 +107,18 @@ Lemma maps_to_map {A B: Type} (f: A -> B) (i: nat) (x: A) (d: t A):
   maps_to i x d -> maps_to i (f x) (map f d).
 Proof.
   destruct d as [ l Hsort ].
-  unfold map, maps_to, find.
-  simpl.
+  unfold map, maps_to, find; simpl.
+
   intros H.
-  induction l as [ | (j, y) l IH ]; [ discriminate | ].
+  induction l as [| (j, y) l IH ].
+  { discriminate. }
+
   simpl in *.
   destruct (i =? j).
-  - inversion H.
-    reflexivity.
-  - apply IH; [ | assumption ].
-    apply Sorted.cons in Hsort.
-    assumption.
+  { now inversion H. }
+
+  apply IH; [| assumption ].
+  now apply Sorted.cons in Hsort.
 Qed.
 
 (** *** Remove *)
@@ -342,109 +341,123 @@ Qed.
 
 (** *** Equivalence consequences *)
 
-Lemma remove_then_add_same_elt {A: Type} (i: nat) (x: A) (d: t A):
-  maps_to i x d ->
-    d = add i x (remove i d).
+Lemma incl_add_remove_l {A: Type} (i: nat) (x: A) (d: t A):
+  maps_to i x d -> inclusion d (add i x (remove i d)).
+Proof.
+  destruct d as [ l Hsort ].
+  intros H j y Hmaps.
+  unfold maps_to, find in *.
+  simpl in *.
+  destruct (PeanoNat.Nat.eq_dec j i).
+  + subst.
+    rewrite H in Hmaps.
+    inversion Hmaps.
+    apply Sorted.add_find_new_element.
+  + induction l as [ | (k, z) l IH ]; [ discriminate | ].
+    simpl in *.
+    destruct (i =? k) eqn: Heqik.
+    * apply Sorted.cons in Hsort.
+      change (maps_to j y (add i x {| d_elements := l; d_sorted := Hsort |})).
+      apply maps_to_add; [ | assumption ].
+      destruct (j =? k) eqn: Heqjk.
+      -- inversion Hmaps.
+         subst.
+         exfalso.
+         apply n.
+         apply PeanoNat.Nat.eqb_eq in Heqik, Heqjk.
+         subst.
+         reflexivity.
+      -- unfold maps_to, find.
+         simpl.
+         assumption.
+    * simpl.
+      destruct (i ?= k) eqn: Hcomp.
+      -- exfalso.
+         apply PeanoNat.Nat.eqb_neq in Heqik.
+         apply Comparison.eq_is_eq in Hcomp.
+         auto.
+      -- simpl.
+         apply PeanoNat.Nat.eqb_neq in n.
+         rewrite n.
+         destruct (j =? k); [ assumption | ].
+         apply Sorted.cons in Hsort.
+         change (maps_to j y (remove i {| d_elements := l; d_sorted := Hsort |})).
+         apply PeanoNat.Nat.eqb_neq in n.
+         apply maps_to_not_removed; [ | assumption ].
+         unfold maps_to, find.
+         assumption.
+      -- simpl.
+         destruct (j =? k); [ assumption | ].
+         apply IH; [ | assumption | assumption ].
+         apply Sorted.cons in Hsort.
+         assumption.
+Qed.
+
+Lemma incl_add_remove_r {A: Type} (i: nat) (x: A) (d: t A):
+  maps_to i x d -> inclusion (add i x (remove i d)) d.
 Proof.
   destruct d as [ l Hsort ].
   simpl.
+  intros H j y Hmaps.
+  unfold maps_to, find in *.
+  simpl in *.
+  induction l as [ | (k, z) l IH ]; [ discriminate | ].
+  simpl in *.
+  destruct (j =? k) eqn: Heqjk.
+  + apply PeanoNat.Nat.eqb_eq in Heqjk.
+    subst.
+    destruct (i =? k) eqn: Heqik.
+    * apply PeanoNat.Nat.eqb_eq in Heqik.
+      subst.
+      pose proof (Sorted.add_find_new_element k x l) as H'.
+      simpl in *.
+      rewrite H' in Hmaps.
+      inversion H.
+      inversion Hmaps.
+      reflexivity.
+    * simpl in Hmaps.
+      destruct (i ?= k) eqn: Hcomp.
+      -- exfalso.
+         apply PeanoNat.Nat.eqb_neq in Heqik.
+         apply Comparison.eq_is_eq in Hcomp.
+         auto.
+      -- simpl in Hmaps.
+         rewrite PeanoNat.Nat.eqb_sym in Heqik.
+         rewrite Heqik in Hmaps.
+         rewrite PeanoNat.Nat.eqb_refl in Hmaps.
+         assumption.
+      -- simpl in Hmaps.
+         rewrite PeanoNat.Nat.eqb_refl in Hmaps.
+         assumption.
+  + destruct (i =? k) eqn: Heqik.
+    * apply PeanoNat.Nat.eqb_eq in Heqik.
+      inversion H.
+      subst.
+      apply PeanoNat.Nat.eqb_neq in Heqjk.
+      apply Sorted.add_find_other_element in Hmaps; assumption.
+    * apply PeanoNat.Nat.eqb_neq in Heqik.
+      apply IH.
+      -- apply Sorted.cons in Hsort.
+         assumption.
+      -- assumption.
+      -- destruct (PeanoNat.Nat.eq_dec i j) as [ eq | ne ].
+         ++ subst.
+            rewrite Sorted.add_find_new_element in *.
+            assumption.
+         ++ apply Sorted.add_find_other_element in Hmaps; [ | symmetry; assumption ].
+            simpl in Hmaps.
+            rewrite Heqjk in Hmaps.
+            apply Sorted.find_other_added_element; [ assumption | ].
+            auto.
+Qed.
+
+Lemma remove_then_add_same_elt {A: Type} (i: nat) (x: A) (d: t A):
+  maps_to i x d -> d = add i x (remove i d).
+Proof.
   intros H.
   apply equivalence_is_eq.
+
   split.
-  - intros j y Hmaps.
-    unfold maps_to, find in *.
-    simpl in *.
-    destruct (PeanoNat.Nat.eq_dec j i).
-    + subst.
-      rewrite H in Hmaps.
-      inversion Hmaps.
-      apply Sorted.add_find_new_element.
-    + induction l as [ | (k, z) l IH ]; [ discriminate | ].
-      simpl in *.
-      destruct (i =? k) eqn: Heqik.
-      * apply Sorted.cons in Hsort.
-        change (maps_to j y (add i x {| d_elements := l; d_sorted := Hsort |})).
-        apply maps_to_add; [ | assumption ].
-        destruct (j =? k) eqn: Heqjk.
-        -- inversion Hmaps.
-           subst.
-           exfalso.
-           apply n.
-           apply PeanoNat.Nat.eqb_eq in Heqik, Heqjk.
-           subst.
-           reflexivity.
-        -- unfold maps_to, find.
-           simpl.
-           assumption.
-      * simpl.
-        destruct (i ?= k) eqn: Hcomp.
-        -- exfalso.
-           apply PeanoNat.Nat.eqb_neq in Heqik.
-           apply Comparison.eq_is_eq in Hcomp.
-           auto.
-        -- simpl.
-           apply PeanoNat.Nat.eqb_neq in n.
-           rewrite n.
-           destruct (j =? k); [ assumption | ].
-           apply Sorted.cons in Hsort.
-           change (maps_to j y (remove i {| d_elements := l; d_sorted := Hsort |})).
-           apply PeanoNat.Nat.eqb_neq in n.
-           apply maps_to_not_removed; [ | assumption ].
-           unfold maps_to, find.
-           assumption.
-        -- simpl.
-           destruct (j =? k); [ assumption | ].
-           apply IH; [ | assumption | assumption ].
-           apply Sorted.cons in Hsort.
-           assumption.
-  - intros j y Hmaps.
-    unfold maps_to, find in *.
-    simpl in *.
-    induction l as [ | (k, z) l IH ]; [ discriminate | ].
-    simpl in *.
-    destruct (j =? k) eqn: Heqjk.
-    + apply PeanoNat.Nat.eqb_eq in Heqjk.
-      subst.
-      destruct (i =? k) eqn: Heqik.
-      * apply PeanoNat.Nat.eqb_eq in Heqik.
-        subst.
-        pose proof (Sorted.add_find_new_element k x l) as H'.
-        rewrite H' in Hmaps.
-        inversion H.
-        inversion Hmaps.
-        reflexivity.
-      * simpl in Hmaps.
-        destruct (i ?= k) eqn: Hcomp.
-        -- exfalso.
-           apply PeanoNat.Nat.eqb_neq in Heqik.
-           apply Comparison.eq_is_eq in Hcomp.
-           auto.
-        -- simpl in Hmaps.
-           rewrite PeanoNat.Nat.eqb_sym in Heqik.
-           rewrite Heqik in Hmaps.
-           rewrite PeanoNat.Nat.eqb_refl in Hmaps.
-           assumption.
-        -- simpl in Hmaps.
-           rewrite PeanoNat.Nat.eqb_refl in Hmaps.
-           assumption.
-    + destruct (i =? k) eqn: Heqik.
-      * apply PeanoNat.Nat.eqb_eq in Heqik.
-        inversion H.
-        subst.
-        apply PeanoNat.Nat.eqb_neq in Heqjk.
-        apply Sorted.add_find_other_element in Hmaps; assumption.
-      * apply PeanoNat.Nat.eqb_neq in Heqik.
-        apply IH.
-        -- apply Sorted.cons in Hsort.
-           assumption.
-        -- assumption.
-        -- destruct (PeanoNat.Nat.eq_dec i j) as [ eq | ne ].
-           ++ subst.
-              rewrite Sorted.add_find_new_element in *.
-              assumption.
-           ++ apply Sorted.add_find_other_element in Hmaps; [ | symmetry; assumption ].
-              simpl in Hmaps.
-              rewrite Heqjk in Hmaps.
-              apply Sorted.find_other_added_element; [ assumption | ].
-              auto.
+  - now apply incl_add_remove_l.
+  - now apply incl_add_remove_r.
 Qed.
