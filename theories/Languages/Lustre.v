@@ -45,6 +45,7 @@ Record node := mk_node {
 
   n_assigned_vars_are_vars: incl n_assigned_vars (map fst n_vars);
   n_assigned_out: In (fst n_out) n_assigned_vars;
+  n_out_is_not_an_input: ~ In n_out n_in;
   n_inputs_equations: incl (List.map (fun b => (fst b, EInput b)) n_in) n_body;
   n_no_einputs_in_other: Forall (fun '(name, exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
 }.

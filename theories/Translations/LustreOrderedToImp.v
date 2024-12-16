@@ -50,18 +50,78 @@ Definition translate_history (h: Source.history): Target.stack :=
 Definition translate_node_body (body: list Source.equation): Target.stmt :=
   fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
 
-Definition tranlsate_lustre_node (n: Source.node): Target.method := {|
-    Target.m_name := Source.n_name n;
+Lemma in_fst_has_snd {A B: Type} (x: A) (l: list (A * B)):
+  In x (map fst l) ->
+    exists y: B, In (x, y) l.
+Proof.
+  intros Hin.
+  induction l as [ | (y, ly) l IH ]; [ inversion Hin | ].
+  destruct Hin as [ Heq | Hin ].
+  - subst.
+    exists ly.
+    left.
+    reflexivity.
+  - specialize (IH Hin) as [ lx Hlx ].
+    exists lx.
+    right.
+    assumption.
+Qed.
 
-    Target.m_in := map translate_binder (Source.n_in n);
-    Target.m_out := translate_type (snd (Source.n_out n));
-    Target.m_vars := map translate_binder (Source.n_vars n);
+Lemma lustre_assignment_is_substmt (n: LustreOrdered.node_ordered) (name: ident) (exp: Source.exp):
+  In (name, exp) (Source.n_body (LustreOrdered.node_ordered_is_node n)) ->
+  Target.is_substmt (Target.SAssign name (translate_exp exp)) (translate_node_body (Source.n_body (LustreOrdered.node_ordered_is_node n))) = true.
+Proof.
+  destruct n.
+  destruct node_ordered_is_node.
+  simpl in *.
+  intros Hin.
+  clear n_assigned_out n_inputs_equations n_no_einputs_in_other.
+  induction n_body as [ | (eq_left, eq_right) body IH ]; [ inversion Hin | ].
+  simpl.
+  apply Bool.orb_true_intro.
+  destruct Hin as [ Heq | Hin ].
+  - inversion Heq.
+    subst.
+    right.
+    rewrite (PeanoNat.Nat.eqb_refl).
+    simpl.
+    rewrite Target.exp_eqb_refl.
+    reflexivity.
+  - left.
+    apply IH.
+    + intros i Hi.
+      pose proof (in_cons eq_left _ _ Hi) as H.
+      apply n_assigned_vars_are_vars in H.
+      assumption.
+    + apply Ordered.cons in ordered.
+      assumption.
+    + assumption.
+Qed.
 
-    Target.m_body := translate_node_body n.(Source.n_body)
-|}.
+Definition translate_node (n: LustreOrdered.node_ordered): Target.method.
+Proof.
+  pose n as n'.
+  destruct n.
+  destruct node_ordered_is_node.
+  simpl in *.
 
-Definition translate_node (n: LustreOrdered.node_ordered): Target.method :=
-  tranlsate_lustre_node (LustreOrdered.node_ordered_is_node n).
+  refine ({|
+    Target.m_name := n_name;
+
+    Target.m_in := map translate_binder n_in;
+    Target.m_out := translate_binder n_out;
+    Target.m_vars := map translate_binder n_vars;
+
+    Target.m_body := translate_node_body n_body
+  |}).
+
+  apply in_fst_has_snd in n_assigned_out as Hexp.
+  destruct Hexp as [ exp Hexp ].
+  exists (translate_exp exp).
+  replace n_body with (Source.n_body (LustreOrdered.node_ordered_is_node n')); [ | reflexivity ].
+  apply lustre_assignment_is_substmt.
+  assumption.
+Defined.
 
 
 (** Lemmas *)
