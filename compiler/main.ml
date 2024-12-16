@@ -1,32 +1,43 @@
-(*
-  Example: in = [ a; b ], out = c
-    y = x && (false || a)
-    z = (b <> a) || (y && x)
-    c = x && (b || z)
-    x = true || a
+open Parser
+open Printf
+open Arg
 
-  x -> 0
-  y -> 1
-  z -> 2
-  a -> 3
-  b -> 4
-  c -> 5
-*)
+let usage_message = "compiler <file>"
+let input_file = ref ""
+let entry_file file = input_file := file
+
+let parse_file filename =
+  let tbool = snd Lustre.var_bool in
+  let inx = open_in filename in
+  let lexbuf = Lexing.from_channel inx in
+  let name, locals, ret, eqs =
+    match Parser.node Lexer.token lexbuf with
+    | v -> v
+    | exception Lexer.Error msg ->
+        eprintf "lexer error: %s" msg;
+        exit 1
+    | exception Lexer.Eof ->
+        eprintf "end of file";
+        exit 1
+  in
+  close_in inx;
+  Lustre.
+    {
+      n_name = name;
+      n_in = [];
+      n_out = (ret, tbool);
+      n_locals = locals;
+      n_body = eqs;
+    }
 
 let () =
-  let tbool = snd Lustre.var_bool in
-  let node = {
-     Lustre.n_name = 0;
-     Lustre.n_in = [(* (3, tbool); (4, tbool) *)];
-     Lustre.n_out = (5, tbool);
-     Lustre.n_locals = [(0, tbool); (2, tbool); (1, tbool)];
-     Lustre.n_body = [
-      (1, Lustre.EBinop (Lustre.Bop_and, Lustre.EVar (0, tbool), Lustre.EBinop (Lustre.Bop_or, Lustre.EConst (Stream.from false), Lustre.EVar (0, tbool))));
-      (2, Lustre.EBinop (Lustre.Bop_or, Lustre.EBinop (Lustre.Bop_xor, Lustre.EVar (1, tbool), Lustre.EVar (0, tbool)), Lustre.EBinop (Lustre.Bop_and, Lustre.EVar (1, tbool), Lustre.EVar (0, tbool))));
-      (5, Lustre.EBinop (Lustre.Bop_and, Lustre.EVar (0, tbool), Lustre.EBinop (Lustre.Bop_or, Lustre.EVar (1, tbool), Lustre.EVar (2, tbool))));
-      (0, Lustre.EBinop (Lustre.Bop_or, Lustre.EConst (Stream.from true), Lustre.EConst (Stream.from false)))
-     ]
-  } [@@ocamlformat "disable"] in
-  match LustreOrdering.translate_node node with
-  | Result.Ok _ -> Printf.printf "Success\n"
-  | Result.Err x -> Printf.printf "Error: %s\n" x
+  Arg.parse [] entry_file usage_message;
+
+  let node = parse_file !input_file in
+
+  match Ordered.node_ordering node with
+  | Ok ordered_node -> (
+      match LustreOrdering.translate_node ordered_node with
+      | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
+      | Err x -> Printf.printf "Error lustre ordering translate: %s\n" x)
+  | Err x -> Printf.printf "Error node ordering: %s\n" x

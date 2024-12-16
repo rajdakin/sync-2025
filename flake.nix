@@ -33,7 +33,11 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = with packages; [ theories ];
-          packages = [ coqPackages.vscoq-language-server ocamlPackages.ocamlformat ];
+          packages =
+                   (with coqPackages; [ vscoq-language-server ])
+                   ++ (with ocamlPackages; [
+                      ocamlformat menhir merlin ocaml-lsp
+                   ]);
         };
 
         formatter = pkgs.nixfmt-rfc-style;

@@ -1,15 +1,34 @@
 (coq.extraction
  (prelude Extractor)
  (extracted_modules
-  Ascii List Mergesort Nat Orders String
-  Base Datatypes Dict Result Sorted Stream
-  Lustre LustreOrdered
-  LustreOrdering)
+  Ascii
+  List
+  Mergesort
+  Nat
+  Orders
+  String
+  Base
+  Datatypes
+  Dict
+  Result
+  Sorted
+  Stream
+  Lustre
+  LustreOrdered
+  LustreOrdering
+  LustreOrderedToImp
+  Imp)
  (theories Reactive Reactive.Datatypes Reactive.Translations))
 
 (executable
  (name main)
  (public_name reactive))
+
+(ocamllex
+ (modules lexer))
+
+(menhir
+ (modules parser))
 
 (env
  (dev
