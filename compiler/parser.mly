@@ -1,5 +1,5 @@
 %{
-    open Extracted.Lustre
+    open Extracted.LustreAst
 
     let ident_map = Hashtbl.create 19
     let gen_id =
@@ -93,7 +93,7 @@ const:
 expr:
   | LPAREN e = expr RPAREN    { e }
   | c = const                 { EConst(c) }
-  | v = var                   { EVar((v, snd Extracted.Lustre.var_bool)) }
+  | v = var                   { EVar((v, TBool)) }
   | e1 = expr AND e2 = expr   { EBinop(Bop_and, e1, e2) }
   | e1 = expr OR e2 = expr    { EBinop(Bop_or, e1, e2) }
   | e1 = expr XOR e2 = expr   { EBinop(Bop_xor, e1, e2) }

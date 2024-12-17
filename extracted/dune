@@ -3,7 +3,7 @@
  (extracted_modules
   Ascii Bool List Mergesort Nat Orders String
   Base Datatypes Dict Result Sorted Stream
-  Lustre LustreOrdered Imp
+  LustreAst Lustre LustreOrdered Imp
   LustreOrdering LustreOrderedToImp)
  (theories Reactive Reactive.Datatypes Reactive.Translations))
 

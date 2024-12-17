@@ -19,9 +19,9 @@ Scheme Equality for list.
 Module EquationOrder <: Orders.TotalLeBool.
   Local Coercion is_true : bool >-> Sortclass.
 
-  Definition t := Source.equation.
+  Definition t := LustreAst.equation.
 
-  Definition leb (x y: Source.equation): bool := Nat.leb (fst x) (fst y).
+  Definition leb (x y: LustreAst.equation): bool := Nat.leb (fst x) (fst y).
   Infix "<=?" := leb (at level 70, no associativity).
 
   Theorem leb_total: forall x y, x <=? y \/ y <=? x.
@@ -38,24 +38,24 @@ Module Import EquationSort := Sort EquationOrder.
 
 
 Definition list_eq_dec_binder :=
-  list_eq_dec _ Source.binder_eqb Source.binder_eqb_to_eq Source.binder_eq_to_eqb.
+  list_eq_dec _ LustreAst.binder_eqb LustreAst.binder_eqb_to_eq LustreAst.binder_eq_to_eqb.
 
 Definition list_eq_dec_equation :=
-  list_eq_dec _ Source.equation_eqb Source.equation_eqb_to_eq Source.equation_eq_to_eqb.
+  list_eq_dec _ LustreAst.equation_eqb LustreAst.equation_eqb_to_eq LustreAst.equation_eq_to_eqb.
 
 Definition check_eq_node (source guess: Source.node): Result.t (Source.node_eq source guess).
 Proof.
-  destruct source as [name1 in1 out1 locals1 body1].
-  destruct guess as [name2 in2 out2 locals2 body2].
+  destruct source as [[name1 in1 out1 locals1 body1]].
+  destruct guess as [[name2 in2 out2 locals2 body2]].
   unfold Source.node_eq; simpl.
 
-  destruct (Source.name_dec name1 name2).
+  destruct (LustreAst.name_dec name1 name2).
   2: { apply Result.Err, "Node names are not equal". }
 
   destruct (list_eq_dec_binder in1 in2).
   2: { apply Result.Err, "Node inputs are not equal". }
 
-  destruct (Source.binder_dec out1 out2).
+  destruct (LustreAst.binder_dec out1 out2).
   2: { apply Result.Err, "Node outputs are not equal". }
 
   destruct (list_eq_dec_binder locals1 locals2).

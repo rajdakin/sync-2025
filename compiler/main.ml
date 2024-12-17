@@ -19,7 +19,7 @@ let parse_file filename =
         exit 1
   in
   close_in inx;
-  Lustre.
+  LustreAst.
     {
       n_name = name;
       n_in = args;

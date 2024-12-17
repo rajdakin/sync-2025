@@ -1,0 +1,4 @@
+node add(x: int, y:int) return z:int
+let
+	z = x + y;
+tel

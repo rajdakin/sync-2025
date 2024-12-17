@@ -1,16 +1,16 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Ordered.
-From Reactive.Languages Require Lustre.
+From Reactive.Languages Require LustreAst Lustre LustreAst.
 
 Module Lustre := Lustre.
 
 
 Definition dag := list (prod ident (list ident)).
 
-Fixpoint equations_to_dag (equations: list Lustre.equation): dag :=
+Fixpoint equations_to_dag (equations: list LustreAst.equation): dag :=
   match equations with
     | [] => []
-    | (name, exp) :: remaining_eqs => (name, Lustre.var_of_exp exp) :: equations_to_dag remaining_eqs
+    | (name, exp) :: remaining_eqs => (name, LustreAst.var_of_exp exp) :: equations_to_dag remaining_eqs
   end.
 
 Record node_ordered := mk_node_ordered {
@@ -20,7 +20,7 @@ Record node_ordered := mk_node_ordered {
 
 (** Lemmas *)
 
-Lemma dag_names (equations: list Lustre.equation):
+Lemma dag_names (equations: list LustreAst.equation):
   map fst equations = map fst (equations_to_dag equations).
 Proof.
   induction equations.
@@ -31,7 +31,7 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma dag_length (equations: list Lustre.equation):
+Lemma dag_length (equations: list LustreAst.equation):
   List.length equations = List.length (equations_to_dag equations).
 Proof.
   induction equations.
@@ -43,12 +43,12 @@ Proof.
     assumption.
 Qed.
 
-Lemma dag_nil (equations: list Lustre.equation):
+Lemma dag_nil (equations: list LustreAst.equation):
   equations = [] <-> equations_to_dag equations = [].
 Proof.
   split.
   - intros eq.
-    pose proof (@f_equal _ _ (@List.length Lustre.equation) _ _ eq) as H.
+    pose proof (@f_equal _ _ (@List.length LustreAst.equation) _ _ eq) as H.
     simpl in H.
     rewrite dag_length in H.
     apply length_zero_iff_nil.
@@ -60,8 +60,8 @@ Proof.
     assumption.
 Qed.
 
-Lemma equations_to_dag_is_map (equations: list Lustre.equation):
-  equations_to_dag equations = map (fun '(name, exp) => (name, Lustre.var_of_exp exp)) equations.
+Lemma equations_to_dag_is_map (equations: list LustreAst.equation):
+  equations_to_dag equations = map (fun '(name, exp) => (name, LustreAst.var_of_exp exp)) equations.
 Proof.
   induction equations as [ | (name, exp) l IH ]; [ reflexivity | ].
   simpl.
@@ -94,7 +94,7 @@ Qed.
 
 Lemma sem_exp_with_useless_var (e: Lustre.exp) (h: Lustre.history) (name: ident) (v: Lustre.value) (s: Stream.t Lustre.value):
   Lustre.sem_exp h e v ->
-  ~ In name (Lustre.var_of_exp e) ->
+  ~ In name (LustreAst.var_of_exp e) ->
   Lustre.sem_exp (Dict.add name s h) e v.
 Proof.
   intros Hexp Hnin.
@@ -108,7 +108,7 @@ Proof.
     apply Lustre.SeInput.
   - inversion Hexp.
     subst.
-    unfold Lustre.var_of_exp in Hnin.
+    unfold LustreAst.var_of_exp in Hnin.
     simpl in Hnin.
     apply Lustre.SeVar.
     simpl.
@@ -136,9 +136,9 @@ Proof.
     + apply IH3; assumption.
 Qed.
 
-Lemma var_of_last_exp_in_body (body: list Lustre.equation) (name: ident) (exp: Lustre.exp):
+Lemma var_of_last_exp_in_body (body: list LustreAst.equation) (name: ident) (exp: Lustre.exp):
   Ordered.t (equations_to_dag ((name, exp) :: body)) ->
-  Forall (fun x => In x (map fst body)) (Lustre.var_of_exp exp).
+  Forall (fun x => In x (map fst body)) (LustreAst.var_of_exp exp).
 Proof.
   intros Hord.
   induction exp as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ].
@@ -183,7 +183,7 @@ Proof.
         assumption.
 Qed.
 
-Lemma minimal_history (body: list Lustre.equation):
+Lemma minimal_history (body: list LustreAst.equation):
   Ordered.t (equations_to_dag body) ->
   exists (h: Lustre.history),
     (forall (i: ident), Dict.is_in i h <-> In i (map fst body)) /\
@@ -204,7 +204,7 @@ Proof.
     inversion H.
   - specialize (IH (Ordered.cons _ _ Hord)) as ( h & IH1 & IH2 ).
 
-    assert (Forall (fun v => Dict.is_in v h) (Lustre.var_of_exp exp)) as Hforall.
+    assert (Forall (fun v => Dict.is_in v h) (LustreAst.var_of_exp exp)) as Hforall.
     { apply Forall_impl with (P := fun v => In v (map fst body)).
       - apply IH1.
       - apply var_of_last_exp_in_body with (name := name).
@@ -268,8 +268,8 @@ Proof.
         { now apply Dict.maps_to_add. }
 
         apply sem_exp_with_useless_var; [ assumption | ].
-        apply Ordered.vars_coherence with (y := i) (ly := Lustre.var_of_exp x) in Hord; [ assumption | ].
-        apply in_map with (f := fun '(i, x) => (i, Lustre.var_of_exp x)) in Hin.
+        apply Ordered.vars_coherence with (y := i) (ly := LustreAst.var_of_exp x) in Hord; [ assumption | ].
+        apply in_map with (f := fun '(i, x) => (i, LustreAst.var_of_exp x)) in Hin.
         rewrite equations_to_dag_is_map.
         assumption.
 Qed.

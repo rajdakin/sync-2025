@@ -6,43 +6,43 @@ Module Source := LustreOrdered.Lustre.
 Module Target := Imp.
 
 
-Definition translate_const (c: Source.const): Target.const :=
+Definition translate_const (c: LustreAst.const): Target.const :=
   match c with
-  | Source.CVoid => Target.CVoid
-  | Source.CBool b => Target.CBool b
-  | Source.CInt n => Target.CInt n
+  | LustreAst.CVoid => Target.CVoid
+  | LustreAst.CBool b => Target.CBool b
+  | LustreAst.CInt n => Target.CInt n
   end.
 
-Definition translate_type (t: Source.type): Target.type :=
+Definition translate_type (t: LustreAst.type): Target.type :=
   match t with
-  | Source.TVoid => Target.TVoid
-  | Source.TBool => Target.TBool
-  | Source.TInt => Target.TInt
+  | LustreAst.TVoid => Target.TVoid
+  | LustreAst.TBool => Target.TBool
+  | LustreAst.TInt => Target.TInt
   end.
 
 Definition translate_binder (b: Source.binder): Target.binder :=
   (fst b, translate_type (snd b)).
 
-Definition translate_unop (op: Source.unop): Target.unop :=
+Definition translate_unop (op: LustreAst.unop): Target.unop :=
   match op with
-  | Source.Uop_not => Target.Uop_not 
-  | Source.Uop_neg => Target.Uop_neg 
+  | LustreAst.Uop_not => Target.Uop_not
+  | LustreAst.Uop_neg => Target.Uop_neg
   end.
 
-Definition translate_binop (op: Source.binop): Target.binop :=
+Definition translate_binop (op: LustreAst.binop): Target.binop :=
   match op with
-  | Source.Bop_and => Target.Bop_and
-  | Source.Bop_or => Target.Bop_or
-  | Source.Bop_xor => Target.Bop_xor
-  | Source.Bop_plus => Target.Bop_plus
-  | Source.Bop_minus => Target.Bop_minus
-  | Source.Bop_mult => Target.Bop_mult
-  | Source.Bop_div => Target.Bop_div
-  | Source.Bop_eq => Target.Bop_eq
-  | Source.Bop_lt => Target.Bop_lt
-  | Source.Bop_le => Target.Bop_le
-  | Source.Bop_gt => Target.Bop_gt
-  | Source.Bop_ge => Target.Bop_ge
+  | LustreAst.Bop_and => Target.Bop_and
+  | LustreAst.Bop_or => Target.Bop_or
+  | LustreAst.Bop_xor => Target.Bop_xor
+  | LustreAst.Bop_plus => Target.Bop_plus
+  | LustreAst.Bop_minus => Target.Bop_minus
+  | LustreAst.Bop_mult => Target.Bop_mult
+  | LustreAst.Bop_div => Target.Bop_div
+  | LustreAst.Bop_eq => Target.Bop_eq
+  | LustreAst.Bop_lt => Target.Bop_lt
+  | LustreAst.Bop_le => Target.Bop_le
+  | LustreAst.Bop_gt => Target.Bop_gt
+  | LustreAst.Bop_ge => Target.Bop_ge
   end.
 
 Fixpoint translate_value (v: Source.value): Target.value :=
@@ -54,23 +54,23 @@ Fixpoint translate_value (v: Source.value): Target.value :=
   | Source.VIfte v1 v2 v3 => Target.VIfte (translate_value v1) (translate_value v2) (translate_value v3)
   end.
 
-Fixpoint translate_exp (e: Source.exp): Target.exp :=
+Fixpoint translate_exp (e: LustreAst.exp): Target.exp :=
   match e with
-  | Source.EConst c => Target.EConst (translate_const c)
-  | Source.EInput b => Target.EInput (translate_binder b)
-  | Source.EVar b => Target.EVar (translate_binder b)
-  | Source.EUnop op e => Target.EUnop (translate_unop op) (translate_exp e)
-  | Source.EBinop op e1 e2 => Target.EBinop (translate_binop op) (translate_exp e1) (translate_exp e2)
-  | Source.EIfte e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
+  | LustreAst.EConst c => Target.EConst (translate_const c)
+  | LustreAst.EInput b => Target.EInput (translate_binder b)
+  | LustreAst.EVar b => Target.EVar (translate_binder b)
+  | LustreAst.EUnop op e => Target.EUnop (translate_unop op) (translate_exp e)
+  | LustreAst.EBinop op e1 e2 => Target.EBinop (translate_binop op) (translate_exp e1) (translate_exp e2)
+  | LustreAst.EIfte e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
   end.
 
-Definition translate_equation (eq: Source.equation): Target.stmt :=
+Definition translate_equation (eq: LustreAst.equation): Target.stmt :=
   Target.SAssign (fst eq) (translate_exp (snd eq)).
 
 Definition translate_history (h: Source.history): Target.stack :=
   Dict.map (fun x => translate_value (Stream.hd x)) h.
 
-Definition translate_node_body (body: list Source.equation): Target.stmt :=
+Definition translate_node_body (body: list LustreAst.equation): Target.stmt :=
   fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
 
 Lemma lustre_assignment_is_substmt (n: LustreOrdered.node_ordered) (name: ident) (exp: Source.exp):
@@ -79,7 +79,8 @@ Lemma lustre_assignment_is_substmt (n: LustreOrdered.node_ordered) (name: ident)
   Target.is_substmt (Target.SAssign name (translate_exp exp)) (translate_node_body body) = true.
 Proof.
   destruct n.
-  destruct node_ordered_is_node.
+  destruct node_ordered_is_node as [[]].
+  unfold Source.n_body in *.
   simpl in *.
   intros Hin.
   clear n_assigned_out n_inputs_equations n_no_einputs_in_other.
@@ -109,7 +110,7 @@ Definition translate_node (n: LustreOrdered.node_ordered): Target.method.
 Proof.
   pose n as n'.
   destruct n.
-  destruct node_ordered_is_node.
+  destruct node_ordered_is_node as [[]].
   simpl in *.
 
   refine ({|
@@ -160,7 +161,7 @@ Proof.
     simpl.
 
     apply Target.SeBinop; assumption.
-  
+
   - (* EIfte *)
     simpl.
     apply Target.SeIfte; assumption.
@@ -168,7 +169,7 @@ Qed.
 
 Lemma sem_exp_without_useless_var (e: Source.exp) (h: Source.history) (name: ident) (v: Source.value):
   Source.sem_exp h e v ->
-  ~ In name (Source.var_of_exp e) ->
+  ~ In name (LustreAst.var_of_exp e) ->
     Source.sem_exp (Dict.remove name h) e v.
 Proof.
   intros Hexp Hnin.
@@ -182,7 +183,7 @@ Proof.
     apply Source.SeInput.
   - inversion Hexp.
     subst.
-    unfold Source.var_of_exp in Hnin.
+    unfold LustreAst.var_of_exp in Hnin.
     simpl in Hnin.
     apply Source.SeVar.
     simpl.
@@ -210,10 +211,10 @@ Proof.
     + apply IH3; assumption.
 Qed.
 
-Definition evaluable_equations (s: Target.stack) (l: list Source.equation): Prop :=
+Definition evaluable_equations (s: Target.stack) (l: list LustreAst.equation): Prop :=
   Forall (fun eq => exists v: Target.value, Target.sem_exp s (translate_exp (snd eq)) v) l.
 
-Lemma ordered_equations_are_evaluable (h: Source.history) (l: list Source.equation):
+Lemma ordered_equations_are_evaluable (h: Source.history) (l: list LustreAst.equation):
   (Forall (fun eq =>
       exists (v': Stream.t Source.value),
       Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')
@@ -235,7 +236,7 @@ Proof.
     inversion Heqdag.
     subst.
     constructor.
-    + assert (Forall (fun v => Dict.is_in v h) (Source.var_of_exp eq_right)) as Hvars.
+    + assert (Forall (fun v => Dict.is_in v h) (LustreAst.var_of_exp eq_right)) as Hvars.
       * apply LustreOrdered.Forall_impl_in with (P := fun y => exists ly, In (y, ly) (LustreOrdered.equations_to_dag l)); [ | assumption ].
         intros name Hin [ vars Hvars ].
         apply Forall_inv in Hhist as [ v' [ Hmaps Hsem ] ].
@@ -255,7 +256,7 @@ Proof.
       assumption.
 Qed.
 
-Lemma translation_ordered_body (body: list Source.equation) (h: Source.history):
+Lemma translation_ordered_body (body: list LustreAst.equation) (h: Source.history):
   Ordered.t (LustreOrdered.equations_to_dag body) ->
   (Forall (fun eq =>
       exists (v': Stream.t Source.value),
@@ -327,7 +328,7 @@ Qed.
 Lemma correctness_translation_equation (h: Source.history) (name: ident) (exp: Source.exp) (v: Stream.t Source.value):
   Source.sem_exp h exp (Stream.hd v) ->
   Dict.maps_to name v h ->
-  ~ In name (Source.var_of_exp exp) ->
+  ~ In name (LustreAst.var_of_exp exp) ->
   Target.sem_stmt (translate_history (Dict.remove name h)) (translate_equation (name, exp)) (translate_history h).
 Proof.
   intros Hexp Hmaps Hnin.
@@ -353,7 +354,8 @@ Lemma correctness_node_under_history_assumptions (n: LustreOrdered.node_ordered)
 Proof.
   intros Hhist Hsource.
   destruct n.
-  destruct node_ordered_is_node.
+  destruct node_ordered_is_node as [[]].
+  unfold Source.n_body in *.
   simpl in *.
   clear n_assigned_out n_inputs_equations n_no_einputs_in_other.
   revert h Hhist Hsource.
@@ -455,8 +457,8 @@ Proof.
       -- simpl in *.
          unfold hprev.
          apply sem_exp_without_useless_var; [ assumption | ].
-         apply Ordered.vars_coherence with (l := LustreOrdered.equations_to_dag n_body) (y := i) (lx := Source.var_of_exp eq_right); [ assumption | ].
-         apply in_map with (f := fun '(i, x) => (i, Source.var_of_exp x)) in Hin.
+         apply Ordered.vars_coherence with (l := LustreOrdered.equations_to_dag n_body) (y := i) (lx := LustreAst.var_of_exp eq_right); [ assumption | ].
+         apply in_map with (f := fun '(i, x) => (i, LustreAst.var_of_exp x)) in Hin.
          rewrite LustreOrdered.equations_to_dag_is_map.
          assumption.
 Qed.
