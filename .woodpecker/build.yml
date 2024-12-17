@@ -1,0 +1,9 @@
+when:
+  - event: [push, pull_request, manual]
+
+steps:
+  - name: Build project
+    image: nixos/nix:2.25.3
+    commands:
+      - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+      - nix build

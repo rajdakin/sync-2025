@@ -1,0 +1,9 @@
+when:
+  - event: [push, pull_request, manual]
+
+steps:
+  - name: Check ocamlformat
+    image: nixos/nix:2.25.3
+    commands:
+      - echo "experimental-features = nix-command flakes" >> /etc/nix/nix.conf
+      - nix develop -c -- bash -c "nix run nixpkgs#findutils -- . -name '*.ml' | xargs bash -c 'diff <(ocamlformat --enable-outside-detected-project -p default \$1) \$1 1>&2' -"
