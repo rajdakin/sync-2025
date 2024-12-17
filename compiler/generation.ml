@@ -1,8 +1,7 @@
-open Printf
+open Extracted.Imp
 open Format
-open Imp
 
-let pretty_printer m : unit = Printf.printf "Ok: %d\n" (Imp.m_name m)
+let pretty_printer m = printf "Ok: %d\n" (m_name m)
 let pp_ident fmt ident = fprintf fmt "var_%i" ident
 let pp_fun_name fmt ident = fprintf fmt "fun_%i" ident
 
@@ -32,5 +31,5 @@ let rec pp_stmt fmt stmt =
   | SNop -> fprintf fmt ""
 
 let pp_coq_method cm =
-  fprintf Format.std_formatter "char %a() {@[<h4>%a\n return %a;\n@]}"
-    pp_fun_name (m_name cm) pp_stmt (m_body cm) pp_var (m_out cm)
+  printf "char %a() {@[<h4>%a\n return %a;\n@]}" pp_fun_name (m_name cm) pp_stmt
+    (m_body cm) pp_var (m_out cm)

@@ -1,6 +1,5 @@
-open Parser
+open Extracted
 open Printf
-open Arg
 
 let usage_message = "compiler <file>"
 let input_file = ref ""
@@ -37,4 +36,4 @@ let () =
 
   match LustreOrdering.translate_node node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
-  | Err x -> Printf.printf "Error lustre ordering translate: %s\n" x
+  | Err x -> printf "Error lustre ordering translate: %s\n" x

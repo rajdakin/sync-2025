@@ -1,5 +1,5 @@
 %{
-    open Lustre
+    open Extracted.Lustre
 
     let ident_map = Hashtbl.create 18
     let gen_id =
@@ -23,7 +23,7 @@
 %%
 
 typ:
-  | BOOL { snd Lustre.var_bool }
+  | BOOL { snd Extracted.Lustre.var_bool }
 
 local_vars:
   | id = ident COLON typ = typ SEMI_COLON
@@ -71,7 +71,7 @@ const:
 expr:
   | LPAREN e = expr RPAREN { e }
   | c = const { EConst(c) }
-  | v = var { EVar((v, snd Lustre.var_bool)) }
+  | v = var { EVar((v, snd Extracted.Lustre.var_bool)) }
   | e1 = expr AND e2 = expr { EBinop(Bop_and, e1, e2) }
   | e1 = expr OR e2 = expr { EBinop(Bop_or, e1, e2) }
   | e1 = expr XOR e2 = expr { EBinop(Bop_xor, e1, e2) }

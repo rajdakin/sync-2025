@@ -1,6 +1,3 @@
-open Extracted.Lustre
-open Extracted.LustreOrdered
-
 type vertex = int
 type graph = int list array
 type color = White | Grey | Black
