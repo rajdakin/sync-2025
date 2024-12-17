@@ -49,7 +49,7 @@ Proof.
   destruct guess as [name2 in2 out2 locals2 body2].
   unfold Source.node_eq; simpl.
 
-  destruct (PeanoNat.Nat.eq_dec name1 name2).
+  destruct (Source.name_dec name1 name2).
   2: { apply Result.Err, "Node names are not equal". }
 
   destruct (list_eq_dec_binder in1 in2).

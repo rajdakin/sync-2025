@@ -1,7 +1,7 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Dict Stream.
 
-From Coq Require Import Permutation.
+From Coq Require Import Permutation String.
 
 Inductive type: Type :=
   | TVoid
@@ -68,7 +68,7 @@ Fixpoint has_einput (e: exp): bool :=
 Definition equation := prod ident exp.
 
 Record node := mk_node {
-  n_name: ident;
+  n_name: string;
 
   n_in: list binder;
   n_out: binder;
@@ -94,6 +94,9 @@ Definition node_eq (n1 n2: node) :=
 
 
 Definition var_bool := (0, TBool).
+
+Definition name_dec := String.string_dec.
+
 
 Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
   match e with

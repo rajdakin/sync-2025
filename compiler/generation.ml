@@ -1,9 +1,9 @@
 open Extracted.Imp
 open Format
 
-let pretty_printer m = printf "Ok: %d\n" (m_name m)
+let pretty_printer m = printf "Ok: %s\n" (m_name m)
 let pp_ident fmt ident = fprintf fmt "var_%i" ident
-let pp_fun_name fmt ident = fprintf fmt "fun_%i" ident
+let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
 let todo fmt = fprintf fmt "not yet implemented"
 
 let pp_const fmt c =

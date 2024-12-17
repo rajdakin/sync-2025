@@ -18,7 +18,7 @@
 
 %left AND OR XOR
 
-%start<int * (binder list) * int * ((int*exp) list)> node
+%start<string * (binder list) * int * ((int*exp) list)> node
 
 %%
 
@@ -32,17 +32,17 @@ local_vars:
     { (id, typ) :: vars }
 
 node:
-  | NODE ident_func RETURN ret = ident COLON typ
+  | NODE name=ident_node RETURN ret = ident COLON typ
     VAR locals = local_vars
     LET
       eqs = equation_list
     TEL EOF
-    { (0, locals, ret, eqs) }
-  | NODE ident_func RETURN ret = ident COLON typ
+    { (name, locals, ret, eqs) }
+  | NODE name=ident_node RETURN ret = ident COLON typ
     LET
       eqs = equation_list
     TEL EOF
-    { (0, [], ret, eqs) }
+    { (name, [], ret, eqs) }
 
 ident:
   | id = IDENT
@@ -52,7 +52,7 @@ ident:
          Hashtbl.add ident_map id new_id;
          new_id }
 
-ident_func:
+ident_node:
   | id = IDENT { id }
 
 equation_list:

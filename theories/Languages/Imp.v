@@ -128,7 +128,7 @@ Fixpoint is_substmt (sub s: stmt): bool :=
   end.
 
 Record method := mk_method {
-  m_name: ident;
+  m_name: string;
 
   m_in: list binder;
   m_out: binder;
