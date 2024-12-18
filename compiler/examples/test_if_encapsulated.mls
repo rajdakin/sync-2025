@@ -1,0 +1,7 @@
+node test_int_cond(i1: int, i2: int, cond: bool) return a: bool
+var b: bool; c: int;
+let
+  c = if i1 >= i2 then if i1 <= 0 then i1 else 25 else i2;  
+  b = if c > 10 then false else true;
+  a = if cond && b then c else i1;
+tel

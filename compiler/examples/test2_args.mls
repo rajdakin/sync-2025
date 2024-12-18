@@ -1,0 +1,7 @@
+node test(f: bool, g: bool) return a: bool
+var b: bool; c: bool;
+let
+  b = c;
+  c = f;
+  a = g ^ true;
+tel

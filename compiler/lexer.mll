@@ -9,6 +9,14 @@ rule token = parse
   | "&&"        {AND}
   | "||"        {OR}
   | '^'         {XOR}
+  | '+'         {PLUS}
+  | '-'         {MINUS}
+  | '*'         {TIMES}
+  | '~'         {NOT}
+  | "<="        {LE}
+  | ">="        {GE}
+  | '<'         {LT}
+  | '>'         {GT}
   | "true"      {TRUE}
   | "false"     {FALSE}
   | "="         {EQ}
@@ -23,7 +31,13 @@ rule token = parse
   | "let"       {LET}
   | "tel"       {TEL}
   | "bool"      {BOOL}
+  | "int"       {INT}
+  | "void"      {VOID}
+  | "if"        {IF}
+  | "then"      {THEN}
+  | "else"      {ELSE}
   | eof         {EOF}
+  | ['0'-'9' '_']+ as id {NUM (int_of_string id)}
   | ['A'-'Z' 'a'-'z'] ['A'-'Z' 'a'-'z' '0'-'9' '_']* as id {IDENT id}
   | _
     { raise (Error (Printf.sprintf "At offset %d: unexpected character.\n" (Lexing.lexeme_start lexbuf))) }

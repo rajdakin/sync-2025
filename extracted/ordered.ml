@@ -58,12 +58,10 @@ let node_to_graph (node : Lustre.node) : graph * (int, vertex) Hashtbl.t =
   let g = Array.make n [] in
   let var_table = Hashtbl.create n in
   let index_table = Hashtbl.create n in
-  let counter = ref 0 in
   let var_idx (v : vertex) : int =
     if Hashtbl.mem var_table v then Hashtbl.find var_table v
     else
-      let value = !counter in
-      incr counter;
+      let value = v in
       Hashtbl.add var_table v value;
       Hashtbl.add index_table value v;
       value

@@ -1,0 +1,6 @@
+node test_int_cond() return a: bool
+var c : bool;
+let
+  c = false;
+  a = c ;
+tel

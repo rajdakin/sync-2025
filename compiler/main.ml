@@ -6,7 +6,6 @@ let input_file = ref ""
 let entry_file file = input_file := file
 
 let parse_file filename =
-  let tbool = snd Lustre.var_bool in
   let inx = open_in filename in
   let lexbuf = Lexing.from_channel inx in
   let name, args, locals, ret, eqs =
@@ -24,7 +23,7 @@ let parse_file filename =
     {
       n_name = name;
       n_in = args;
-      n_out = (ret, tbool);
+      n_out = ret;
       n_locals = locals;
       n_body = List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
     }
