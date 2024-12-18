@@ -12,6 +12,7 @@ rule token = parse
   | '+'         {PLUS}
   | '-'         {MINUS}
   | '*'         {TIMES}
+  | '/'         {DIV}
   | '~'         {NOT}
   | "<="        {LE}
   | ">="        {GE}
