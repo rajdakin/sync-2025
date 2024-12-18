@@ -8,29 +8,50 @@ Module Target := Imp.
 
 Definition translate_const (c: Source.const): Target.const :=
   match c with
+  | Source.CVoid => Target.CVoid
   | Source.CBool b => Target.CBool b
+  | Source.CInt n => Target.CInt n
   end.
 
 Definition translate_type (t: Source.type): Target.type :=
   match t with
+  | Source.TVoid => Target.TVoid
   | Source.TBool => Target.TBool
+  | Source.TInt => Target.TInt
   end.
 
 Definition translate_binder (b: Source.binder): Target.binder :=
   (fst b, translate_type (snd b)).
+
+Definition translate_unop (op: Source.unop): Target.unop :=
+  match op with
+  | Source.Uop_not => Target.Uop_not 
+  | Source.Uop_neg => Target.Uop_neg 
+  end.
 
 Definition translate_binop (op: Source.binop): Target.binop :=
   match op with
   | Source.Bop_and => Target.Bop_and
   | Source.Bop_or => Target.Bop_or
   | Source.Bop_xor => Target.Bop_xor
+  | Source.Bop_plus => Target.Bop_plus
+  | Source.Bop_minus => Target.Bop_minus
+  | Source.Bop_mult => Target.Bop_mult
+  | Source.Bop_div => Target.Bop_div
+  | Source.Bop_eq => Target.Bop_eq
+  | Source.Bop_lt => Target.Bop_lt
+  | Source.Bop_le => Target.Bop_le
+  | Source.Bop_gt => Target.Bop_gt
+  | Source.Bop_ge => Target.Bop_ge
   end.
 
 Fixpoint translate_value (v: Source.value): Target.value :=
   match v with
   | Source.VConst c => Target.VConst (translate_const c)
   | Source.VInput b => Target.VInput (translate_binder b)
+  | Source.VUnop op v => Target.VUnop (translate_unop op) (translate_value v)
   | Source.VBinop op v1 v2 => Target.VBinop (translate_binop op) (translate_value v1) (translate_value v2)
+  | Source.VIfte v1 v2 v3 => Target.VIfte (translate_value v1) (translate_value v2) (translate_value v3)
   end.
 
 Fixpoint translate_exp (e: Source.exp): Target.exp :=
@@ -38,7 +59,9 @@ Fixpoint translate_exp (e: Source.exp): Target.exp :=
   | Source.EConst c => Target.EConst (translate_const c)
   | Source.EInput b => Target.EInput (translate_binder b)
   | Source.EVar b => Target.EVar (translate_binder b)
+  | Source.EUnop op e => Target.EUnop (translate_unop op) (translate_exp e)
   | Source.EBinop op e1 e2 => Target.EBinop (translate_binop op) (translate_exp e1) (translate_exp e2)
+  | Source.EIfte e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
   end.
 
 Definition translate_equation (eq: Source.equation): Target.stmt :=
@@ -128,12 +151,19 @@ Proof.
     pose (fun e => translate_const (Stream.hd e)) as f.
     now apply Dict.maps_to_map with (f := fun x => translate_value (Stream.hd x)).
 
-  - (* EAnd *)
+  - (* EUnop *)
+    simpl.
+    apply Target.SeUnop.
+    assumption.
+
+  - (* EBinop *)
     simpl.
 
-    apply Target.SeBinop.
-    + apply IHsem_exp1.
-    + apply IHsem_exp2.
+    apply Target.SeBinop; assumption.
+  
+  - (* EIfte *)
+    simpl.
+    apply Target.SeIfte; assumption.
 Qed.
 
 Lemma sem_exp_without_useless_var (e: Source.exp) (h: Source.history) (name: ident) (v: Source.value):
@@ -143,7 +173,7 @@ Lemma sem_exp_without_useless_var (e: Source.exp) (h: Source.history) (name: ide
 Proof.
   intros Hexp Hnin.
   revert v Hexp.
-  induction e as [ c | t | [ b t ] | op e1 IH1 e2 IH2 ]; intros v Hexp.
+  induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
   - inversion Hexp.
     subst.
     apply Source.SeConst.
@@ -163,11 +193,21 @@ Proof.
     assumption.
   - inversion Hexp.
     subst.
+    apply Source.SeUnop.
+    apply IH; assumption.
+  - inversion Hexp.
+    subst.
+    pose proof (Source.var_of_exp_not_in_binop e1 e2 name op) as [ H1' H2' ]; [ assumption | ].
     apply Source.SeBinop.
-    + apply IH1; [ | assumption ].
-      pose proof (Source.var_of_exp_not_in_binop e1 e2 name op) as [ H _ ]; assumption.
-    + apply IH2; [ | assumption ].
-      pose proof (Source.var_of_exp_not_in_binop e1 e2 name op) as [ _ H ]; assumption.
+    + apply IH1; assumption.
+    + apply IH2; assumption.
+  - inversion Hexp.
+    subst.
+    pose proof (Source.var_of_exp_not_in_ifte e1 e2 e3 name) as ( H1' & H2' & H3' ); [ assumption | ].
+    apply Source.SeIfte.
+    + apply IH1; assumption.
+    + apply IH2; assumption.
+    + apply IH3; assumption.
 Qed.
 
 Definition evaluable_equations (s: Target.stack) (l: list Source.equation): Prop :=

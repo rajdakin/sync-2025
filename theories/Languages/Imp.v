@@ -3,23 +3,47 @@ From Reactive.Datatypes Require Dict.
 
 
 Inductive type :=
-  | TBool.
+  | TVoid
+  | TBool
+  | TInt.
 
 Definition binder := prod ident type.
 
 Inductive const :=
-  | CBool: bool -> const.
+  | CVoid: const
+  | CBool: bool -> const
+  | CInt: nat -> const.
 
-Inductive binop :=
-  | Bop_and : binop
-  | Bop_or : binop
-  | Bop_xor : binop.
+Inductive unop: Type :=
+  | Uop_not: unop
+  | Uop_neg: unop.
 
-Inductive exp :=
-  | EConst : const -> exp
-  | EInput : binder -> exp
-  | EVar : binder -> exp
-  | EBinop : binop -> exp -> exp -> exp.
+Inductive binop: Type :=
+  (** Boolean binop *)
+  | Bop_and: binop
+  | Bop_or: binop
+  | Bop_xor: binop
+ 
+  (** Arithmetic binop *)
+  | Bop_plus: binop
+  | Bop_minus: binop
+  | Bop_mult: binop
+  | Bop_div: binop
+  
+  (** Relational binop *)
+  | Bop_eq: binop
+  | Bop_le: binop
+  | Bop_lt: binop
+  | Bop_ge: binop
+  | Bop_gt: binop.
+
+Inductive exp: Type :=
+  | EConst: const -> exp
+  | EInput: binder -> exp
+  | EVar: binder -> exp
+  | EUnop: unop -> exp -> exp
+  | EBinop: binop -> exp -> exp -> exp
+  | EIfte: exp -> exp -> exp -> exp.
 
 Inductive stmt :=
   | SAssign: ident -> exp -> stmt
@@ -29,30 +53,60 @@ Inductive stmt :=
 
 (** ** Equalities *)
 
-Definition type_eqb (t1 t2: type): bool :=
-  match t1, t2 with
+Definition type_eqb (x y: type): bool :=
+  match x, y with
+    | TVoid, TVoid => true
     | TBool, TBool => true
+    | TInt, TInt => true
+    | _, _ => false
+  end.
+
+Definition binder_eqb (x y: binder): bool :=
+  andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
+
+Definition unop_eqb (x y: unop): bool :=
+  match x, y with
+    | Uop_not, Uop_not => true
+    | Uop_neg, Uop_neg => true
+    | _, _ => false
+  end.
+
+Definition binop_eqb (x y: binop): bool :=
+  match x, y with
+    | Bop_and, Bop_and => true
+    | Bop_or, Bop_or => true
+    | Bop_xor, Bop_xor => true
+    | Bop_plus, Bop_plus => true
+    | Bop_minus, Bop_minus => true
+    | Bop_mult, Bop_mult => true
+    | Bop_div, Bop_div => true
+    | Bop_eq, Bop_eq => true
+    | Bop_lt, Bop_lt => true
+    | Bop_le, Bop_le => true
+    | Bop_gt, Bop_gt => true
+    | Bop_ge, Bop_ge => true
+    | _, _ => false
   end.
 
 Definition const_eqb (c1 c2: const): bool :=
   match c1, c2 with
+    | CVoid, CVoid => true
     | CBool b1, CBool b2 => Bool.eqb b1 b2
-  end.
-
-Definition binop_eqb (op1 op2: binop): bool :=
-  match op1, op2 with
-    | Bop_and, Bop_and => true
-    | Bop_or, Bop_or => true
-    | Bop_xor, Bop_xor => true
+    | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
     | _, _ => false
   end.
 
 Fixpoint exp_eqb (e1 e2: exp): bool :=
   match e1, e2 with
     | EConst c1, EConst c2 => const_eqb c1 c2
-    | EInput (i1, t1), EInput (i2, t2) | EVar (i1, t1), EVar (i2, t2) =>
-      PeanoNat.Nat.eqb i1 i2 && type_eqb t1 t2
-    | EBinop op1 e11 e12, EBinop op2 e21 e22 => binop_eqb op1 op2 && exp_eqb e11 e21 && exp_eqb e12 e22
+    | EInput b1, EInput b2 => binder_eqb b1 b2
+    | EVar b1, EVar b2 => binder_eqb b1 b2
+    | EUnop op1 e1, EUnop op2 e2 =>
+      (unop_eqb op1 op2) && (exp_eqb e1 e2)
+    | EBinop op1 e11 e12, EBinop op2 e21 e22 =>
+      (binop_eqb op1 op2) && (exp_eqb e11 e21) && (exp_eqb e12 e22)
+    | EIfte e11 e12 e13, EIfte e21 e22 e23 =>
+      (exp_eqb e11 e21) && (exp_eqb e12 e22) && (exp_eqb e13 e23)
     | _, _ => false
   end.
 
@@ -91,7 +145,9 @@ Record method := mk_method {
 Inductive value :=
   | VConst : const -> value
   | VInput : binder -> value
-  | VBinop : binop -> value -> value -> value.
+  | VUnop: unop -> value -> value
+  | VBinop: binop -> value -> value -> value
+  | VIfte: value -> value -> value -> value.
 
 Definition stack := Dict.t value.
 
@@ -106,10 +162,20 @@ Inductive sem_exp: stack -> exp -> value -> Prop :=
       Dict.maps_to (fst b) v s ->
       sem_exp s (EVar b) v
 
+  | SeUnop (s: stack) (op: unop) (e: exp) (v: value):
+      sem_exp s e v ->
+      sem_exp s (EUnop op e) (VUnop op v)
+
   | SeBinop (s: stack) (op: binop) (e1 e2: exp) (v1 v2: value):
       sem_exp s e1 v1 ->
       sem_exp s e2 v2 ->
-      sem_exp s (EBinop op e1 e2) (VBinop op v1 v2).
+      sem_exp s (EBinop op e1 e2) (VBinop op v1 v2)
+
+  | SeIfte (s: stack) (e1 e2 e3: exp) (v1 v2 v3: value):
+      sem_exp s e1 v1 ->
+      sem_exp s e2 v2 ->
+      sem_exp s e3 v3 ->
+      sem_exp s (EIfte e1 e2 e3) (VIfte v1 v2 v3).
 
 Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
   | SeAssign (s: stack) (name: ident) (e: exp) (v: value):
@@ -132,7 +198,9 @@ Fixpoint has_var (e: exp): bool :=
     | EConst _ => false
     | EInput _ => false
     | EVar _ => true
+    | EUnop _ e => has_var e
     | EBinop _ e1 e2 => has_var e1 || has_var e2
+    | EIfte e1 e2 e3 => has_var e1 || has_var e2 || has_var e3
   end.
 
 Fixpoint eval_exp (e: exp) (s: stack): option value :=
@@ -140,9 +208,17 @@ Fixpoint eval_exp (e: exp) (s: stack): option value :=
     | EConst c => Some (VConst c)
     | EInput b => Some (VInput b)
     | EVar (name, typ) => Dict.find name s
+    | EUnop op e => match eval_exp e s with
+      | Some v => Some (VUnop op v)
+      | None => None
+    end
     | EBinop op e1 e2 => match eval_exp e1 s, eval_exp e2 s with
       | Some v1, Some v2 => Some (VBinop op v1 v2)
       | _, _ => None
+    end
+    | EIfte e1 e2 e3 => match eval_exp e1 s, eval_exp e2 s, eval_exp e3 s with
+      | Some v1, Some v2, Some v3 => Some (VIfte v1 v2 v3)
+      | _, _, _ => None
     end
   end.
 
@@ -152,12 +228,12 @@ Definition is_evaluable (e: exp) (s: stack): Prop :=
 
 (** ** Lemmas *)
 
-Lemma exp_no_var_is_const (e: exp):
+Lemma exp_no_var_is_evaluable (e: exp):
   has_var e = false ->
   forall (s: stack), is_evaluable e s.
 Proof.
   intros H.
-  induction e as [ c | | | op e1 IHe1 e2 IHe2].
+  induction e as [ c | | (v, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros s.
   - exists (VConst c).
     simpl.
     reflexivity.
@@ -165,33 +241,75 @@ Proof.
     reflexivity.
   - simpl in H.
     discriminate.
-  - intros s.
-    simpl in H.
+  - simpl in H.
+    apply IH with (s := s) in H as [ v Hv ].
+    exists (VUnop op v).
+    simpl.
+    rewrite Hv.
+    reflexivity.
+  - simpl in H.
     apply Bool.orb_false_iff in H.
     destruct H as [ H1 H2 ].
-    apply IHe1 with (s := s) in H1.
-    apply IHe2 with (s := s) in H2.
+    apply IH1 with (s := s) in H1.
+    apply IH2 with (s := s) in H2.
     destruct H1 as [ v1 H1 ].
     destruct H2 as [ v2 H2 ].
     exists (VBinop op v1 v2).
     simpl.
     rewrite H1, H2.
     reflexivity.
-Qed.
-
-Lemma const_eqb_refl (c: const):
-  const_eqb c c = true.
-Proof.
-  destruct c.
-  - simpl.
-    rewrite Bool.eqb_reflx.
+  - simpl in H.
+    apply Bool.orb_false_iff in H as [ H H3 ].
+    apply Bool.orb_false_iff in H as [ H1 H2 ].
+    apply IH1 with (s := s) in H1 as [ v1 Hv1 ].
+    apply IH2 with (s := s) in H2 as [ v2 Hv2 ].
+    apply IH3 with (s := s) in H3 as [ v3 Hv3 ].
+    exists (VIfte v1 v2 v3).
+    simpl.
+    rewrite Hv1, Hv2, Hv3.
     reflexivity.
 Qed.
 
-Lemma type_eqb_refl (typ: type):
-  type_eqb typ typ = true.
+Lemma type_eqb_refl (t: type):
+  type_eqb t t = true.
 Proof.
-  destruct typ; reflexivity.
+  destruct t; reflexivity.
+Qed.
+
+Lemma binder_eqb_refl (b: binder):
+  binder_eqb b b = true.
+Proof.
+  destruct b as (i, t).
+  apply andb_true_intro.
+  split.
+  - apply PeanoNat.Nat.eqb_refl.
+  - apply type_eqb_refl.
+Qed.
+
+Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
+Proof.
+  unfold binder_eqb, andb.
+  destruct (fst x =? fst y) eqn:Heq; [| discriminate ].
+
+  rewrite PeanoNat.Nat.eqb_eq in Heq.
+  destruct x, y; simpl in Heq |- *.
+  rewrite Heq.
+
+  intros H.
+  now destruct t, t0.
+Qed.
+
+Lemma unop_eqb_refl (op: unop):
+  unop_eqb op op = true.
+Proof.
+  destruct op; reflexivity.
+Qed.
+
+Lemma unop_eqb_to_eq (op1 op2: unop):
+  unop_eqb op1 op2 = true -> op1 = op2.
+Proof.
+  intros H.
+  destruct op1, op2; (reflexivity || inversion H).
 Qed.
 
 Lemma binop_eqb_refl (op: binop):
@@ -200,21 +318,103 @@ Proof.
   destruct op; reflexivity.
 Qed.
 
+Lemma binop_eqb_to_eq (op1 op2: binop):
+  binop_eqb op1 op2 = true -> op1 = op2.
+Proof.
+  intros H.
+  destruct op1, op2; reflexivity || inversion H.
+Qed.
+
+Lemma const_eqb_refl (c: const):
+  const_eqb c c = true.
+Proof.
+  destruct c as [ | b | n ].
+  - reflexivity.
+  - apply Bool.eqb_true_iff.
+    reflexivity.
+  - apply PeanoNat.Nat.eqb_refl.
+Qed.
+
+Lemma const_eqb_to_eq (c1 c2: const):
+  const_eqb c1 c2 = true -> c1 = c2.
+Proof.
+  intros H.
+  destruct c1.
+  - destruct c2.
+    + reflexivity.
+    + inversion H.
+    + inversion H.
+  - destruct c2.
+    + inversion H.
+    + simpl in H.
+      f_equal.
+      apply Bool.eqb_true_iff.
+      assumption.
+    + inversion H.
+  - destruct c2.
+    + inversion H.
+    + inversion H.
+    + apply PeanoNat.Nat.eqb_eq in H.
+      subst.
+      reflexivity.
+Qed.
+
 Lemma exp_eqb_refl (e: exp):
   exp_eqb e e = true.
 Proof.
-  induction e as [ c | (i, t) | (i, t) | op e1 IHe1 e2 IHe2].
+  induction e.
+  - apply const_eqb_refl.
+  - apply binder_eqb_refl.
+  - apply binder_eqb_refl.
+  - apply andb_true_intro.
+    split; [ | assumption ].
+    apply unop_eqb_refl.
+  - apply andb_true_intro.
+    split; [ | assumption ].
+    apply andb_true_intro.
+    split; [ | assumption ].
+    apply binop_eqb_refl.
   - simpl.
-    apply const_eqb_refl.
-  - simpl.
-    rewrite PeanoNat.Nat.eqb_refl.
-    rewrite type_eqb_refl.
+    rewrite IHe1, IHe2, IHe3.
     reflexivity.
-  - simpl.
-    rewrite PeanoNat.Nat.eqb_refl.
-    rewrite type_eqb_refl.
+Qed.
+
+Lemma exp_eqb_to_eq (e1 e2: exp):
+  exp_eqb e1 e2 = true -> e1 = e2.
+Proof.
+  intros H.
+  revert e2 H.
+  induction e1 as [ c1 | b1 | b1 | op1 e1 IH | op1 e11 IH1 e12 IH2 | e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
+  - destruct e2; try inversion H.
+    apply const_eqb_to_eq in H1.
+    subst.
     reflexivity.
-  - simpl.
-    rewrite binop_eqb_refl, IHe1, IHe2.
+  - destruct e2; try inversion H.
+    apply binder_eqb_to_eq in H1.
+    subst.
     reflexivity.
+  - destruct e2; try inversion H.
+    apply binder_eqb_to_eq in H1.
+    subst.
+    reflexivity.
+  -  destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply unop_eqb_to_eq in H1.
+    apply IH in H2.
+    f_equal; assumption.
+  - destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply andb_prop in H1 as [ H3 H1 ].
+    apply IH1 in H1.
+    apply IH2 in H2.
+    apply binop_eqb_to_eq in H3.
+    rewrite H1, H2, H3.
+    reflexivity.
+  - destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H3 ].
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply IH1 in H1.
+    apply IH2 in H2.
+    apply IH3 in H3.
+    f_equal; assumption.
 Qed.

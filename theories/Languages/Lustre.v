@@ -3,31 +3,66 @@ From Reactive.Datatypes Require Dict Stream.
 
 From Coq Require Import Permutation.
 
-
-Inductive type :=
-  | TBool.
+Inductive type: Type :=
+  | TVoid
+  | TBool
+  | TInt.
 
 Definition binder := prod ident type.
 
-Inductive const :=
-  | CBool: bool -> const.
+Inductive const: Type :=
+  | CVoid: const
+  | CBool: bool -> const
+  | CInt: nat -> const.
 
-Inductive binop :=
-  | Bop_and : binop
-  | Bop_or : binop
-  | Bop_xor : binop.
+(** A unary operator
 
-Inductive exp :=
-  | EConst : const -> exp
-  | EInput : binder -> exp
-  | EVar : binder -> exp
-  | EBinop : binop -> exp -> exp -> exp.
+  An operator of type [unop tyin tyout] takes an argument of type [tyin] and
+  returns an expression of type [tyout].
+*)
+Inductive unop: Type :=
+  | Uop_not: unop
+  | Uop_neg: unop.
+
+(** A binary operator
+
+  An operator of type [binop ty1 ty2 tyout] takes two arguments of type [ty1]
+  and [ty2] returns an expression of type [tyout].
+*)
+Inductive binop: Type :=
+  (** Boolean binop *)
+  | Bop_and: binop
+  | Bop_or: binop
+  | Bop_xor: binop
+ 
+  (** Arithmetic binop *)
+  | Bop_plus: binop
+  | Bop_minus: binop
+  | Bop_mult: binop
+  | Bop_div: binop
+  
+  (** Relational binop *)
+  | Bop_eq: binop
+  | Bop_le: binop
+  | Bop_lt: binop
+  | Bop_ge: binop
+  | Bop_gt: binop.
+
+Inductive exp: Type :=
+  | EConst: const -> exp
+  | EInput: binder -> exp
+  | EVar: binder -> exp
+  | EUnop: unop -> exp -> exp
+  | EBinop: binop -> exp -> exp -> exp
+  | EIfte: exp -> exp -> exp -> exp.
 
 Fixpoint has_einput (e: exp): bool :=
   match e with
     | EInput _ => true
     | EConst _ | EVar _ => false
+    | EUnop _ e => has_einput e
     | EBinop _ e1 e2 => has_einput e1 || has_einput e2
+    | EIfte e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
   end.
 
 Definition equation := prod ident exp.
@@ -65,8 +100,11 @@ Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
     | EConst _ => acc
     | EInput _ => acc
     | EVar (name, _) => name :: acc
+    | EUnop _ e => var_of_exp_aux e acc
     | EBinop _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
   end.
 
 Definition var_of_exp (e: exp): list ident :=
@@ -77,14 +115,23 @@ Definition var_of_exp (e: exp): list ident :=
 
 Definition type_eqb (x y: type): bool :=
   match x, y with
+    | TVoid, TVoid => true
     | TBool, TBool => true
+    | TInt, TInt => true
+    | _, _ => false
   end.
 
 Lemma type_eqb_refl (t: type):
   type_eqb t t = true.
 Proof.
-  destruct t.
-  reflexivity.
+  destruct t; reflexivity.
+Qed.
+
+Lemma type_dec (x y: type): {x = y} + {x <> y}.
+Proof.
+  destruct x, y.
+  1, 5, 9: left; reflexivity.
+  all: right; inversion 1.
 Qed.
 
 Definition binder_eqb (x y: binder): bool :=
@@ -93,15 +140,25 @@ Definition binder_eqb (x y: binder): bool :=
 Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
 Proof.
   destruct x, y.
-  destruct t, t0.
 
   pose proof (PeanoNat.Nat.eq_dec i i0).
   destruct H.
-  { now left; f_equal. }
+  2: {
+    right.
+    inversion 1.
+    contradiction.
+  }
 
-  right.
-  inversion 1.
-  contradiction.
+  destruct (type_dec t t0).
+  2: {
+    right.
+    inversion 1.
+    contradiction.
+  }
+
+  subst.
+  left.
+  reflexivity.
 Defined.
 
 Lemma binder_eqb_refl (b: binder):
@@ -123,7 +180,7 @@ Proof.
   destruct x, y; simpl in Heq |- *.
   rewrite Heq.
 
-  intros _.
+  intros H.
   now destruct t, t0.
 Qed.
 
@@ -141,17 +198,36 @@ Qed.
 
 (** ** Equality of equations *)
 
+Definition unop_eqb (x y: unop): bool :=
+  match x, y with
+    | Uop_not, Uop_not => true
+    | Uop_neg, Uop_neg => true
+    | _, _ => false
+  end.
+
 Definition binop_eqb (x y: binop): bool :=
   match x, y with
     | Bop_and, Bop_and => true
     | Bop_or, Bop_or => true
     | Bop_xor, Bop_xor => true
+    | Bop_plus, Bop_plus => true
+    | Bop_minus, Bop_minus => true
+    | Bop_mult, Bop_mult => true
+    | Bop_div, Bop_div => true
+    | Bop_eq, Bop_eq => true
+    | Bop_lt, Bop_lt => true
+    | Bop_le, Bop_le => true
+    | Bop_gt, Bop_gt => true
+    | Bop_ge, Bop_ge => true
     | _, _ => false
   end.
 
 Definition const_eqb (c1 c2: const): bool :=
   match c1, c2 with
+    | CVoid, CVoid => true
     | CBool b1, CBool b2 => Bool.eqb b1 b2
+    | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
+    | _, _ => false
   end.
 
 Fixpoint exp_eqb (e1 e2: exp): bool :=
@@ -159,10 +235,27 @@ Fixpoint exp_eqb (e1 e2: exp): bool :=
     | EConst c1, EConst c2 => const_eqb c1 c2
     | EInput b1, EInput b2 => binder_eqb b1 b2
     | EVar b1, EVar b2 => binder_eqb b1 b2
+    | EUnop op1 e1, EUnop op2 e2 =>
+      (unop_eqb op1 op2) && (exp_eqb e1 e2)
     | EBinop op1 e11 e12, EBinop op2 e21 e22 =>
       (binop_eqb op1 op2) && (exp_eqb e11 e21) && (exp_eqb e12 e22)
+    | EIfte e11 e12 e13, EIfte e21 e22 e23 =>
+      (exp_eqb e11 e21) && (exp_eqb e12 e22) && (exp_eqb e13 e23)
     | _, _ => false
   end.
+
+Lemma unop_eqb_refl (op: unop):
+  unop_eqb op op = true.
+Proof.
+  destruct op; reflexivity.
+Qed.
+
+Lemma unop_eqb_to_eq (op1 op2: unop):
+  unop_eqb op1 op2 = true -> op1 = op2.
+Proof.
+  intros H.
+  destruct op1, op2; (reflexivity || inversion H).
+Qed.
 
 Lemma binop_eqb_refl (op: binop):
   binop_eqb op op = true.
@@ -174,28 +267,41 @@ Lemma binop_eqb_to_eq (op1 op2: binop):
   binop_eqb op1 op2 = true -> op1 = op2.
 Proof.
   intros H.
-  destruct op1, op2; try reflexivity; try inversion H.
+  destruct op1, op2; reflexivity || inversion H.
 Qed.
 
 Lemma const_eqb_refl (c: const):
   const_eqb c c = true.
 Proof.
-  destruct c.
-  simpl.
-  destruct b; reflexivity.
+  destruct c as [ | b | n ].
+  - reflexivity.
+  - apply Bool.eqb_true_iff.
+    reflexivity.
+  - apply PeanoNat.Nat.eqb_refl.
 Qed.
 
 Lemma const_eqb_to_eq (c1 c2: const):
   const_eqb c1 c2 = true -> c1 = c2.
 Proof.
   intros H.
-  revert c2 H.
-  induction c1 as [ b1 ]; intros c2 H.
-  destruct c2.
-  inversion H.
-  apply Bool.eqb_prop in H1.
-  subst.
-  reflexivity.
+  destruct c1.
+  - destruct c2.
+    + reflexivity.
+    + inversion H.
+    + inversion H.
+  - destruct c2.
+    + inversion H.
+    + simpl in H.
+      f_equal.
+      apply Bool.eqb_true_iff.
+      assumption.
+    + inversion H.
+  - destruct c2.
+    + inversion H.
+    + inversion H.
+    + apply PeanoNat.Nat.eqb_eq in H.
+      subst.
+      reflexivity.
 Qed.
 
 Lemma exp_eqb_refl (e: exp):
@@ -207,9 +313,15 @@ Proof.
   - apply binder_eqb_refl.
   - apply andb_true_intro.
     split; [ | assumption ].
+    apply unop_eqb_refl.
+  - apply andb_true_intro.
+    split; [ | assumption ].
     apply andb_true_intro.
     split; [ | assumption ].
     apply binop_eqb_refl.
+  - simpl.
+    rewrite IHe1, IHe2, IHe3.
+    reflexivity.
 Qed.
 
 Lemma exp_eqb_to_eq (e1 e2: exp):
@@ -217,7 +329,7 @@ Lemma exp_eqb_to_eq (e1 e2: exp):
 Proof.
   intros H.
   revert e2 H.
-  induction e1 as [ c1 | b1 | b1 | op1 e11 IH1 e12 IH2 ]; intros e2 H.
+  induction e1 as [ c1 | b1 | b1 | op1 e1 IH | op1 e11 IH1 e12 IH2 | e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
   - destruct e2; try inversion H.
     apply const_eqb_to_eq in H1.
     subst.
@@ -230,6 +342,11 @@ Proof.
     apply binder_eqb_to_eq in H1.
     subst.
     reflexivity.
+  -  destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply unop_eqb_to_eq in H1.
+    apply IH in H2.
+    f_equal; assumption.
   - destruct e2; try inversion H.
     apply andb_prop in H1 as [ H1 H2 ].
     apply andb_prop in H1 as [ H3 H1 ].
@@ -238,6 +355,13 @@ Proof.
     apply binop_eqb_to_eq in H3.
     rewrite H1, H2, H3.
     reflexivity.
+  - destruct e2; try inversion H.
+    apply andb_prop in H1 as [ H1 H3 ].
+    apply andb_prop in H1 as [ H1 H2 ].
+    apply IH1 in H1.
+    apply IH2 in H2.
+    apply IH3 in H3.
+    f_equal; assumption.
 Qed.
 
 Definition equation_eqb (eq1 eq2: equation): bool :=
@@ -280,7 +404,9 @@ Qed.
 Inductive value :=
   | VConst : const -> value
   | VInput : binder -> value
-  | VBinop : binop -> value -> value -> value.
+  | VUnop: unop -> value -> value
+  | VBinop: binop -> value -> value -> value
+  | VIfte: value -> value -> value -> value.
 
 Definition history := Dict.t (Stream.t value).
 
@@ -295,10 +421,20 @@ Inductive sem_exp: history -> exp -> value -> Prop :=
       Dict.maps_to (fst b) v h ->
       sem_exp h (EVar b) (Stream.hd v)
 
+  | SeUnop (h: history) (op: unop) (e: exp) (v: value):
+      sem_exp h e v ->
+      sem_exp h (EUnop op e) (VUnop op v)
+
   | SeBinop (h: history) (op: binop) (e1 e2: exp) (v1 v2: value):
       sem_exp h e1 v1 ->
       sem_exp h e2 v2 ->
-      sem_exp h (EBinop op e1 e2) (VBinop op v1 v2).
+      sem_exp h (EBinop op e1 e2) (VBinop op v1 v2)
+      
+  | SeIfte (h: history) (e1 e2 e3: exp) (v1 v2 v3: value):
+      sem_exp h e1 v1 ->
+      sem_exp h e2 v2 ->
+      sem_exp h e3 v3 ->
+      sem_exp h (EIfte e1 e2 e3) (VIfte v1 v2 v3).
 
 
 (** ** Properties *)
@@ -308,9 +444,17 @@ Fixpoint eval_exp (e: exp) (h: history): option value :=
     | EConst c => Some (VConst c)
     | EInput b => Some (VInput b)
     | EVar (name, typ) => option_map Stream.hd (Dict.find name h)
+    | EUnop op e => match eval_exp e h with
+      | Some v => Some (VUnop op v)
+      | None => None
+    end
     | EBinop op e1 e2 => match eval_exp e1 h, eval_exp e2 h with
       | Some v1, Some v2 => Some (VBinop op v1 v2)
       | _, _ => None
+    end
+    | EIfte e1 e2 e3 => match eval_exp e1 h, eval_exp e2 h, eval_exp e3 h with
+      | Some v1, Some v2, Some v3 => Some (VIfte v1 v2 v3)
+      | _, _, _ => None
     end
   end.
 
@@ -320,64 +464,43 @@ Definition is_evaluable (e: exp) (h: history): Prop :=
 
 (** ** Lemmas *)
 
-Lemma var_of_exp_aux_non_empty (e: exp) (l: list ident):
-  l <> [] -> var_of_exp_aux e l <> [].
+Lemma var_of_exp_aux_eq (e: exp) (l: list ident):
+  var_of_exp_aux e l = var_of_exp e ++ l.
 Proof.
-  intros Hl He.
-  revert l Hl He.
-  induction e as [ | | v | op e1 IHe1 e2 IHe2 ]; intros l Hl He.
-  - simpl in He.
-    contradiction.
-  - simpl in He.
-    apply Hl.
-    assumption.
-  - destruct v.
-    simpl in He.
-    discriminate.
-  - simpl in He.
-    apply IHe1 with (l := var_of_exp_aux e2 l).
-    + intros He2.
-      apply IHe2 with (l := l); assumption.
-    + assumption.
+  revert l.
+  induction e as [ c | | (v, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - apply IH.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
 Qed.
 
 Lemma var_of_exp_aux_empty (e: exp) (l: list ident):
   var_of_exp_aux e l = [] -> l = [].
 Proof.
-  revert l.
-  induction e as [ | | v | op e1 IHe1 e2 IHe2 ]; intros l H.
-  - simpl in H.
-    assumption.
-  - assumption.
-  - destruct v.
-    simpl in H.
-    discriminate.
-  - simpl in H.
-    apply IHe2.
-    apply IHe1.
-    assumption.
+  intros H.
+  rewrite var_of_exp_aux_eq in H.
+  apply app_eq_nil in H as [ _ H ].
+  assumption.
 Qed.
 
 Lemma var_of_exp_aux_incl (e: exp) (l1 l2: list ident):
   incl l1 l2 -> incl (var_of_exp_aux e l1) (var_of_exp_aux e l2).
 Proof.
-  intros H x Hx.
-  revert l1 l2 x H Hx.
-  induction e; intros l1 l2 x H Hx; simpl in *.
-  - apply H.
-    assumption.
-  - apply H.
-    assumption.
-  - destruct b as [ i t ].
-    destruct Hx as [ Hx | Hx ].
-    + left.
-      assumption.
-    + right.
-      apply H.
-      assumption.
-  - apply IHe1 with (l1 := var_of_exp_aux e2 l1); [ | assumption ].
-    intros y Hy.
-    apply IHe2 with (l1 := l1); assumption.
+  intros H i Hi.
+  rewrite var_of_exp_aux_eq in Hi |- *.
+  apply in_or_app.
+  apply in_app_or in Hi as [ Hin | Hin ]; auto.
 Qed.
 
 Lemma var_of_exp_aux_in_exp (e: exp) (l: list ident) (x: ident):
@@ -391,30 +514,27 @@ Qed.
 Lemma var_of_exp_aux_in_acc (e: exp) (l: list ident) (x: ident):
   In x l -> In x (var_of_exp_aux e l).
 Proof.
-  revert l.
-  induction e; intros l H.
-  - assumption.
-  - assumption.
-  - destruct b.
-    right.
-    assumption.
-  - simpl.
-    apply IHe1.
-    apply IHe2.
-    assumption.
+  intros H.
+  rewrite var_of_exp_aux_eq.
+  apply in_or_app.
+  auto.
 Qed.
 
-Lemma var_of_exp_aux_eq (e: exp) (l: list ident):
-  var_of_exp_aux e l = var_of_exp e ++ l.
+Lemma var_of_exp_binop_eq (e1 e2: exp) (b: binop):
+  var_of_exp (EBinop b e1 e2) = (var_of_exp e1) ++ (var_of_exp e2).
 Proof.
-  revert l.
-  induction e as [ c | | (v, t) | op e1 IH1 e2 IH2 ]; intros l; [ reflexivity.. | ].
   unfold var_of_exp.
   simpl.
-  rewrite IH1.
-  rewrite IH1.
-  rewrite IH2.
-  rewrite app_assoc.
+  rewrite var_of_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma var_of_exp_ifte_eq (e1 e2 e3: exp):
+  var_of_exp (EIfte e1 e2 e3) = (var_of_exp e1) ++ (var_of_exp e2) ++ (var_of_exp e3).
+Proof.
+  unfold var_of_exp.
+  simpl.
+  do 2 rewrite var_of_exp_aux_eq.
   reflexivity.
 Qed.
 
@@ -438,6 +558,35 @@ Proof.
     assumption.
 Qed.
 
+Lemma var_of_exp_not_in_ifte (e1 e2 e3: exp) (x: ident):
+  ~ In x (var_of_exp (EIfte e1 e2 e3)) ->
+  ~ In x (var_of_exp e1) /\ ~ In x (var_of_exp e2) /\ ~ In x (var_of_exp e3).
+Proof.
+  intros Hnin.
+  split.
+  - intros Hin.
+    apply Hnin.
+    unfold var_of_exp.
+    simpl.
+    apply var_of_exp_aux_in_exp.
+    assumption.
+  - split.
+    + intros Hin.
+      apply Hnin.
+      unfold var_of_exp.
+      simpl.
+      apply var_of_exp_aux_in_acc.
+      apply var_of_exp_aux_in_exp.
+      assumption.
+    + intros Hin.
+      apply Hnin.
+      unfold var_of_exp.
+      simpl.
+      apply var_of_exp_aux_in_acc.
+      apply var_of_exp_aux_in_acc.
+      assumption.
+Qed.
+
 Lemma var_of_exp_binop_empty (exp1 exp2: exp) (b: binop):
   var_of_exp (EBinop b exp1 exp2) = [] ->
   var_of_exp exp1 = [] /\ var_of_exp exp2 = [].
@@ -455,13 +604,22 @@ Proof.
     assumption.
 Qed.
 
-Lemma var_of_exp_binop_eq (e1 e2: exp) (b: binop):
-  var_of_exp (EBinop b e1 e2) = (var_of_exp e1) ++ (var_of_exp e2).
+Lemma var_of_exp_ifte_empty (e1 e2 e3: exp):
+  var_of_exp (EIfte e1 e2 e3) = [] ->
+  var_of_exp e1 = [] /\ var_of_exp e2 = [] /\ var_of_exp e3 = [].
 Proof.
-  unfold var_of_exp.
-  simpl.
-  rewrite var_of_exp_aux_eq.
-  reflexivity.
+  intros H.
+  unfold var_of_exp in *.
+  simpl in H.
+  apply var_of_exp_aux_empty in H as H2.
+  split.
+  - rewrite H2 in H.
+    assumption.
+  - apply var_of_exp_aux_empty in H2 as H3.
+    split.
+    + rewrite H3 in H2.
+      assumption.
+    + assumption.
 Qed.
 
 Lemma exp_no_var_is_evaluable (e: exp) (h: history):
@@ -469,13 +627,19 @@ Lemma exp_no_var_is_evaluable (e: exp) (h: history):
   is_evaluable e h.
 Proof.
   intros H.
-  induction e as [ c | b | (b, t) | op e1 IH1 e2 IH2 ].
+  induction e as [ c | | (v, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ].
   - exists (VConst c).
     reflexivity.
   - exists (VInput b).
     reflexivity.
   - unfold var_of_exp in H.
     discriminate.
+  - apply IH in H.
+    destruct H as [ v Hv ].
+    exists (VUnop op v).
+    simpl.
+    rewrite Hv.
+    reflexivity.
   - apply var_of_exp_binop_empty in H as [ H1 H2 ].
     specialize (IH1 H1) as [ v1 Hv1 ].
     specialize (IH2 H2) as [ v2 Hv2 ].
@@ -484,6 +648,14 @@ Proof.
     rewrite Hv1.
     rewrite Hv2.
     reflexivity.
+  - apply var_of_exp_ifte_empty in H as ( H1 & H2 & H3 ).
+    apply IH1 in H1 as [ v1 Hv1 ].
+    apply IH2 in H2 as [ v2 Hv2 ].
+    apply IH3 in H3 as [ v3 Hv3 ].
+    exists (VIfte v1 v2 v3).
+    simpl.
+    rewrite Hv1, Hv2, Hv3.
+    reflexivity.
 Qed.
 
 Lemma exp_with_evaluable_vars_is_evaluable (e: exp) (h: history):
@@ -491,7 +663,7 @@ Lemma exp_with_evaluable_vars_is_evaluable (e: exp) (h: history):
   exists v: value, eval_exp e h = Some v.
 Proof.
   intros H.
-  induction e as [ c | b | (b, t) | op e1 IH1 e2 IH2 ].
+  induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ].
   - exists (VConst c).
     reflexivity.
   - exists (VInput b).
@@ -499,6 +671,13 @@ Proof.
   - apply Forall_inv in H.
     destruct H as [ v Hv ].
     exists (Stream.hd v).
+    simpl.
+    rewrite Hv.
+    reflexivity.
+  - unfold var_of_exp in H.
+    simpl in H.
+    apply IH in H as [ v Hv ].
+    exists (VUnop op v).
     simpl.
     rewrite Hv.
     reflexivity.
@@ -510,6 +689,16 @@ Proof.
     simpl.
     rewrite Hv1, Hv2.
     reflexivity.
+  - rewrite var_of_exp_ifte_eq in H.
+    apply Forall_app in H as [ H1 H2 ]. 
+    apply Forall_app in H2 as [ H2 H3 ].
+    apply IH1 in H1 as [ v1 Hv1 ]. 
+    apply IH2 in H2 as [ v2 Hv2 ]. 
+    apply IH3 in H3 as [ v3 Hv3 ].
+    exists (VIfte v1 v2 v3).
+    simpl.
+    rewrite Hv1, Hv2, Hv3.
+    reflexivity. 
 Qed.
 
 Lemma exp_evaluable_have_evaluable_vars (e: exp) (h: history) (v: value):
@@ -518,14 +707,19 @@ Lemma exp_evaluable_have_evaluable_vars (e: exp) (h: history) (v: value):
 Proof.
   intros H.
   revert v H.
-  induction e as [ c' | | (b, t) | op e1 IH1 e2 IH2 ]; intros c H.
+  induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
   - constructor.
   - constructor.
   - constructor; [ | constructor ].
     simpl in H.
-    destruct (Dict.find b h) as [ s | ] eqn: Heq; [ | discriminate ].
+    destruct (Dict.find i h) as [ s | ] eqn: Heq; [ | discriminate ].
     exists s.
     assumption.
+  - unfold var_of_exp.
+    simpl in *.
+    destruct (eval_exp e h); [ | discriminate ].
+    apply IH with (v := v0).
+    reflexivity.
   - simpl in H.
     destruct (eval_exp e1 h) as [ v1 | ]; [ | discriminate ].
     destruct (eval_exp e2 h) as [ v2 | ]; [ | discriminate ].
@@ -534,6 +728,21 @@ Proof.
     rewrite var_of_exp_binop_eq.
     apply Forall_app.
     split; assumption.
+  - simpl in H.
+    destruct (eval_exp e1 h) as [ v1 | ]; [ | discriminate ].
+    destruct (eval_exp e2 h) as [ v2 | ]; [ | discriminate ].
+    destruct (eval_exp e3 h) as [ v3 | ]; [ | discriminate ].
+    rewrite var_of_exp_ifte_eq.
+    apply Forall_app.
+    split.
+    + apply IH1 with (v := v1).
+      reflexivity.
+    + apply Forall_app.
+      split.
+      * apply IH2 with (v := v2).
+        reflexivity.
+      * apply IH3 with (v := v3).
+        reflexivity.
 Qed.
 
 Theorem sem_eval_exp (e: exp) (h: history) (v: value):
@@ -542,16 +751,22 @@ Proof.
   split.
   - intros H.
     revert v H.
-    induction e as [ c' | t | (v, t) | op e1 IH1 e2 IH2 ]; intros c H.
+    induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
     + inversion H.
       apply SeConst.
     + inversion H.
       subst.
       apply SeInput.
     + inversion H.
-      destruct (Dict.find v h) as [ s | ] eqn: Heq; [ | discriminate ].
+      destruct (Dict.find i h) as [ s | ] eqn: Heq; [ | discriminate ].
       inversion H1.
       apply SeVar.
+      assumption.
+    + inversion H.
+      destruct (eval_exp e h) as [ v' | ]; [ | discriminate ].
+      specialize (IH v' eq_refl).
+      inversion H1.
+      apply SeUnop.
       assumption.
     + simpl in H.
       destruct (eval_exp e1 h) as [ v1 | ]; [ | discriminate ].
@@ -560,9 +775,18 @@ Proof.
       specialize (IH2 v2 eq_refl).
       inversion H.
       apply SeBinop; assumption.
+    + simpl in H.
+      destruct (eval_exp e1 h) as [ v1 | ]; [ | discriminate ].
+      destruct (eval_exp e2 h) as [ v2 | ]; [ | discriminate ].
+      destruct (eval_exp e3 h) as [ v3 | ]; [ | discriminate ].
+      specialize (IH1 v1 eq_refl).
+      specialize (IH2 v2 eq_refl).
+      specialize (IH3 v3 eq_refl).
+      inversion H.
+      apply SeIfte; assumption.
   - intros H.
     revert v H.
-    induction e as [ c' | t | (v, t) | op e1 IH1 e2 IH2 ]; intros c H.
+    induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
     + inversion H.
       reflexivity.
     + inversion H.
@@ -575,8 +799,22 @@ Proof.
     + inversion H.
       subst.
       simpl.
+      specialize (IH v0 H4).
+      rewrite IH.
+      reflexivity.
+    + inversion H.
+      subst.
+      simpl.
       specialize (IH1 v1 H5).
       specialize (IH2 v2 H6).
       rewrite IH1, IH2.
+      reflexivity.
+    + inversion H.
+      subst.
+      simpl.
+      specialize (IH1 _ H4).
+      specialize (IH2 _ H6).
+      specialize (IH3 _ H7).
+      rewrite IH1, IH2, IH3.
       reflexivity.
 Qed.
