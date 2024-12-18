@@ -101,6 +101,23 @@ Proof.
     now apply Sorted.cons in Hsort.
 Qed.
 
+Lemma maps_to_last_added {A: Type} (i: nat) (x: A) (d: t A):
+  maps_to i x (add i x d).
+Proof.
+  unfold maps_to, find.
+  apply Sorted.add_find_new_element.
+Qed.
+
+Lemma maps_to_not_last_added {A: Type} (i j: nat) (x y: A) (d: t A):
+  maps_to i x (add j y d) ->
+  i <> j ->
+  maps_to i x d.
+Proof.
+  intros Hmaps Hne.
+  unfold maps_to, find in Hmaps |- *.
+  apply Sorted.add_find_other_element with (j := j) (y := y); assumption.
+Qed.
+
 (** *** Map *)
 
 Lemma maps_to_map {A B: Type} (f: A -> B) (i: nat) (x: A) (d: t A):

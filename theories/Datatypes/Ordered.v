@@ -90,3 +90,67 @@ Proof.
   apply in_map with (f := fst) in Hly.
   assumption.
 Qed.
+
+Lemma app_right_side_l {A: Type} (l: list (A * list A)) (x: A) (lx1 lx2: list A):
+  t ((x, lx1 ++ lx2) :: l) ->
+  t ((x, lx1) :: l).
+Proof.
+  intros Hord.
+  revert lx1 lx2 Hord.
+  induction l as [ | (y, ly) l IH ]; intros lx1 lx2 Hord.
+  - constructor.
+    + apply cons in Hord.
+      assumption.
+    + inversion 1.
+    + inversion Hord; subst.
+      * symmetry in H0.
+        apply app_eq_nil in H0.
+        destruct H0.
+        subst.
+        constructor.
+      * apply incl_Forall with (l2 := lx1) in H4; [ assumption | ].
+        apply incl_appl.
+        apply incl_refl.
+  - inversion Hord; subst.
+    + symmetry in H0.
+      apply app_eq_nil in H0.
+      destruct H0.
+      subst.
+      constructor; assumption.
+    + constructor; [ assumption.. | ].
+      apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+      apply incl_appl.
+      apply incl_refl.
+Qed.
+
+Lemma app_right_side_r {A: Type} (l: list (A * list A)) (x: A) (lx1 lx2: list A):
+  t ((x, lx1 ++ lx2) :: l) ->
+  t ((x, lx2) :: l).
+Proof.
+  intros Hord.
+  revert lx1 lx2 Hord.
+  induction l as [ | (y, ly) l IH ]; intros lx1 lx2 Hord.
+  - constructor.
+    + apply cons in Hord.
+      assumption.
+    + inversion 1.
+    + inversion Hord; subst.
+      * symmetry in H0.
+        apply app_eq_nil in H0.
+        destruct H0.
+        subst.
+        constructor.
+      * apply incl_Forall with (l2 := lx2) in H4; [ assumption | ].
+        apply incl_appr.
+        apply incl_refl.
+  - inversion Hord; subst.
+    + symmetry in H0.
+      apply app_eq_nil in H0.
+      destruct H0.
+      subst.
+      constructor; assumption.
+    + constructor; [ assumption.. | ].
+      apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+      apply incl_appr.
+      apply incl_refl.
+Qed.

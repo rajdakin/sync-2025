@@ -213,27 +213,6 @@ Qed.
 Definition evaluable_equations (s: Target.stack) (l: list Source.equation): Prop :=
   Forall (fun eq => exists v: Target.value, Target.sem_exp s (translate_exp (snd eq)) v) l.
 
-Lemma Forall_impl_in {A: Type} (P Q: A -> Prop) (l: list A):
-  (forall a : A, In a l -> P a -> Q a) ->
-  Forall P l -> Forall Q l.
-Proof.
-  intros H Hforall.
-  induction l as [ | x l ]; [ constructor | ].
-  constructor.
-  - apply H.
-    + left.
-      reflexivity.
-    + apply Forall_inv with (l := l).
-      assumption.
-  - apply IHl.
-    + intros a Hin HPa.
-      apply H; [ | assumption ].
-      right.
-      assumption.
-    + apply Forall_inv_tail with (a := x).
-      assumption.
-Qed.
-
 Lemma ordered_equations_are_evaluable (h: Source.history) (l: list Source.equation):
   (Forall (fun eq =>
       exists (v': Stream.t Source.value),
@@ -275,7 +254,7 @@ Proof.
     subst.
     constructor.
     + assert (Forall (fun v => Dict.is_in v h) (Source.var_of_exp eq_right)) as Hvars.
-      * apply Forall_impl_in with (P := fun y => exists ly, In (y, ly) (LustreOrdered.equations_to_dag l)); [ | assumption ].
+      * apply LustreOrdered.Forall_impl_in with (P := fun y => exists ly, In (y, ly) (LustreOrdered.equations_to_dag l)); [ | assumption ].
         intros name Hin [ vars Hvars ].
         apply Forall_inv in Hhist as [ v' [ Hmaps Hsem ] ].
         apply Source.sem_eval_exp in Hsem.
@@ -381,14 +360,14 @@ Proof.
     assumption.
 Qed.
 
-Theorem correctness_node (n: LustreOrdered.node_ordered) (m: Target.method) (h: Source.history) (v: Stream.t Source.const):
+Lemma correctness_node_under_history_assumptions (n: LustreOrdered.node_ordered) (h: Source.history):
   (forall (i: ident), Dict.is_in i h <-> In i (map fst (Source.n_body (LustreOrdered.node_ordered_is_node n)))) ->
   (Forall (fun eq =>
       exists (v': Stream.t Source.value),
       Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')
     ) (Source.n_body (LustreOrdered.node_ordered_is_node n))
   ) ->
-    Target.sem_stmt (Dict.empty _) (Target.m_body (translate_node n)) (translate_history h).
+  Target.sem_stmt (Dict.empty _) (Target.m_body (translate_node n)) (translate_history h).
 Proof.
   intros Hhist Hsource.
   destruct n.
@@ -498,4 +477,13 @@ Proof.
          apply in_map with (f := fun '(i, x) => (i, Source.var_of_exp x)) in Hin.
          rewrite LustreOrdered.equations_to_dag_is_map.
          assumption.
+Qed.
+
+Theorem correctness_node (n: LustreOrdered.node_ordered):
+  exists h: Source.history,
+  Target.sem_stmt (Dict.empty _) (Target.m_body (translate_node n)) (translate_history h).
+Proof.
+  pose proof (LustreOrdered.minimal_history (Source.n_body (LustreOrdered.node_ordered_is_node n)) (LustreOrdered.ordered n)) as ( h & H1 & H2 ).
+  exists h.
+  apply correctness_node_under_history_assumptions; assumption.
 Qed.
