@@ -12,8 +12,11 @@ rule token = parse
   | "true"      {TRUE}
   | "false"     {FALSE}
   | "="         {EQ}
+  | ","         {COMMA}
   | ";"         {SEMI_COLON}
   | ":"         {COLON}
+  | "("         {LPAREN}
+  | ")"         {RPAREN}
   | "node"      {NODE}
   | "var"       {VAR}
   | "return"    {RETURN}

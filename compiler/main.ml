@@ -9,7 +9,7 @@ let parse_file filename =
   let tbool = snd Lustre.var_bool in
   let inx = open_in filename in
   let lexbuf = Lexing.from_channel inx in
-  let name, locals, ret, eqs =
+  let name, args, locals, ret, eqs =
     match Parser.node Lexer.token lexbuf with
     | v -> v
     | exception Lexer.Error msg ->
@@ -23,10 +23,10 @@ let parse_file filename =
   Lustre.
     {
       n_name = name;
-      n_in = [];
+      n_in = args;
       n_out = (ret, tbool);
       n_locals = locals;
-      n_body = eqs;
+      n_body = List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
     }
 
 let () =

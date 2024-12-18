@@ -1,7 +1,7 @@
 %{
     open Extracted.Lustre
 
-    let ident_map = Hashtbl.create 18
+    let ident_map = Hashtbl.create 19
     let gen_id =
       let i = ref 0 in
       fun () -> incr i; !i - 1
@@ -11,14 +11,14 @@
 %token LPAREN RPAREN
 %token AND OR XOR
 %token TRUE FALSE
-%token EQ SEMI_COLON COLON
+%token EQ SEMI_COLON COLON COMMA
 %token NODE RETURN VAR
 %token BOOL
 %token LET TEL EOF
 
 %left AND OR XOR
 
-%start<string * (binder list) * int * ((int*exp) list)> node
+%start<string * (binder list) *(binder list) * int * ((int*exp) list)> node
 
 %%
 
@@ -32,17 +32,23 @@ local_vars:
     { (id, typ) :: vars }
 
 node:
-  | NODE name=ident_node RETURN ret = ident COLON typ
+  | NODE name=ident_node LPAREN args=args RPAREN RETURN ret = ident COLON typ
     VAR locals = local_vars
     LET
       eqs = equation_list
     TEL EOF
-    { (name, locals, ret, eqs) }
-  | NODE name=ident_node RETURN ret = ident COLON typ
+    { (name, args,locals, ret, eqs) }
+  | NODE name=ident_node LPAREN args=args RPAREN RETURN ret = ident COLON typ
     LET
       eqs = equation_list
     TEL EOF
-    { (name, [], ret, eqs) }
+    { (name, args,[], ret, eqs) }
+
+args:
+  | id=ident COLON typ = typ COMMA args=args {(id,typ)::args}
+  | id=ident COLON typ = typ {(id,typ)::[]}
+  | { [] }
+
 
 ident:
   | id = IDENT

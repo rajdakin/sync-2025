@@ -23,18 +23,33 @@ let pp_op fmt op =
 let rec pp_expr fmt exp =
   match exp with
   | EConst c -> fprintf fmt "%a" pp_const c
-  | EInput _ -> fprintf fmt ""
+  | EInput _ -> ()
   | EVar v -> fprintf fmt "%a" pp_var v
   | EBinop (op, e1, e2) ->
       fprintf fmt "(%a %a@ %a)" pp_expr e1 pp_op op pp_expr e2
   | _ -> todo fmt
 
+let is_empty_sassign stmt =
+  match stmt with SAssign (_, EInput _) -> true | _ -> false
+
 let rec pp_stmt fmt stmt =
   match stmt with
+  | SAssign (_, EInput _) -> ()
+  | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt fmt s2
+  | SSeq (s1, s2) when is_empty_sassign s2 -> pp_stmt fmt s1
   | SAssign (x, e) -> fprintf fmt "%s %a =@ %a;" "char" pp_ident x pp_expr e
   | SSeq (s1, s2) -> fprintf fmt "%a \n %a" pp_stmt s1 pp_stmt s2
   | SNop -> fprintf fmt ""
 
+let pp_binder fmt binder = fprintf fmt "%a" pp_ident (fst binder)
+let pp_arg fmt arg = fprintf fmt "char %a" pp_binder arg
+
+let pp_args fmt (args : binder list) =
+  Format.pp_print_list
+    ~pp_sep:(fun fmt () -> fprintf fmt ",")
+    (fun fmt arg -> fprintf fmt "%a" pp_arg arg)
+    fmt args
+
 let pp_coq_method cm =
-  printf "char %a() {@[<h4>%a\n return %a;\n@]}" pp_fun_name (m_name cm) pp_stmt
-    (m_body cm) pp_var (m_out cm)
+  printf "char %a(%a) {@[<h4>%a\n return %a;\n@]}" pp_fun_name (m_name cm)
+    pp_args (m_in cm) pp_stmt (m_body cm) pp_var (m_out cm)
