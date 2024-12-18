@@ -65,8 +65,8 @@ var:
   | id = ident { id }
 
 const:
-  | TRUE { true }
-  | FALSE { false }
+  | TRUE { CBool true }
+  | FALSE { CBool false }
 
 expr:
   | LPAREN e = expr RPAREN { e }
