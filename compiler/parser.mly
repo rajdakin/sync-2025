@@ -10,12 +10,13 @@
 %token<string> IDENT
 %token<int> NUM
 %token LPAREN RPAREN
+%token EQ
 %token AND OR XOR NOT
 %token LE GE LT GT
 %token PLUS MINUS
 %token TIMES
 %token TRUE FALSE
-%token EQ SEMI_COLON COLON COMMA
+%token SEMI_COLON COLON COMMA
 %token NODE RETURN VAR
 %token BOOL INT VOID
 %token LET TEL EOF
@@ -24,6 +25,7 @@
 %left AND OR XOR NOT
 %left LT GT GE LE
 %left PLUS MINUS TIMES
+%left EQ
 %left ELSE
 
 %start<string * (binder list) *(binder list) * binder * ((int*exp) list)> node
@@ -102,6 +104,7 @@ expr:
   | e1 = expr LE e2 = expr { EBinop(Bop_le, e1, e2) }
   | e1 = expr GT e2 = expr { EBinop(Bop_gt, e1, e2) }
   | e1 = expr LT e2 = expr { EBinop(Bop_lt, e1, e2) }
+  | e1 = expr EQ e2 = expr { EBinop(Bop_eq, e1, e2) }
   | NOT e1 = expr             {EUnop(Uop_not,e1)}
   | MINUS e1 = expr           {EUnop(Uop_neg,e1)}
   | IF cond=expr THEN e1=expr ELSE e2=expr {EIfte(cond,e1,e2)}
