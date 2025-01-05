@@ -33,6 +33,14 @@ let () =
 
   let node = parse_file !input_file in
 
-  match LustreOrdering.translate_node node with
+  let checked_node =
+    match LustreAstToLustre.check_node_prop node with
+    | Ok m -> m
+    | Err x ->
+        printf "Error when node properties have been checked: %s\n" x;
+        exit 1
+  in
+
+  match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
   | Err x -> printf "Error lustre ordering translate: %s\n" x

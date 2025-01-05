@@ -203,6 +203,12 @@ Definition unop_eqb (x y: unop): bool :=
     | _, _ => false
   end.
 
+Lemma unop_dec (x y: unop) : {x = y} + {x <> y}.
+Proof.
+  destruct x, y.
+  all: try (right; discriminate); try (left; reflexivity).
+Defined.
+
 Definition binop_eqb (x y: binop): bool :=
   match x, y with
     | Bop_and, Bop_and => true
@@ -220,6 +226,12 @@ Definition binop_eqb (x y: binop): bool :=
     | _, _ => false
   end.
 
+Lemma binop_dec (x y: binop) : {x = y} + {x <> y}.
+Proof.
+  destruct x, y.
+  all: try (right; discriminate); try (left; reflexivity).
+Defined.
+
 Definition const_eqb (c1 c2: const): bool :=
   match c1, c2 with
     | CVoid, CVoid => true
@@ -227,6 +239,19 @@ Definition const_eqb (c1 c2: const): bool :=
     | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
     | _, _ => false
   end.
+
+Lemma const_dec (c1 c2: const) : {c1 = c2} + {c1 <> c2}.
+Proof.
+  destruct c1,c2.
+  all: try (right; discriminate).
+  - left; reflexivity.
+  - destruct (Bool.bool_dec b b0).
+    + left. rewrite e. reflexivity.
+    + right. inversion 1. contradiction.
+  - destruct (PeanoNat.Nat.eq_dec n n0).
+    + left. rewrite e. reflexivity.
+    + right. inversion 1. contradiction.
+Defined.
 
 Fixpoint exp_eqb (e1 e2: exp): bool :=
   match e1, e2 with
@@ -241,6 +266,41 @@ Fixpoint exp_eqb (e1 e2: exp): bool :=
       (exp_eqb e11 e21) && (exp_eqb e12 e22) && (exp_eqb e13 e23)
     | _, _ => false
   end.
+
+Lemma exp_dec (e1 e2: exp) : {e1 = e2} + {e1 <> e2}.
+Proof.
+  revert e2.
+  induction e1, e2.
+  all: try (right; discriminate).
+  - destruct (const_dec c c0).
+    + left. rewrite e. reflexivity.
+    + right. inversion 1. contradiction.
+  - destruct (binder_dec b b0).
+    + left. rewrite e. reflexivity.
+    + right. inversion 1. contradiction.
+  - destruct (binder_dec b b0).
+    + left. rewrite e. reflexivity.
+    + right. inversion 1. contradiction.
+  - destruct (unop_dec u u0).
+    2: {right. inversion 1. contradiction. }
+    destruct (IHe1 e2).
+    2: {right. inversion 1. contradiction. }
+    left. rewrite e, e0. reflexivity.
+  - destruct (binop_dec b b0).
+    2: {right. inversion 1. contradiction. }
+    destruct (IHe1_1 e2_1).
+    2: {right. inversion 1. contradiction. }
+    destruct (IHe1_2 e2_2).
+    2: {right. inversion 1. contradiction. }
+    left. rewrite e, e0, e1. reflexivity.
+  - destruct (IHe1_1 e2_1).
+    2: {right. inversion 1. contradiction. }
+    destruct (IHe1_2 e2_2).
+    2: {right. inversion 1. contradiction. }
+    destruct (IHe1_3 e2_3).
+    2: {right. inversion 1. contradiction. }
+    left. rewrite e, e0, e1. reflexivity.
+Defined.
 
 Lemma unop_eqb_refl (op: unop):
   unop_eqb op op = true.
@@ -364,6 +424,30 @@ Qed.
 
 Definition equation_eqb (eq1 eq2: equation): bool :=
   (fst eq1 =? fst eq2) && (exp_eqb (snd eq1) (snd eq2)).
+
+Lemma equation_dec (e1 e2: equation) : { e1 = e2 } + {e1 <> e2}.
+Proof.
+  destruct e1 as [ e1_name e1_exp].
+  destruct e2 as [e2_name e2_exp ].
+  pose proof (PeanoNat.Nat.eq_dec e1_name e2_name).
+  destruct H.
+  2: {
+    right.
+    inversion 1.
+    contradiction.
+  }
+
+  destruct (exp_dec e1_exp e2_exp).
+  2: {
+    right.
+    inversion 1.
+    contradiction.
+  }
+
+  left.
+  subst.
+  reflexivity.
+Defined.
 
 Lemma equation_eqb_to_eq (eq1 eq2: equation):
   equation_eqb eq1 eq2 = true -> eq1 = eq2.
