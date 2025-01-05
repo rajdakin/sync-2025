@@ -212,9 +212,6 @@ Fixpoint eval_exp (e: exp) (s: stack): option value :=
     end
   end.
 
-Definition is_evaluable (e: exp) (s: stack): Prop :=
-  exists v: value, eval_exp e s = Some v.
-
 
 (** ** Lemmas *)
 

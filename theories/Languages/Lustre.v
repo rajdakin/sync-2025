@@ -135,7 +135,7 @@ Proof.
   destruct x, y.
   1, 5, 9: left; reflexivity.
   all: right; inversion 1.
-Qed.
+Defined.
 
 Definition binder_eqb (x y: binder): bool :=
   andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
@@ -590,44 +590,9 @@ Proof.
       assumption.
 Qed.
 
-Lemma var_of_exp_binop_empty (exp1 exp2: exp) (b: binop):
-  var_of_exp (EBinop b exp1 exp2) = [] ->
-  var_of_exp exp1 = [] /\ var_of_exp exp2 = [].
-Proof.
-  intros H.
-  split.
-  - unfold var_of_exp in *.
-    simpl in H.
-    apply var_of_exp_aux_empty in H as H2.
-    rewrite H2 in H.
-    assumption.
-  - unfold var_of_exp in *.
-    simpl in H.
-    apply var_of_exp_aux_empty in H as H2.
-    assumption.
-Qed.
-
-Lemma var_of_exp_ifte_empty (e1 e2 e3: exp):
-  var_of_exp (EIfte e1 e2 e3) = [] ->
-  var_of_exp e1 = [] /\ var_of_exp e2 = [] /\ var_of_exp e3 = [].
-Proof.
-  intros H.
-  unfold var_of_exp in *.
-  simpl in H.
-  apply var_of_exp_aux_empty in H as H2.
-  split.
-  - rewrite H2 in H.
-    assumption.
-  - apply var_of_exp_aux_empty in H2 as H3.
-    split.
-    + rewrite H3 in H2.
-      assumption.
-    + assumption.
-Qed.
-
 Lemma exp_with_evaluable_vars_is_evaluable (e: exp) (h: history):
   Forall (fun v => Dict.is_in v h) (var_of_exp e) ->
-  exists v: value, eval_exp e h = Some v.
+  is_evaluable e h.
 Proof.
   intros H.
   induction e as [ c | | (i, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ].
