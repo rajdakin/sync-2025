@@ -1,6 +1,6 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Ordered.
-From Reactive.Languages Require LustreAst Lustre LustreAst.
+From Reactive.Languages Require LustreAst Lustre.
 
 Module Lustre := Lustre.
 
