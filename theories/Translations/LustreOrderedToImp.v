@@ -224,29 +224,11 @@ Proof.
   intros Hhist Hord.
   remember (LustreOrdered.equations_to_dag l) as dag.
   revert l Hhist Heqdag.
-  induction Hord as [ | x l' | x lx l' ]; intros l Hhist Heqdag.
+  induction Hord as [ | x lx l' ]; intros l Hhist Heqdag.
   - symmetry in Heqdag.
     apply LustreOrdered.dag_nil in Heqdag.
     rewrite Heqdag.
     constructor.
-  - destruct l as [ | eq l ]; [ constructor | ].
-    simpl in Heqdag.
-    destruct eq as [ eq_left eq_right ].
-    inversion Heqdag.
-    subst.
-    symmetry in H2.
-    apply Source.exp_no_var_is_evaluable with (h := h) in H2 as [ c Hc ].
-    constructor.
-    + exists (translate_value c).
-      apply correctness_exp.
-      apply Source.sem_eval_exp.
-      assumption.
-    + apply Forall_inv_tail in Hhist.
-      apply Forall_impl with (P := fun eq => exists v', Dict.maps_to (fst eq) v' h /\ Source.sem_exp h (snd eq) (Stream.hd v')); [ | assumption ].
-      intros (name, exp) [ v' [ Hmaps Hsem ] ].
-      exists (translate_value (Stream.hd v')).
-      apply correctness_exp.
-      assumption.
   - destruct l as [ | eq l ]; [ constructor | ].
     simpl in Heqdag.
     destruct eq as [ eq_left eq_right ].

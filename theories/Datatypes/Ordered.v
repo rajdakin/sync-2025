@@ -3,10 +3,6 @@ From Reactive Require Export Base.
 
 Inductive t {A: Type}: list (A * list A) -> Prop :=
   | nil : t []
-  | alone (x: A) (l: list (A * list A)):
-      t l ->
-      ~ In x (map fst l) ->
-      t ((x, []) :: l)
   | append (x: A) (lx: list A) (l: list (A * list A)):
       t l ->
       ~ In x (map fst l) ->
@@ -19,8 +15,7 @@ Lemma cons {A: Type} (l: list (A * list A)) (x: A * list A):
 Proof.
   intros H.
   inversion H; subst.
-  - assumption.
-  - assumption.
+  assumption.
 Qed.
 
 Lemma vars_no_dups {A: Type} (l: list (A * list A)) (x: A) (lx: list A):
@@ -37,9 +32,9 @@ Lemma var_cons_in_right_side {A: Type} (x y: A) (lx: list A) (l: list (A * list 
   exists ly: list A, In (y, ly) l.
 Proof.
   intros Hord Hin.
-  inversion Hord; subst.
-  - inversion Hin.
-  - apply Forall_forall with (x := y) in H4; assumption.
+  inversion Hord.
+  subst.
+  apply Forall_forall with (x := y) in H4; assumption.
 Qed.
 
 Lemma var_in_right_side {A: Type} (x y: A) (lx: list A) (l: list (A * list A)):
@@ -102,25 +97,17 @@ Proof.
     + apply cons in Hord.
       assumption.
     + inversion 1.
-    + inversion Hord; subst.
-      * symmetry in H0.
-        apply app_eq_nil in H0.
-        destruct H0.
-        subst.
-        constructor.
-      * apply incl_Forall with (l2 := lx1) in H4; [ assumption | ].
-        apply incl_appl.
-        apply incl_refl.
-  - inversion Hord; subst.
-    + symmetry in H0.
-      apply app_eq_nil in H0.
-      destruct H0.
+    + inversion Hord.
       subst.
-      constructor; assumption.
-    + constructor; [ assumption.. | ].
-      apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+      apply incl_Forall with (l2 := lx1) in H4; [ assumption | ].
       apply incl_appl.
       apply incl_refl.
+  - inversion Hord.
+    subst.
+    constructor; [ assumption.. | ].
+    apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+    apply incl_appl.
+    apply incl_refl.
 Qed.
 
 Lemma app_right_side_r {A: Type} (l: list (A * list A)) (x: A) (lx1 lx2: list A):
@@ -134,23 +121,14 @@ Proof.
     + apply cons in Hord.
       assumption.
     + inversion 1.
-    + inversion Hord; subst.
-      * symmetry in H0.
-        apply app_eq_nil in H0.
-        destruct H0.
-        subst.
-        constructor.
-      * apply incl_Forall with (l2 := lx2) in H4; [ assumption | ].
-        apply incl_appr.
-        apply incl_refl.
-  - inversion Hord; subst.
-    + symmetry in H0.
-      apply app_eq_nil in H0.
-      destruct H0.
+    + inversion Hord.
       subst.
-      constructor; assumption.
-    + constructor; [ assumption.. | ].
-      apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+      apply incl_Forall with (l2 := lx2) in H4; [ assumption | ].
       apply incl_appr.
       apply incl_refl.
+  - inversion Hord; subst.
+    constructor; [ assumption.. | ].
+    apply incl_Forall with (l1 := lx1 ++ lx2); [ | assumption ].
+    apply incl_appr.
+    apply incl_refl.
 Qed.

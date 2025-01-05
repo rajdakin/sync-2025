@@ -87,7 +87,7 @@ Proof.
   { apply Result.Err, "Identifier is in list". }
 
   induction l as [| y ? IHl ].
-  { apply Result.Ok, Ordered.alone; assumption. }
+  { apply Result.Ok, Ordered.append; [ assumption | assumption | constructor ]. }
 
   inversion IHl as [ IHl' | err ].
   2: { apply Result.Err, err. }
@@ -103,8 +103,7 @@ Proof.
   { now apply Sorted.in_map_fst. }
 
   inversion IHl'.
-  + constructor.
-  + assumption.
+  assumption.
 Defined.
 
 
