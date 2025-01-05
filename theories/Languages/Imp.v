@@ -193,16 +193,6 @@ Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
 
 (** ** Properties *)
 
-Fixpoint has_var (e: exp): bool :=
-  match e with
-    | EConst _ => false
-    | EInput _ => false
-    | EVar _ => true
-    | EUnop _ e => has_var e
-    | EBinop _ e1 e2 => has_var e1 || has_var e2
-    | EIfte e1 e2 e3 => has_var e1 || has_var e2 || has_var e3
-  end.
-
 Fixpoint eval_exp (e: exp) (s: stack): option value :=
   match e with
     | EConst c => Some (VConst c)
@@ -227,48 +217,6 @@ Definition is_evaluable (e: exp) (s: stack): Prop :=
 
 
 (** ** Lemmas *)
-
-Lemma exp_no_var_is_evaluable (e: exp):
-  has_var e = false ->
-  forall (s: stack), is_evaluable e s.
-Proof.
-  intros H.
-  induction e as [ c | | (v, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ]; intros s.
-  - exists (VConst c).
-    simpl.
-    reflexivity.
-  - exists (VInput b).
-    reflexivity.
-  - simpl in H.
-    discriminate.
-  - simpl in H.
-    apply IH with (s := s) in H as [ v Hv ].
-    exists (VUnop op v).
-    simpl.
-    rewrite Hv.
-    reflexivity.
-  - simpl in H.
-    apply Bool.orb_false_iff in H.
-    destruct H as [ H1 H2 ].
-    apply IH1 with (s := s) in H1.
-    apply IH2 with (s := s) in H2.
-    destruct H1 as [ v1 H1 ].
-    destruct H2 as [ v2 H2 ].
-    exists (VBinop op v1 v2).
-    simpl.
-    rewrite H1, H2.
-    reflexivity.
-  - simpl in H.
-    apply Bool.orb_false_iff in H as [ H H3 ].
-    apply Bool.orb_false_iff in H as [ H1 H2 ].
-    apply IH1 with (s := s) in H1 as [ v1 Hv1 ].
-    apply IH2 with (s := s) in H2 as [ v2 Hv2 ].
-    apply IH3 with (s := s) in H3 as [ v3 Hv3 ].
-    exists (VIfte v1 v2 v3).
-    simpl.
-    rewrite Hv1, Hv2, Hv3.
-    reflexivity.
-Qed.
 
 Lemma type_eqb_refl (t: type):
   type_eqb t t = true.

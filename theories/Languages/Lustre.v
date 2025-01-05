@@ -625,42 +625,6 @@ Proof.
     + assumption.
 Qed.
 
-Lemma exp_no_var_is_evaluable (e: exp) (h: history):
-  var_of_exp e = [] ->
-  is_evaluable e h.
-Proof.
-  intros H.
-  induction e as [ c | | (v, t) | op e IH | op e1 IH1 e2 IH2 | e1 IH1 e2 IH2 e3 IH3 ].
-  - exists (VConst c).
-    reflexivity.
-  - exists (VInput b).
-    reflexivity.
-  - unfold var_of_exp in H.
-    discriminate.
-  - apply IH in H.
-    destruct H as [ v Hv ].
-    exists (VUnop op v).
-    simpl.
-    rewrite Hv.
-    reflexivity.
-  - apply var_of_exp_binop_empty in H as [ H1 H2 ].
-    specialize (IH1 H1) as [ v1 Hv1 ].
-    specialize (IH2 H2) as [ v2 Hv2 ].
-    exists (VBinop op v1 v2).
-    simpl.
-    rewrite Hv1.
-    rewrite Hv2.
-    reflexivity.
-  - apply var_of_exp_ifte_empty in H as ( H1 & H2 & H3 ).
-    apply IH1 in H1 as [ v1 Hv1 ].
-    apply IH2 in H2 as [ v2 Hv2 ].
-    apply IH3 in H3 as [ v3 Hv3 ].
-    exists (VIfte v1 v2 v3).
-    simpl.
-    rewrite Hv1, Hv2, Hv3.
-    reflexivity.
-Qed.
-
 Lemma exp_with_evaluable_vars_is_evaluable (e: exp) (h: history):
   Forall (fun v => Dict.is_in v h) (var_of_exp e) ->
   exists v: value, eval_exp e h = Some v.
