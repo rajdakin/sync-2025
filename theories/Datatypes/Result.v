@@ -1,6 +1,6 @@
 From Reactive Require Export Base.
 
-From Coq Require Export String.
+From Stdlib Require Export String.
 
 
 Inductive t (A: Type): Type :=

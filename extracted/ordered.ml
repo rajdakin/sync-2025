@@ -81,7 +81,7 @@ let node_ordering (node : Lustre.node) : LustreOrdered.node_ordered Result.t =
   | None ->
       let new_order =
         reorder_list node.n_body
-          (List.map
+          (Stdlib.List.map
              (fun idx -> Hashtbl.find index_table idx)
              (topological_sort graph))
       in

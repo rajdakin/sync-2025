@@ -3,7 +3,7 @@ From Reactive.Datatypes Require Dict Stream.
 From Reactive.Languages Require LustreAst.
 
 
-From Coq Require Import Permutation String.
+From Stdlib Require Import Permutation String.
 
 Module LustreAst := LustreAst.
 

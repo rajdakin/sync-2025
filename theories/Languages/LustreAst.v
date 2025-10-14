@@ -3,7 +3,7 @@ From Reactive Require Import Base.
 From Reactive.Datatypes Require Dict Stream.
 
 
-From Coq Require Import Permutation String.
+From Stdlib Require Import Permutation String.
 
 Inductive type: Type :=
   | TVoid

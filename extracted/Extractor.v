@@ -1,7 +1,7 @@
 From Reactive.Translations Require LustreAstToLustre LustreOrderedToImp LustreOrdering.
 
-From Coq Require Extraction.
-From Coq Require Import ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlNativeString.
+From Corelib Require Extraction.
+From Stdlib Require Import ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlNativeString.
 
 #[local] Set Warnings "-extraction-default-directory".
 

@@ -1,7 +1,7 @@
 #[export] Set Default Goal Selector "!".
 
-From Coq Require Export List Nat String.
-From Coq Require Export Lia.
+From Stdlib Require Export List Nat String.
+From Stdlib Require Export Lia.
 
 Export ListNotations.
 Open Scope nat_scope.

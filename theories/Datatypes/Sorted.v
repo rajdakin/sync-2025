@@ -1,7 +1,7 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Comparison.
 
-From Coq Require Export Sorting.
+From Stdlib Require Export Sorting.
 
 
 Definition t {A: Type}: list (nat * A) -> Prop :=

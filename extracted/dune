@@ -3,7 +3,7 @@
  (extracted_modules
   Ascii
   Bool
-  List
+  List ListDec ListDef
   Mergesort
   Nat
   Orders
@@ -22,7 +22,7 @@
   LustreAstToLustre
   LustreOrdering
   LustreOrderedToImp)
- (theories Reactive Reactive.Datatypes Reactive.Translations))
+ (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations))
 
 (library
  (name extracted)

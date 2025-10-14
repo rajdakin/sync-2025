@@ -3,7 +3,7 @@ From Reactive Require Import Base.
 From Reactive.Datatypes Require Result Sorted.
 From Reactive.Languages Require Lustre LustreOrdered.
 
-From Coq Require Import Sorting Permutation.
+From Stdlib Require Import Sorting Permutation.
 
 
 Open Scope string_scope.

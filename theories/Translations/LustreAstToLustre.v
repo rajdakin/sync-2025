@@ -3,7 +3,7 @@ From Reactive Require Import Base.
 From Reactive.Datatypes Require Result.
 From Reactive.Languages Require LustreAst Lustre.
 
-From Coq Require Import ListDec Bool Sorting Permutation.
+From Stdlib Require Import ListDec Bool Sorting Permutation.
 
 Module Source := LustreAst.
 Module Target := Lustre.

@@ -1,3 +1,4 @@
 (coq.theory
  (name Reactive)
- (package Reactive))
+ (package Reactive)
+ (theories Stdlib))
