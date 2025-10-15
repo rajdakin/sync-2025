@@ -25,7 +25,8 @@ let parse_file filename =
       n_in = args;
       n_out = ret;
       n_locals = locals;
-      n_body = Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
+      n_body =
+        Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
     }
 
 let () =

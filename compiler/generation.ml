@@ -46,12 +46,14 @@ type parent_op =
   | TernaryR
 
 (* [op] needs to be parenthesized when inside [parent_op] *)
-let needs_paren_unary op parent_op = match parent_op, op with
+let needs_paren_unary op parent_op =
+  match (parent_op, op) with
   | None, _ -> false
   | _, Uop_not -> true
   | _, Uop_neg -> true
 
-let needs_paren_binary op parent_op = match parent_op, op with
+let needs_paren_binary op parent_op =
+  match (parent_op, op) with
   | None, _ -> false
   (* Boolean operators *)
   | Some (BinaryL pop | BinaryR pop), (Bop_and | Bop_or) when pop = op -> false
@@ -59,13 +61,23 @@ let needs_paren_binary op parent_op = match parent_op, op with
   | Some (BinaryL (Bop_and | Bop_or) | BinaryR (Bop_and | Bop_or)), _ -> true
   (* Comparisons operators *)
   | _, (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) -> true
-  | Some (BinaryL (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) | BinaryR (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt)), _ -> false
+  | ( Some
+        ( BinaryL (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt)
+        | BinaryR (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) ),
+      _ ) ->
+      false
   (* Arithmetic operators *)
   | Some (BinaryL Bop_xor | BinaryR Bop_xor), Bop_xor -> false
   | _, Bop_xor -> true
-  | Some (BinaryL (Bop_plus | Bop_minus) | BinaryR Bop_plus), (Bop_plus | Bop_minus) -> false
+  | ( Some (BinaryL (Bop_plus | Bop_minus) | BinaryR Bop_plus),
+      (Bop_plus | Bop_minus) ) ->
+      false
   | _, (Bop_plus | Bop_minus) -> true
-  | Some (BinaryL (Bop_mult | Bop_div | Bop_plus | Bop_minus) | BinaryR (Bop_mult | Bop_plus | Bop_minus)), (Bop_mult | Bop_div) -> false
+  | ( Some
+        ( BinaryL (Bop_mult | Bop_div | Bop_plus | Bop_minus)
+        | BinaryR (Bop_mult | Bop_plus | Bop_minus) ),
+      (Bop_mult | Bop_div) ) ->
+      false
   | _, (Bop_mult | Bop_div) -> true
 
 let needs_paren_ternary _parent_op = true
@@ -76,14 +88,29 @@ let rec pp_expr parent_op fmt exp =
   | EInput _ -> ()
   | EVar v -> fprintf fmt "%a" pp_var v
   | EUnop (op, e) ->
-      if needs_paren_unary op parent_op then fprintf fmt "@[(%a%a)@]" pp_unop op (pp_expr (Some (Unary op))) e
+      if needs_paren_unary op parent_op then
+        fprintf fmt "@[(%a%a)@]" pp_unop op (pp_expr (Some (Unary op))) e
       else fprintf fmt "@[%a%a@]" pp_unop op (pp_expr (Some (Unary op))) e
   | EBinop (op, e1, e2) ->
-      if needs_paren_binary op parent_op then fprintf fmt "(@[%a %a@ %a@])" (pp_expr (Some (BinaryL op))) e1 pp_binop op (pp_expr (Some (BinaryR op))) e2
-      else fprintf fmt "@[<hv2>%a %a@ %a@]" (pp_expr (Some (BinaryL op))) e1 pp_binop op (pp_expr (Some (BinaryR op))) e2
+      if needs_paren_binary op parent_op then
+        fprintf fmt "(@[%a %a@ %a@])"
+          (pp_expr (Some (BinaryL op)))
+          e1 pp_binop op
+          (pp_expr (Some (BinaryR op)))
+          e2
+      else
+        fprintf fmt "@[<hv2>%a %a@ %a@]"
+          (pp_expr (Some (BinaryL op)))
+          e1 pp_binop op
+          (pp_expr (Some (BinaryR op)))
+          e2
   | EIfte (cond, e1, e2) ->
-      if needs_paren_ternary parent_op then fprintf fmt "@[<hv>(%a ?@ %a :@ %a)@]" (pp_expr (Some TernaryL)) cond (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
-      else fprintf fmt "@[<hv>%a ?@ %a :@ %a@]" (pp_expr (Some TernaryL)) cond (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
+      if needs_paren_ternary parent_op then
+        fprintf fmt "@[<hv>(%a ?@ %a :@ %a)@]" (pp_expr (Some TernaryL)) cond
+          (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
+      else
+        fprintf fmt "@[<hv>%a ?@ %a :@ %a@]" (pp_expr (Some TernaryL)) cond
+          (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
 
 let is_empty_sassign stmt =
   match stmt with SAssign (_, EInput _) -> true | _ -> false
@@ -95,7 +122,8 @@ let rec pp_stmt env fmt stmt =
   match stmt with
   | SAssign (_, EInput _) -> ()
   | SAssign (x, e) ->
-      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ x env) pp_ident x (pp_expr None) e
+      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ x env) pp_ident x
+        (pp_expr None) e
   | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt env fmt s2
   | SSeq (s1, s2) when is_empty_sassign s2 -> pp_stmt env fmt s1
   | SSeq (s1, s2) -> fprintf fmt "%a@\n%a" (pp_stmt env) s1 (pp_stmt env) s2
