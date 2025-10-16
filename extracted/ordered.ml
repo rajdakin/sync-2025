@@ -67,8 +67,8 @@ let node_to_graph (node : Lustre.node) : graph * (int, vertex) Hashtbl.t =
       value
   in
   Stdlib.List.iter
-    (fun (v, exp) ->
-      let vars = remove_dup @@ LustreAst.var_of_exp exp in
+    (fun (v, Specif.Coq_existT (ty, exp)) ->
+      let vars = remove_dup @@ Stdlib.List.map fst @@ Lustre.var_of_exp ty exp in
       Stdlib.List.iter (fun u -> ignore @@ var_idx u) vars;
       g.(var_idx v) <- vars)
     node.n_body;

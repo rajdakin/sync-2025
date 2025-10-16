@@ -24,8 +24,6 @@ let pp_unop fmt op =
 
 let pp_binop fmt op =
   match op with
-  | Bop_and -> fprintf fmt "&&"
-  | Bop_or -> fprintf fmt "||"
   | Bop_xor -> fprintf fmt "^"
   | Bop_plus -> fprintf fmt "+"
   | Bop_minus -> fprintf fmt "-"
@@ -41,24 +39,37 @@ type parent_op =
   | Unary of unop
   | BinaryL of binop
   | BinaryR of binop
+  | BinaryAndL | BinaryOrL
+  | BinaryAndR | BinaryOrR
   | TernaryL
   | TernaryM
   | TernaryR
 
 (* [op] needs to be parenthesized when inside [parent_op] *)
 let needs_paren_unary op parent_op =
-  match (parent_op, op) with
+  match parent_op, op with
   | None, _ -> false
   | _, Uop_not -> true
   | _, Uop_neg -> true
 
+let needs_paren_binary_and parent_op =
+  match parent_op with
+  | None -> false
+  | Some (BinaryAndL | BinaryAndR) -> false
+  | Some _ -> true
+
+let needs_paren_binary_or parent_op =
+  match parent_op with
+  | None -> false
+  | Some (BinaryOrL | BinaryOrR) -> false
+  | Some _ -> true
+
 let needs_paren_binary op parent_op =
-  match (parent_op, op) with
+  match parent_op, op with
   | None, _ -> false
   (* Boolean operators *)
-  | Some (BinaryL pop | BinaryR pop), (Bop_and | Bop_or) when pop = op -> false
-  | _, (Bop_and | Bop_or) -> true
-  | Some (BinaryL (Bop_and | Bop_or) | BinaryR (Bop_and | Bop_or)), _ -> true
+  | Some (BinaryAndL | BinaryOrL | BinaryAndR | BinaryOrR), _ -> true
+  (* Xor is not a boolean operator... *)
   (* Comparisons operators *)
   | _, (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) -> true
   | ( Some
@@ -84,27 +95,43 @@ let needs_paren_ternary _parent_op = true
 
 let rec pp_expr parent_op fmt exp =
   match exp with
-  | EConst c -> fprintf fmt "%a" pp_const c
+  | EConst (_, c) -> fprintf fmt "%a" pp_const c
   | EInput _ -> ()
   | EVar v -> fprintf fmt "%a" pp_var v
-  | EUnop (op, e) ->
+  | EUnop (_, _, op, e) ->
       if needs_paren_unary op parent_op then
         fprintf fmt "@[(%a%a)@]" pp_unop op (pp_expr (Some (Unary op))) e
       else fprintf fmt "@[%a%a@]" pp_unop op (pp_expr (Some (Unary op))) e
-  | EBinop (op, e1, e2) ->
+  | EBAnd (e1, e2) ->
+      if needs_paren_binary_and parent_op then
+        fprintf fmt "(@[%a &&@ %a@])"
+          (pp_expr (Some BinaryAndL)) e1
+          (pp_expr (Some BinaryAndR)) e2
+      else
+        fprintf fmt "@[<hv2>%a &&@ %a@]"
+          (pp_expr (Some BinaryAndL)) e1
+          (pp_expr (Some BinaryAndR)) e2
+  | EBOr (e1, e2) ->
+      if needs_paren_binary_or parent_op then
+        fprintf fmt "(@[%a ||@ %a@])"
+          (pp_expr (Some BinaryOrL)) e1
+          (pp_expr (Some BinaryOrR)) e2
+      else
+        fprintf fmt "@[<hv2>%a ||@ %a@]"
+          (pp_expr (Some BinaryOrL)) e1
+          (pp_expr (Some BinaryOrR)) e2
+  | EBinop (_, _, _, op, e1, e2) ->
       if needs_paren_binary op parent_op then
         fprintf fmt "(@[%a %a@ %a@])"
-          (pp_expr (Some (BinaryL op)))
-          e1 pp_binop op
-          (pp_expr (Some (BinaryR op)))
-          e2
+          (pp_expr (Some (BinaryL op))) e1
+          pp_binop op
+          (pp_expr (Some (BinaryR op))) e2
       else
         fprintf fmt "@[<hv2>%a %a@ %a@]"
-          (pp_expr (Some (BinaryL op)))
-          e1 pp_binop op
-          (pp_expr (Some (BinaryR op)))
-          e2
-  | EIfte (cond, e1, e2) ->
+          (pp_expr (Some (BinaryL op))) e1
+          pp_binop op
+          (pp_expr (Some (BinaryR op))) e2
+  | EIfte (_, cond, e1, e2) ->
       if needs_paren_ternary parent_op then
         fprintf fmt "@[<hv>(%a ?@ %a :@ %a)@]" (pp_expr (Some TernaryL)) cond
           (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
@@ -121,7 +148,7 @@ let get_var_typ var env =
 let rec pp_stmt env fmt stmt =
   match stmt with
   | SAssign (_, EInput _) -> ()
-  | SAssign (x, e) ->
+  | SAssign ((x, _), e) ->
       fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ x env) pp_ident x
         (pp_expr None) e
   | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt env fmt s2

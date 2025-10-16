@@ -87,7 +87,8 @@ Proof.
     end).
 Defined.
 
-Definition check_body (entry: Source.node): Result.t { body : list Target.equation | incl (map fst body) (map fst (nvars entry)) }.
+Definition check_body (entry: Source.node): Result.t
+  { body : list Target.equation | incl (map (fun '(n, existT _ ty _) => (n, ty)) body) (nvars entry) }.
 Proof.
   pose (env := fold_left (fun d '(n, ty) => Dict.add n ty d) (nvars entry) (Dict.empty _)).
   destruct entry.
@@ -100,14 +101,14 @@ Proof.
     refine (Result.bind IH _); clear IH.
     intros [ eqs IH ].
     cbn.
-    exact (match ListDec.incl_dec PeanoNat.Nat.eq_dec (n :: map fst eqs) _ with
+    exact (match ListDec.incl_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) ((n, _) :: map (fun '(y, existT _ ty _) => (y, ty)) eqs) _ with
       | left h => Result.Ok (exist (fun body => incl (map _ body) _) ((n, existT Target.exp ty e') :: eqs) (incl_cons (h _ (or_introl eq_refl)) IH))
       | right _ => Result.Err "A variable is never declared"
       end).
 Defined.
 
 Definition n_assigned_vars (body: list Target.equation) :=
-  map fst body.
+  map (fun '(n, existT _ ty _) => (n, ty)) body.
 
 Scheme Equality for list.
 
@@ -137,9 +138,9 @@ Definition list_eq_dec_binder :=
 Definition list_eq_dec_equation :=
   list_eq_dec _ Source.equation_eqb Source.equation_eqb_to_eq Source.equation_eq_to_eqb.
 
-Definition check_assigned_out (entry: Source.node) body: Result.t (In (fst (convert_binder (Source.n_out entry))) (n_assigned_vars body)).
+Definition check_assigned_out (entry: Source.node) body: Result.t (In (convert_binder (Source.n_out entry)) (n_assigned_vars body)).
 Proof.
-  exact (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with
+  exact (match ListDec.In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) _ _ with
     | left h => Result.Ok h
     | right h => Result.Err "The output variable is never assigned"
   end).
