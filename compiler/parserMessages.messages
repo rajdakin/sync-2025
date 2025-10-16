@@ -1,0 +1,939 @@
+node: XOR
+##
+## Ends in an error in state: 0.
+##
+## node' -> . node [ # ]
+##
+## The known suffix of the stack is as follows:
+##
+##
+
+Unexpected token, expected 'node'.
+
+node: NODE XOR
+##
+## Ends in an error in state: 1.
+##
+## node -> NODE . ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE . ident_node LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE
+##
+
+Unexpected token, expected node name.
+
+node: NODE IDENT XOR
+##
+## Ends in an error in state: 3.
+##
+## node -> NODE ident_node . LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE ident_node . LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN XOR
+##
+## Ends in an error in state: 4.
+##
+## node -> NODE ident_node LPAREN . args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE ident_node LPAREN . args RPAREN returns LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN IDENT XOR
+##
+## Ends in an error in state: 6.
+##
+## args -> ident . COLON typ COMMA args [ RPAREN ]
+## args -> ident . COLON typ [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN IDENT COLON XOR
+##
+## Ends in an error in state: 7.
+##
+## args -> ident COLON . typ COMMA args [ RPAREN ]
+## args -> ident COLON . typ [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN IDENT COLON BOOL XOR
+##
+## Ends in an error in state: 11.
+##
+## args -> ident COLON typ . COMMA args [ RPAREN ]
+## args -> ident COLON typ . [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
+##
+## Ends in an error in state: 12.
+##
+## args -> ident COLON typ COMMA . args [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ COMMA
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN XOR
+##
+## Ends in an error in state: 15.
+##
+## node -> NODE ident_node LPAREN args RPAREN . returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE ident_node LPAREN args RPAREN . returns LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN XOR
+##
+## Ends in an error in state: 16.
+##
+## returns -> RETURN . ident COLON typ [ VAR LET ]
+##
+## The known suffix of the stack is as follows:
+## RETURN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT XOR
+##
+## Ends in an error in state: 17.
+##
+## returns -> RETURN ident . COLON typ [ VAR LET ]
+##
+## The known suffix of the stack is as follows:
+## RETURN ident
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON XOR
+##
+## Ends in an error in state: 18.
+##
+## returns -> RETURN ident COLON . typ [ VAR LET ]
+##
+## The known suffix of the stack is as follows:
+## RETURN ident COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL XOR
+##
+## Ends in an error in state: 20.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns . VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE ident_node LPAREN args RPAREN returns . LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR XOR
+##
+## Ends in an error in state: 21.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns VAR . local_vars LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns VAR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON LET XOR
+##
+## Ends in an error in state: 23.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns VAR local_vars LET . equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns VAR local_vars LET
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT XOR
+##
+## Ends in an error in state: 24.
+##
+## equation_list -> ident . EQ expr SEMI_COLON [ TEL ]
+## equation_list -> ident . EQ expr SEMI_COLON equation_list [ TEL ]
+##
+## The known suffix of the stack is as follows:
+## ident
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ XOR
+##
+## Ends in an error in state: 25.
+##
+## equation_list -> ident EQ . expr SEMI_COLON [ TEL ]
+## equation_list -> ident EQ . expr SEMI_COLON equation_list [ TEL ]
+##
+## The known suffix of the stack is as follows:
+## ident EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ NOT XOR
+##
+## Ends in an error in state: 28.
+##
+## expr -> NOT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## NOT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ MINUS XOR
+##
+## Ends in an error in state: 29.
+##
+## expr -> MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## MINUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ LPAREN XOR
+##
+## Ends in an error in state: 30.
+##
+## expr -> LPAREN . expr RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF XOR
+##
+## Ends in an error in state: 31.
+##
+## expr -> IF . expr THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IF
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE SEMI_COLON
+##
+## Ends in an error in state: 35.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> IF expr . THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IF expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE XOR XOR
+##
+## Ends in an error in state: 36.
+##
+## expr -> expr XOR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr XOR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE XOR FALSE VOID
+##
+## Ends in an error in state: 37.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr XOR expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr XOR expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE TIMES XOR
+##
+## Ends in an error in state: 38.
+##
+## expr -> expr TIMES . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr TIMES
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE TIMES FALSE VOID
+##
+## Ends in an error in state: 39.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr TIMES expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr TIMES expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE EQ XOR
+##
+## Ends in an error in state: 40.
+##
+## expr -> expr EQ . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr EQ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE PLUS XOR
+##
+## Ends in an error in state: 43.
+##
+## expr -> expr PLUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr PLUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE PLUS FALSE VOID
+##
+## Ends in an error in state: 44.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr PLUS expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr PLUS expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE MINUS XOR
+##
+## Ends in an error in state: 45.
+##
+## expr -> expr MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr MINUS
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE MINUS FALSE VOID
+##
+## Ends in an error in state: 46.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr MINUS expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr MINUS expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LT XOR
+##
+## Ends in an error in state: 47.
+##
+## expr -> expr LT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr LT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LT FALSE VOID
+##
+## Ends in an error in state: 48.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr LT expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr LT expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE DIV XOR
+##
+## Ends in an error in state: 49.
+##
+## expr -> expr DIV . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr DIV
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE DIV FALSE VOID
+##
+## Ends in an error in state: 50.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr DIV expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr DIV expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LE XOR
+##
+## Ends in an error in state: 51.
+##
+## expr -> expr LE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr LE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LE FALSE VOID
+##
+## Ends in an error in state: 52.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr LE expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr LE expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GT XOR
+##
+## Ends in an error in state: 53.
+##
+## expr -> expr GT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GT
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GT FALSE VOID
+##
+## Ends in an error in state: 54.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr GT expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GT expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GE XOR
+##
+## Ends in an error in state: 55.
+##
+## expr -> expr GE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GE FALSE VOID
+##
+## Ends in an error in state: 56.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr GE expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GE expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN XOR
+##
+## Ends in an error in state: 57.
+##
+## expr -> IF expr THEN . expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN FALSE THEN
+##
+## Ends in an error in state: 58.
+##
+## expr -> expr . AND expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> IF expr THEN expr . ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE OR XOR
+##
+## Ends in an error in state: 59.
+##
+## expr -> expr OR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr OR
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE OR FALSE VOID
+##
+## Ends in an error in state: 60.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr OR expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr OR expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN FALSE ELSE XOR
+##
+## Ends in an error in state: 61.
+##
+## expr -> IF expr THEN expr ELSE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN expr ELSE
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE AND XOR
+##
+## Ends in an error in state: 63.
+##
+## expr -> expr AND . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr AND
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE AND FALSE VOID
+##
+## Ends in an error in state: 64.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr AND expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## expr AND expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ LPAREN FALSE THEN
+##
+## Ends in an error in state: 65.
+##
+## expr -> LPAREN expr . RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . AND expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## LPAREN expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ MINUS FALSE VOID
+##
+## Ends in an error in state: 67.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> MINUS expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## MINUS expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ NOT FALSE VOID
+##
+## Ends in an error in state: 68.
+##
+## expr -> expr . AND expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> NOT expr . [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## NOT expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE THEN
+##
+## Ends in an error in state: 69.
+##
+## equation_list -> ident EQ expr . SEMI_COLON [ TEL ]
+## equation_list -> ident EQ expr . SEMI_COLON equation_list [ TEL ]
+## expr -> expr . AND expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . OR expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . XOR expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . PLUS expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . MINUS expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . TIMES expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . DIV expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GE expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LE expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . GT expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . LT expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . EQ expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+##
+## The known suffix of the stack is as follows:
+## ident EQ expr
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE SEMI_COLON XOR
+##
+## Ends in an error in state: 70.
+##
+## equation_list -> ident EQ expr SEMI_COLON . [ TEL ]
+## equation_list -> ident EQ expr SEMI_COLON . equation_list [ TEL ]
+##
+## The known suffix of the stack is as follows:
+## ident EQ expr SEMI_COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON LET IDENT EQ FALSE SEMI_COLON TEL XOR
+##
+## Ends in an error in state: 73.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL . EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT XOR
+##
+## Ends in an error in state: 75.
+##
+## local_vars -> ident . COLON typ SEMI_COLON [ LET ]
+## local_vars -> ident . COLON typ SEMI_COLON local_vars [ LET ]
+##
+## The known suffix of the stack is as follows:
+## ident
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON XOR
+##
+## Ends in an error in state: 76.
+##
+## local_vars -> ident COLON . typ SEMI_COLON [ LET ]
+## local_vars -> ident COLON . typ SEMI_COLON local_vars [ LET ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL XOR
+##
+## Ends in an error in state: 77.
+##
+## local_vars -> ident COLON typ . SEMI_COLON [ LET ]
+## local_vars -> ident COLON typ . SEMI_COLON local_vars [ LET ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON XOR
+##
+## Ends in an error in state: 78.
+##
+## local_vars -> ident COLON typ SEMI_COLON . [ LET ]
+## local_vars -> ident COLON typ SEMI_COLON . local_vars [ LET ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ SEMI_COLON
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET XOR
+##
+## Ends in an error in state: 80.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns LET . equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns LET
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
+
+node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE SEMI_COLON TEL XOR
+##
+## Ends in an error in state: 82.
+##
+## node -> NODE ident_node LPAREN args RPAREN returns LET equation_list TEL . EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE ident_node LPAREN args RPAREN returns LET equation_list TEL
+##
+
+<YOUR SYNTAX ERROR MESSAGE HERE>
