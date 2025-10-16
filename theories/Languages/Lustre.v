@@ -7,6 +7,8 @@ From Stdlib Require Import Permutation String.
 
 Module LustreAst := LustreAst.
 
+Definition name_dec := LustreAst.name_dec.
+
 Inductive type : Set :=
   | TVoid
   | TBool
@@ -63,6 +65,24 @@ Inductive const : type -> Set :=
   | CBool: bool -> const TBool
   | CInt: nat -> const TInt
 .
+Lemma const_inv {ty} (x: const ty) :
+  {eq : ty = _ & x = eq_rect _ const CVoid _ (eq_sym eq)} +
+  {eq : ty = _ & {b : bool & x = eq_rect _ const (CBool b) _ (eq_sym eq)}} +
+  {eq : ty = _ & {n : nat & x = eq_rect _ const (CInt n) _ (eq_sym eq)}}.
+Proof using.
+  destruct x as [|b|n]; [left; left|left; right|right]; exists eq_refl; [|exists b|exists n]; exact eq_refl.
+Qed.
+Lemma const_dec {ty} (x y: const ty) : {x = y} + {x <> y}.
+Proof.
+  destruct x.
+  all: destruct (const_inv y) as [[[eq' ->]|[eq' [b' ->]]]|[eq' [n' ->]]].
+  all: try discriminate.
+  1: left.
+  2: destruct (Bool.bool_dec b b') as [eq|ne]; [left|right].
+  4: destruct (PeanoNat.Nat.eq_dec n n') as [eq|ne]; [left|right].
+  all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn; try intros [=f]; auto.
+  exact (f_equal _ eq).
+Qed.
 
 (** A unary operator
 
@@ -73,6 +93,22 @@ Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
   | Uop_neg: unop TInt TInt
 .
+
+Lemma unop_inv {ty tout} (x: unop ty tout) :
+  {eq1 : ty = TInt & {eq2 : tout = TInt & x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_not _ (eq_sym eq1)) _ (eq_sym eq2)}} +
+  {eq1 : ty = TInt & {eq2 : tout = TInt & x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_neg _ (eq_sym eq1)) _ (eq_sym eq2)}}.
+Proof using.
+  destruct x; [left|right]; exists eq_refl, eq_refl; exact eq_refl.
+Qed.
+Lemma unop_dec {ty tout} (x y: unop ty tout) : {x = y} + {x <> y}.
+Proof.
+  destruct (unop_inv x) as [[eq1 [eq2 ->]]|[eq1 [eq2 ->]]].
+  all: destruct (unop_inv y) as [[-> [-> ->]]|[-> [-> ->]]].
+  all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn.
+  all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn.
+  1,4: left; reflexivity.
+  all: right; discriminate.
+Qed.
 
 (** A binary operator
 
@@ -99,6 +135,115 @@ Inductive binop: type -> type -> type -> Set :=
   | Bop_gt: binop TInt TInt TBool
 .
 
+Lemma binop_inv {ty1 ty2 tout} (x: binop ty1 ty2 tout) :
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_and _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_or _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_xor _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_plus _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_minus _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_mult _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_div _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_eq _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_le _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_lt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_ge _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_gt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}}.
+Proof using.
+  destruct x.
+  1-11: left.
+  1-10: left.
+  1-09: left.
+  1-08: left.
+  1-07: left.
+  1-06: left.
+  1-05: left.
+  1-04: left.
+  1-03: left.
+  1-02: left.
+  1-01: left.
+  2-12: right.
+  all: exists eq_refl, eq_refl, eq_refl; exact eq_refl.
+Qed.
+Lemma binop_dec {ty1 ty2 tout} (x y: binop ty1 ty2 tout) : {x = y} + {x <> y}.
+Proof.
+  pose proof (binop_inv x) as H.
+  repeat destruct H as [ H | [eq1 [eq2 [eq3 ->]]] ].
+  1: destruct H as [eq1 [eq2 [eq3 ->]]].
+  all: pose proof (binop_inv y) as H.
+  12: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  13: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-11: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  11: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  12: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-10: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  10: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  11: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-9: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  9: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  10: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-8: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  8: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  9: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-7: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  7: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  8: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-6: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  6: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  7: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-5: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  5: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  6: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-4: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  4: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  5: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-3: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  3: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  4: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-2: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  2: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  3: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
+  1: destruct H as [-> [-> [-> ->]]]; left.
+  1: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  all: subst; cbn; intros <-; repeat (destruct f as [f|[? [? [? f]]]]; [|try discriminate]).
+  all: try solve [repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate f].
+  all: destruct f as [? [? [? f]]]; try discriminate.
+  all: repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate f.
+Qed.
+
 Inductive exp : type -> Set :=
   | EConst: forall {ty}, const ty -> exp ty
   | EInput: forall (b : binder), exp (binder_ty b)
@@ -107,6 +252,69 @@ Inductive exp : type -> Set :=
   | EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> exp ty1 -> exp ty2 -> exp tout
   | EIfte: forall {t}, exp TBool -> exp t -> exp t -> exp t
 .
+
+Lemma exp_inv {ty} (x: exp ty) :
+  {c : const ty & x = EConst c} +
+  {b & {eq : ty = _ & x = eq_rect _ exp (EInput b) _ (eq_sym eq)}} +
+  {b & {eq : ty = _ & x = eq_rect _ exp (EVar b) _ (eq_sym eq)}} +
+  {tin : type & {op : unop tin ty & {e : exp tin & x = EUnop op e}}} +
+  {ty1 : type & {ty2 : type & {op : binop ty1 ty2 ty & {e1 : exp ty1 & {e2 : exp ty2 & x = EBinop op e1 e2}}}}} +
+  {eb : exp TBool & {et : exp ty & {ef : exp ty & x = EIfte eb et ef}}}.
+Proof using.
+  destruct x.
+  1-5: left.
+  1-4: left.
+  1-3: left.
+  1-2: left.
+  1-1: left.
+  2-6: right.
+  all: try solve [repeat eexists; exact eq_refl].
+  1,2: exists b, eq_refl; exact eq_refl.
+Qed.
+Lemma exp_dec {ty} (e1 e2: exp ty) : {e1 = e2} + {e1 <> e2}.
+Proof.
+  revert e2.
+  induction e1 as [ ty c | b | b | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1: destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
+    all: right; subst; discriminate.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    3: right; destruct b, b'; cbn in eq1; subst; discriminate.
+    1,3-5: right; subst; discriminate.
+    destruct b as [n1 ty1], b' as [n2 ty2]; cbn in eq1; subst ty2.
+    destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [left; reflexivity|right; cbn; intros [=f]; exact (ne f)].
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    2: right; destruct b, b'; cbn in eq1; subst; discriminate.
+    1,3-5: right; subst; discriminate.
+    destruct b as [n1 ty1], b' as [n2 ty2]; cbn in eq1; subst ty2.
+    destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [left; reflexivity|right; cbn; intros [=f]; exact (ne f)].
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1-3,5-6: right; subst; discriminate.
+    destruct (type_dec tin tin') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
+    destruct (unop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type f)))].
+    destruct (IH e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
+    left; reflexivity.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1-4,6: right; subst; discriminate.
+    destruct (type_dec ty1 ty1') as [<-|ne]; [|right; intros [=f _ _ _]; exact (ne f)].
+    destruct (type_dec ty2 ty2') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
+    destruct (binop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type (sig2T_eq_type f))))].
+    destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
+    destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
+    left; reflexivity.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
+      (c' & ->) | (b' & eq1 & ->) ] | (b' & eq1 & ->) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
+    1-5: right; subst; discriminate.
+    destruct (IHb eb2) as [<-|ne]; [|right; intros [=f]; exact (ne f)].
+    destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
+    destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
+    left; reflexivity.
+Qed.
 
 Fixpoint has_einput {ty} (e: exp ty): bool :=
   match e with
@@ -119,6 +327,16 @@ Fixpoint has_einput {ty} (e: exp ty): bool :=
 
 Definition equation : Type := ident * { ty : type & exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
+
+Lemma equation_dec (e1 e2: equation) : {e1 = e2} + {e1 <> e2}.
+Proof.
+  destruct e1 as [n1 [ty1 e1]].
+  destruct e2 as [n2 [ty2 e2]].
+  destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [|right; cbn; intros [=f]; exact (ne f)].
+  destruct (type_dec ty1 ty2) as [<-|ne]; [|right; cbn; intros [=f]; exact (ne f)].
+  destruct (exp_dec e1 e2) as [<-|ne]; [|right; cbn; intros [=f]; exact (ne (sig2T_eq_type f))].
+  left; reflexivity.
+Qed.
 
 Record node := mk_node {
   n_name: string;
