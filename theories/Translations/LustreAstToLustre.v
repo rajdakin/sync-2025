@@ -50,6 +50,7 @@ Proof.
     exact (match op, e' with
       | Source.Uop_neg, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_neg e))
       | Source.Uop_not, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_not e))
+      | Source.Uop_pre, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_pre e))
       | _, _ => Result.Err "Untypeable expression"
     end).
   - refine (Result.bind (check_exp env e1) _).
@@ -70,6 +71,8 @@ Proof.
       | Source.Bop_lt, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_lt e1 e2))
       | Source.Bop_ge, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_ge e1 e2))
       | Source.Bop_gt, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_gt e1 e2))
+      | Source.Bop_arrow, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_arrow e1 e2))
+      | Source.Bop_fby, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_arrow e1 (Target.EUnop Target.Uop_pre e2)))
       | _, _, _ => Result.Err "Untypeable expression"
     end).
   - refine (Result.bind (check_exp env e1) _).
