@@ -30,6 +30,8 @@
 
 %start<string * (binder list) *(binder list) * binder * ((int*exp) list)> node
 
+%on_error_reduce expr
+
 %%
 
 typ:
