@@ -7,7 +7,9 @@
 rule token = parse
   | [ ' ' '\t' '\n' ] { token lexbuf }
   | "&&"        { AND }
+  | "and"       { AND }
   | "||"        { OR }
+  | "or"        { OR }
   | "->"        { ARROW }
   | '^'         { XOR }
   | '+'         { PLUS }
@@ -15,6 +17,9 @@ rule token = parse
   | '*'         { TIMES }
   | '/'         { DIV }
   | '~'         { NOT }
+  | "not"       { NOT }
+  | "<>"        { NEQ }
+  | "!="        { NEQ }
   | "<="        { LE }
   | ">="        { GE }
   | '<'         { LT }

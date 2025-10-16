@@ -32,6 +32,7 @@ Inductive binop: Type :=
   
   (** Relational binop *)
   | Bop_eq: binop
+  | Bop_neq: binop
   | Bop_le: binop
   | Bop_lt: binop
   | Bop_ge: binop
@@ -81,6 +82,7 @@ Definition binop_eqb (x y: binop): bool :=
     | Bop_mult, Bop_mult => true
     | Bop_div, Bop_div => true
     | Bop_eq, Bop_eq => true
+    | Bop_neq, Bop_neq => true
     | Bop_lt, Bop_lt => true
     | Bop_le, Bop_le => true
     | Bop_gt, Bop_gt => true

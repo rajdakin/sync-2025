@@ -10,7 +10,7 @@
 %token<string> IDENT
 %token<int> NUM
 %token LPAREN RPAREN
-%token EQ
+%token EQ NEQ
 %token AND OR XOR NOT
 %token LE GE LT GT
 %token PLUS MINUS
@@ -27,7 +27,7 @@
 %right ARROW
 %left OR
 %left AND
-%left EQ LT GT GE LE
+%left EQ NEQ LT GT GE LE
 %left PLUS MINUS
 %left TIMES DIV
 %right FBY
@@ -65,11 +65,11 @@ node:
     { (name, args, [], ret, eqs) }
 
 returns: (* TODO: support multiple return values *)
-  | RETURN ret=ident COLON typ=typ {(ret, typ)}
+  | RETURN ret=ident COLON typ=typ { (ret, typ) }
 
 args:
-  | id=ident COLON typ=typ COMMA args=args {(id,typ)::args}
-  | id=ident COLON typ=typ {(id,typ)::[]}
+  | id=ident COLON typ=typ COMMA args=args { (id, typ) :: args }
+  | id=ident COLON typ=typ { (id, typ) :: [] }
   | { [] }
 
 
@@ -94,30 +94,31 @@ var:
   | id=ident { id }
 
 const:
-  | TRUE { CBool true }
-  | FALSE { CBool false }
-  | num=NUM   { CInt num }
+  | TRUE    { CBool true }
+  | FALSE   { CBool false }
+  | num=NUM { CInt num }
 
 expr:
-  | LPAREN e=expr RPAREN    { e }
   | c=const                 { EConst(c) }
   | v=var                   { EVar((v, TBool)) }
+  | NOT e1=expr             { EUnop(Uop_not, e1) }
+  | MINUS e1=expr           { EUnop(Uop_neg, e1) }
+  | PRE e1=expr             { EUnop(Uop_pre, e1) }
+  | e1=expr FBY e2=expr     { Ebinop(Bop_fby, e1, e2) }
+  | e1=expr ARROW e2=expr   { Ebinop(Bop_arrow, e1, e2) }
   | e1=expr AND e2=expr     { EBinop(Bop_and, e1, e2) }
   | e1=expr OR e2=expr      { EBinop(Bop_or, e1, e2) }
   | e1=expr XOR e2=expr     { EBinop(Bop_xor, e1, e2) }
-  | e1=expr PLUS e2=expr    { EBinop(Bop_plus, e1, e2) }
-  | e1=expr MINUS e2=expr   { EBinop(Bop_minus, e1, e2) }
-  | e1=expr TIMES e2=expr   { EBinop(Bop_mult, e1, e2) }
-  | e1=expr DIV e2=expr     { EBinop(Bop_div, e1, e2) }
   | e1=expr GE e2=expr      { EBinop(Bop_ge, e1, e2) }
+  | e1=expr EQ e2=expr      { EBinop(Bop_eq, e1, e2) }
+  | e1=expr NEQ e2=expr     { Ebinop(Bop_neq, e1, e2) }
   | e1=expr LE e2=expr      { EBinop(Bop_le, e1, e2) }
   | e1=expr GT e2=expr      { EBinop(Bop_gt, e1, e2) }
   | e1=expr LT e2=expr      { EBinop(Bop_lt, e1, e2) }
-  | e1=expr EQ e2=expr      { EBinop(Bop_eq, e1, e2) }
-  | e1=expr ARROW e2=expr   { Ebinop(Bop_arrow, e1, e2) }
-  | e1=expr FBY e2=expr     { Ebinop(Bop_fby, e1, e2) }
-  | PRE e1=expr             { EUnop(Uop_pre, e1) }
-  | NOT e1=expr             { EUnop(Uop_not, e1) }
-  | MINUS e1=expr           { EUnop(Uop_neg, e1) }
+  | e1=expr PLUS e2=expr    { EBinop(Bop_plus, e1, e2) }
+  | e1=expr MINUS e2=expr   { EBinop(Bop_minus, e1, e2) }
+  | e1=expr DIV e2=expr     { EBinop(Bop_div, e1, e2) }
+  | e1=expr TIMES e2=expr   { EBinop(Bop_mult, e1, e2) }
   | IF cond=expr THEN e1=expr ELSE e2=expr { EIfte(cond, e1, e2) }
+  | LPAREN e=expr RPAREN    { e }
 ;

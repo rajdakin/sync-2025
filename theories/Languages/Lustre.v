@@ -129,6 +129,7 @@ Inductive binop: type -> type -> type -> Set :=
 
   (** Relational binop *)
   | Bop_eq: binop TInt TInt TBool
+  | Bop_neq: binop TInt TInt TBool
   | Bop_le: binop TInt TInt TBool
   | Bop_lt: binop TInt TInt TBool
   | Bop_ge: binop TInt TInt TBool
@@ -144,12 +145,14 @@ Lemma binop_inv {ty1 ty2 tout} (x: binop ty1 ty2 tout) :
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_mult _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_div _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_eq _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
+  {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_neq _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_le _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_lt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_ge _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}} +
   {eq1 : ty1 = _ & {eq2 : ty2 = _ & {eqo : tout = _ & x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_gt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}}}.
 Proof using.
   destruct x.
+  1-12: left.
   1-11: left.
   1-10: left.
   1-09: left.
@@ -161,15 +164,22 @@ Proof using.
   1-03: left.
   1-02: left.
   1-01: left.
-  2-12: right.
+  2-13: right.
   all: exists eq_refl, eq_refl, eq_refl; exact eq_refl.
 Qed.
+
 Lemma binop_dec {ty1 ty2 tout} (x y: binop ty1 ty2 tout) : {x = y} + {x <> y}.
 Proof.
   pose proof (binop_inv x) as H.
   repeat destruct H as [ H | [eq1 [eq2 [eq3 ->]]] ].
   1: destruct H as [eq1 [eq2 [eq3 ->]]].
   all: pose proof (binop_inv y) as H.
+  13: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
+  14: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-12: destruct H as [H|[-> [-> [-> f]]]]; [|
+    right; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); try discriminate
+  ].
   12: destruct H as [f|[-> [-> [-> ->]]]]; [right|left].
   13: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
   1-11: destruct H as [H|[-> [-> [-> f]]]]; [|
