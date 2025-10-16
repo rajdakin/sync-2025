@@ -19,9 +19,9 @@ Scheme Equality for list.
 Module EquationOrder <: Orders.TotalLeBool.
   Local Coercion is_true : bool >-> Sortclass.
 
-  Definition t := LustreAst.equation.
+  Definition t := Source.equation.
 
-  Definition leb (x y: LustreAst.equation): bool := Nat.leb (fst x) (fst y).
+  Definition leb (x y: Source.equation): bool := Nat.leb (fst x) (fst y).
   Infix "<=?" := leb (at level 70, no associativity).
 
   Theorem leb_total: forall x y, x <=? y \/ y <=? x.
@@ -38,24 +38,24 @@ Module Import EquationSort := Sort EquationOrder.
 
 
 Definition list_eq_dec_binder :=
-  list_eq_dec _ LustreAst.binder_eqb LustreAst.binder_eqb_to_eq LustreAst.binder_eq_to_eqb.
+  List.list_eq_dec Source.binder_dec.
 
 Definition list_eq_dec_equation :=
-  list_eq_dec _ LustreAst.equation_eqb LustreAst.equation_eqb_to_eq LustreAst.equation_eq_to_eqb.
+  List.list_eq_dec Source.equation_dec.
 
 Definition check_eq_node (source guess: Source.node): Result.t (Source.node_eq source guess).
 Proof.
-  destruct source as [[name1 in1 out1 locals1 body1]].
-  destruct guess as [[name2 in2 out2 locals2 body2]].
+  destruct source as [name1 in1 out1 locals1 body1].
+  destruct guess as [name2 in2 out2 locals2 body2].
   unfold Source.node_eq; simpl.
 
-  destruct (LustreAst.name_dec name1 name2).
+  destruct (Source.name_dec name1 name2).
   2: { apply Result.Err, "Node names are not equal". }
 
   destruct (list_eq_dec_binder in1 in2).
   2: { apply Result.Err, "Node inputs are not equal". }
 
-  destruct (LustreAst.binder_dec out1 out2).
+  destruct (Source.binder_dec out1 out2).
   2: { apply Result.Err, "Node outputs are not equal". }
 
   destruct (list_eq_dec_binder locals1 locals2).
@@ -82,17 +82,20 @@ Proof.
   inversion IHguess as [| err ].
   2: { apply Result.Err, err. }
 
-  destruct x as [i l].
-  destruct (in_dec PeanoNat.Nat.eq_dec i (map fst xs)).
+  destruct x as [ [ i ty ] l].
+  destruct (in_dec PeanoNat.Nat.eq_dec i (map (fun '(y, _, _) => y) xs)).
   { apply Result.Err, "Identifier is in list". }
 
-  induction l as [| y ? IHl ].
+  induction l as [| [ y ty' ] ? IHl ].
   { apply Result.Ok, Ordered.append; [ assumption | assumption | constructor ]. }
 
   inversion IHl as [ IHl' | err ].
   2: { apply Result.Err, err. }
 
-  destruct (in_dec PeanoNat.Nat.eq_dec y (map fst xs)).
+  destruct (in_dec (fun '(i, ty1) '(j, ty2) =>
+    match PeanoNat.Nat.eq_dec i j with right n => right (fun (f : (i, ty1) = (j, ty2)) => n (f_equal fst f))
+    | left ij => match Source.type_dec ty1 ty2 with right n => right (fun (f : (i, ty1) = (j, ty2)) => n (f_equal snd f))
+    | left ty => left (f_equal2 pair ij ty) end end) (y, ty') (map fst xs)).
   2: { apply Result.Err, "Identifier not bound". }
 
   apply Result.Ok, Ordered.append.
