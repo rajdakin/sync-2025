@@ -14,16 +14,25 @@ Definition convert_type (t : Source.type) : Target.type := match t with
   | Source.TBool => Target.TBool
   | Source.TInt => Target.TInt
 end.
-Definition convert_binder '((n, t) : Source.binder) : Target.binder := (n, convert_type t).
 
-Definition nvars (entry: Source.node) :=
-  map convert_binder (Source.n_in entry) ++ convert_binder (Source.n_out entry) :: map convert_binder (Source.n_locals entry).
+Record common_temp : Set := {
+  orig :> Source.node;
+  env: Dict.t Target.type;
+  Henv: forall x t, Dict.maps_to x (convert_type t) env <-> In (x, t) (orig.(Source.n_in) ++ orig.(Source.n_out) :: orig.(Source.n_locals));
+  
+  n_in: list Target.binder;
+  n_out: Target.binder;
+  n_locals: list Target.binder;
+  
+  nvars := n_in ++ n_out :: n_locals;
+  Hnvars: nvars = map (fun '(x, t) => (x, convert_type t)) (orig.(Source.n_in) ++ orig.(Source.n_out) :: orig.(Source.n_locals));
+}.
 
 Open Scope string_scope.
 
-Fixpoint check_exp (env: Dict.t Target.type) (e: Source.exp): Result.t (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t (sigT Target.exp).
 Proof.
-  destruct e as [ c | (n, ty') | (n, ty') | op e | op e1 e2 | e1 e2 e3 ].
+  destruct e as [ c | n | n | op e | op e1 e2 | e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
     + exists Target.TVoid.
@@ -32,30 +41,26 @@ Proof.
       exact (Target.EConst (Target.CBool b)).
     + exists Target.TInt.
       exact (Target.EConst (Target.CInt n)).
-  - destruct (Dict.find n env) as [ ty | ].
+  - destruct (Dict.find n (env temp)) as [ ty | ].
     2: right; exact "An input variable is not declared".
-    destruct (Target.type_dec (convert_type ty') ty).
-    2: right; exact "An input variable is used with the wrong type".
     left.
     exists ty.
     exact (Target.EInput (n, ty)).
-  - destruct (Dict.find n env) as [ ty | ].
+  - destruct (Dict.find n (env temp)) as [ ty | ].
     2: right; exact "A variable is not declared".
-    destruct (Target.type_dec (convert_type ty') ty).
-    2: right; exact "A variable is used with the wrong type".
     left.
     exists ty.
-    exact (Target.EInput (n, ty)).
-  - refine (Result.bind (check_exp env e) _).
+    exact (Target.EVar (n, ty)).
+  - refine (Result.bind (check_exp temp e) _).
     intros e'.
     exact (match op, e' with
       | Source.Uop_neg, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_neg e))
       | Source.Uop_not, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_not e))
       | _, _ => Result.Err "Untypeable expression"
     end).
-  - refine (Result.bind (check_exp env e1) _).
+  - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
-    refine (Result.bind (check_exp env e2) _).
+    refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     exact (match op, e1', e2' with
       | Source.Bop_and, existT _ Target.TBool e1, existT _ Target.TBool e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_and e1 e2))
@@ -72,11 +77,11 @@ Proof.
       | Source.Bop_gt, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_gt e1 e2))
       | _, _, _ => Result.Err "Untypeable expression"
     end).
-  - refine (Result.bind (check_exp env e1) _).
+  - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
-    refine (Result.bind (check_exp env e2) _).
+    refine (Result.bind (check_exp temp e2) _).
     intros e2'.
-    refine (Result.bind (check_exp env e3) _).
+    refine (Result.bind (check_exp temp e3) _).
     intros e3'.
     exact (match e1', e2', e3' with
       | existT _ Target.TBool e1, existT _ t2 e2, existT _ t3 e3 =>
@@ -88,24 +93,25 @@ Proof.
     end).
 Defined.
 
-Definition check_body (entry: Source.node): Result.t
-  { body : list Target.equation | incl (map (fun '(n, existT _ ty _) => (n, ty)) body) (nvars entry) }.
+Definition check_body (temp: common_temp) (entry: Source.node): Result.t
+  { body : list Target.equation | incl (map (fun '(n, existT _ ty _) => (n, ty)) body) (nvars temp) }.
 Proof.
-  pose (env := fold_left (fun d '(n, ty) => Dict.add n ty d) (nvars entry) (Dict.empty _)).
   destruct entry.
   induction n_body as [ | [ n e ] tl IH ].
   - left.
     exists [].
     exact (incl_nil_l _).
-  - refine (Result.bind (check_exp env e) _).
+  - refine (Result.bind (check_exp temp e) _).
     intros [ ty e' ].
+    destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) (n, ty) (nvars temp)) as [Hin|_].
+    2: destruct (In_dec PeanoNat.Nat.eq_dec n (map fst (nvars temp))) as [Hin|_].
+    2:  exact (Result.Err "A variable is assigned to an expression of an incompatible type").
+    2: exact (Result.Err "A variable is assigned to but not declared").
     refine (Result.bind IH _); clear IH.
     intros [ eqs IH ].
-    cbn.
-    exact (match incl_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) ((n, _) :: map (fun '(y, existT _ ty _) => (y, ty)) eqs) _ with
-      | left h => Result.Ok (exist (fun body => incl (map _ body) _) ((n, existT Target.exp ty e') :: eqs) (incl_cons (h _ (or_introl eq_refl)) IH))
-      | right _ => Result.Err "A variable is never declared"
-      end).
+    left.
+    exists ((n, existT Target.exp ty e') :: eqs).
+    intros a [<-|H]; [exact Hin|exact (IH _ H)].
 Defined.
 
 Definition n_assigned_vars (body: list Target.equation) :=
@@ -139,7 +145,7 @@ Definition list_eq_dec_binder :=
 Definition list_eq_dec_equation :=
   list_eq_dec _ Source.equation_eqb Source.equation_eqb_to_eq Source.equation_eq_to_eqb.
 
-Definition check_assigned_out (entry: Source.node) body: Result.t (In (convert_binder (Source.n_out entry)) (n_assigned_vars body)).
+Definition check_assigned_out (temp: common_temp) body: Result.t (In (n_out temp) (n_assigned_vars body)).
 Proof.
   exact (match ListDec.In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) _ _ with
     | left h => Result.Ok h
@@ -147,8 +153,8 @@ Proof.
   end).
 Defined.
 
-Definition n_out_is_not_an_input (entry: Source.node) :
-  Result.t (~ In (fst (convert_binder (Source.n_out entry))) (map fst (map convert_binder (Source.n_in entry)))).
+Definition n_out_is_not_an_input (temp: common_temp) :
+  Result.t (~ In (fst (n_out temp)) (map fst (n_in temp))).
 Proof.
   exact (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with
     | left h => Result.Err "The output variable is also an input"
@@ -157,8 +163,8 @@ Proof.
 Defined.
 
 
-Definition n_inputs_equations (entry: Source.node) body:
-  Result.t (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (map convert_binder (Source.n_in entry))) body).
+Definition n_inputs_equations (temp: common_temp) body:
+  Result.t (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (n_in temp)) body).
 Proof.
   refine (match incl_dec _ _ _ with
     | left h => Result.Ok h
@@ -172,8 +178,8 @@ Proof.
 Defined.
 
 
-Definition n_no_einputs_in_other (entry: Source.node) (body: list Target.equation):
-  Result.t (Forall (fun '(name, existT _ _ exp) => ~ In name (map fst (map convert_binder (Source.n_in entry))) -> Target.has_einput exp = false) body).
+Definition n_no_einputs_in_other (temp: common_temp) (body: list Target.equation):
+  Result.t (Forall (fun '(name, existT _ _ exp) => ~ In name (map fst (n_in temp)) -> Target.has_einput exp = false) body).
 Proof.
   refine (match Forall_dec _ _ _ with
     | left h => Result.Ok h
@@ -181,25 +187,200 @@ Proof.
   end).
   intros [n [ty e]].
   refine (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with left h => left (fun f => False_ind _ (f h)) | right h => _ end).
-  destruct (Target.has_einput); [ right | left; reflexivity ].
+  destruct (Target.has_einput e); [ right | left; reflexivity ].
   intros f.
   apply f in h.
   discriminate h.
 Defined.
 
+Lemma forall_type_dec : forall (P : Source.type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
+Proof using.
+  intros P dec.
+  destruct (dec Source.TVoid) as [Pvoid | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
+  destruct (dec Source.TBool) as [Pbool | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
+  destruct (dec Source.TInt)  as [Pint  | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
+  left; intros []; assumption.
+Defined.
+
+Definition dec_not {P : Prop} : {P} + {~P} -> {~P} + {~ ~P} :=
+  fun dec => match dec with left h => right (fun nP => nP h) | right h => left h end.
+
 Import Result.notations.
 
+Lemma check_Henv {entry} :
+  let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
+  let n_out := (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
+  let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
+  Result.t (forall n t,
+    Dict.maps_to n (convert_type t)
+      (fold_left (fun acc '(n, t) => Dict.add n t acc)
+      (n_in ++ n_out :: n_locals)
+      (Dict.empty Target.type)) <->
+    In (n, t) (Source.n_in entry ++ Source.n_out entry :: Source.n_locals entry)).
+Proof using.
+  destruct entry as [? nin [nout tout] nloc ?]; cbn; clear.
+  destruct (In_dec PeanoNat.Nat.eq_dec nout (map fst nin)) as [_|outnotin].
+  1: right; exact "The output variable is in the input list".
+  destruct (In_dec PeanoNat.Nat.eq_dec nout (map fst nloc)) as [_|outnotloc].
+  1: right; exact "The output variable is in the locals list".
+  destruct (Forall_Exists_dec (fun vin => ~ In (fst vin) (map fst nloc))
+    (fun vin => dec_not (In_dec PeanoNat.Nat.eq_dec (fst vin) (map fst nloc))) nin) as [innotloc'|_].
+  2: right; exact "An input variable is in the locals list".
+  destruct (Forall_Exists_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
+    (fun vin => forall ty', In (fst vin, ty') nin -> ty' = snd vin)
+    (fun vin =>
+      match forall_type_dec
+        (fun ty' => In (fst vin, ty') nin -> ty' = snd vin)
+        ltac:(
+          intros ty;
+          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (fst vin, ty) nin) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
+          destruct (Source.type_dec ty (snd vin)) as [eqty|nety]; [left; intros _; exact eqty|];
+          right; intros f; exact (nety (f Hin)))
+      with
+      | left H => left H
+      | right H => right (fun f => match H with ex_intro _ ty Hty => Hty (f ty) end)
+      end)
+    nin) as [innotdup'|_].
+  2: right; exact "An input variable is present multiple times in the input list".
+  destruct (Forall_Exists_dec (fun vloc => ~ In (fst vloc) (map fst nin))
+    (fun vloc => dec_not (In_dec PeanoNat.Nat.eq_dec (fst vloc) (map fst nin))) nloc) as [locnotin'|_].
+  2: right; exact "A local variable is in the input list".
+  destruct (Forall_Exists_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
+    (fun vloc => forall ty', In (fst vloc, ty') nloc -> ty' = snd vloc)
+    (fun vloc =>
+      match forall_type_dec
+        (fun ty' => In (fst vloc, ty') nloc -> ty' = snd vloc)
+        ltac:(
+          intros ty;
+          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (fst vloc, ty) nloc) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
+          destruct (Source.type_dec ty (snd vloc)) as [eqty|nety]; [left; intros _; exact eqty|];
+          right; intros f; exact (nety (f Hin)))
+      with
+      | left H => left H
+      | right H => right (fun f => match H with ex_intro _ ty Hty => Hty (f ty) end)
+      end)
+    nloc) as [locnotdup'|_].
+  2: right; exact "A local variable is present multiple times in the locals list".
+  left; intros n t.
+  match goal with |- Dict.maps_to _ _ (fold_left ?f ?l ?d) <-> _ =>
+  rewrite <-(fold_left_rev_right (fun x y => f y x) l d) end.
+  rewrite (in_rev (nin ++ (nout, tout) :: nloc) (n, t)),
+          !(rev_app_distr _ (_ :: _) : _ = (rev _ ++ [_]) ++ rev _)%list, <-!(app_assoc _ [_] _ : _ ++ _ :: _ = _)%list, <-!map_rev.
+  apply Forall_rev in innotloc', innotdup', locnotin', locnotdup'.
+  rewrite in_rev, <-map_rev in outnotin, outnotloc.
+  specialize (Forall_impl (P := fun vin => ~ In (fst vin) (map fst nloc)) (fun vin => ~ In (fst vin) (map fst (rev nloc)))
+    (fun vin Hnin Hin => Hnin ltac:(cbn in *; rewrite map_rev, <-in_rev in Hin; exact Hin)) innotloc') as innotloc.
+  specialize (Forall_impl (P := fun vin => ~ In (fst vin) (map fst nin)) (fun vin => ~ In (fst vin) (map fst (rev nin)))
+    (fun vin Hnin Hin => Hnin ltac:(cbn in *; rewrite map_rev, <-in_rev in Hin; exact Hin)) locnotin') as locnotin.
+  specialize (Forall_impl
+    (P := fun vin => forall ty', In (fst vin, ty') nin -> ty' = snd vin)
+    (fun vin => forall ty', In (fst vin, ty') (rev nin) -> ty' = snd vin)
+    (fun vin HP ty' Hin => HP ty' (proj2 (in_rev _ _) Hin)) innotdup') as innotdup.
+  specialize (Forall_impl
+    (P := fun vloc => forall ty', In (fst vloc, ty') nloc -> ty' = snd vloc)
+    (fun vloc => forall ty', In (fst vloc, ty') (rev nloc) -> ty' = snd vloc)
+    (fun vloc HP ty' Hin => HP ty' (proj2 (in_rev _ _) Hin)) locnotdup') as locnotdup.
+  remember (rev nin) as l2 eqn:eq2.
+  remember (rev nloc) as l1 eqn:eq1.
+  clear nloc nin eq1 eq2 innotloc' innotdup' locnotin' locnotdup'.
+  split.
+  - intros H.
+    induction l1 as [|(v, t') l1 IH]; swap 1 2.
+    1: destruct (PeanoNat.Nat.eq_dec n v) as [<-|Hne]; [left; f_equal; cbn in H; clear - H|].
+    1:  unfold Dict.maps_to in H; rewrite Dict.maps_to_last_added in H.
+    1:  injection H as H.
+    1:  destruct t, t'; try exact eq_refl; discriminate H.
+    1: right; cbn in *; apply Forall_inv in locnotin as H1; apply Forall_inv in locnotdup as H2.
+    1: apply Forall_inv_tail in locnotin, locnotdup.
+    1: refine (IH (fun h => outnotloc (or_intror h)) (Forall_impl _ _ innotloc) locnotin (Forall_impl _ _ locnotdup) _).
+    1:   intros [b tb] Hb Hin; exact (Hb (or_intror Hin)).
+    1:  intros [b tb] Hb ty Hin; exact (Hb ty (or_intror Hin)).
+    1: exact (Dict.maps_to_not_last_added _ _ _ _ _ H Hne).
+    cbn; clear locnotin innotloc locnotdup outnotloc.
+    destruct (PeanoNat.Nat.eq_dec n nout) as [<-|Hne]; [left; f_equal; cbn in H; clear - H|].
+    1: unfold Dict.maps_to in H; rewrite Dict.maps_to_last_added in H.
+    1: injection H as H.
+    1: destruct t, tout; try exact eq_refl; discriminate H.
+    right; cbn in *.
+    apply Dict.maps_to_not_last_added in H; [|exact Hne].
+    clear nout tout outnotin Hne.
+    induction l2 as [|(v, t') l IH].
+    1: unfold Dict.maps_to, Dict.find, map, fold_right in H.
+    1: rewrite (proj2 (Dict.no_element_is_empty _) eq_refl) in H.
+    1: discriminate H.
+    destruct (PeanoNat.Nat.eq_dec n v) as [<-|Hne]; [left; f_equal; cbn in H; clear - H|].
+    1: unfold Dict.maps_to in H; rewrite Dict.maps_to_last_added in H.
+    1: injection H as H.
+    1: destruct t, t'; try exact eq_refl; discriminate H.
+    right; apply Forall_inv in innotdup as H1.
+    apply Forall_inv_tail in innotdup.
+    refine (IH (Forall_impl _ _ innotdup) _).
+    1: intros [b tb] Hb ty Hin; exact (Hb ty (or_intror Hin)).
+    exact (Dict.maps_to_not_last_added _ _ _ _ _ H Hne).
+  - intros H.
+    induction l1 as [|(v, t') l1 IH]; swap 1 2.
+    1: destruct (prod_dec PeanoNat.Nat.eq_dec Source.type_dec (n, t) (v, t')) as [[=<- <-]|ntnevt'].
+    1:  exact (Dict.maps_to_last_added _ _ _).
+    1: destruct H as [[=-> ->]|H].
+    1:  exact (Dict.maps_to_last_added _ _ _).
+    1: apply Forall_inv in locnotin as H1; apply Forall_inv in locnotdup as H2.
+    1: apply Forall_inv_tail in locnotin, locnotdup.
+    1: refine (Dict.maps_to_add _ _ _ _ _ (IH (fun h => outnotloc (or_intror h)) (Forall_impl _ _ innotloc) locnotin (Forall_impl _ _ locnotdup) H) _).
+    1:   intros [b tb] Hb Hin; exact (Hb (or_intror Hin)).
+    1:  intros [b tb] Hb ty Hin; exact (Hb ty (or_intror Hin)).
+    1: intros <-; refine (ntnevt' (f_equal _ _)); clear IH locnotin H2 ntnevt' innotdup; cbn in *.
+    1: apply in_app_or in H; destruct H as [H|[[=nouteq _]|H]].
+    1:   exact (eq_sym (proj1 (Forall_forall _ _) locnotdup _ H _ (or_introl eq_refl))).
+    1:  contradiction (outnotloc (or_introl (eq_sym nouteq))).
+    1: contradiction (proj1 (Forall_forall _ _) innotloc _ H (or_introl eq_refl)).
+    clear innotloc locnotin locnotdup outnotloc.
+    destruct (prod_dec PeanoNat.Nat.eq_dec Source.type_dec (n, t) (nout, tout)) as [[=<- <-]|Hne].
+    1: exact (Dict.maps_to_last_added _ _ _).
+    destruct H as [[=<- <-]|H].
+    1: exact (Dict.maps_to_last_added _ _ _).
+    cbn; refine (Dict.maps_to_add _ _ _ _ _ _ _); swap 1 2.
+    1: intros <-; refine (Hne (f_equal _ _)); clear Hne; cbn in *.
+    1: contradiction (outnotin (in_map _ _ _ H)).
+    clear nout tout outnotin Hne.
+    induction l2 as [|(v, t') l IH]; [destruct H|].
+    destruct (prod_dec PeanoNat.Nat.eq_dec Source.type_dec (n, t) (v, t')) as [[=<- <-]|ntnevt'].
+    1: exact (Dict.maps_to_last_added _ _ _).
+    destruct H as [[=-> ->]|H].
+    1: exact (Dict.maps_to_last_added _ _ _).
+    apply Forall_inv in innotdup as H2.
+    apply Forall_inv_tail in innotdup.
+    refine (Dict.maps_to_add _ _ _ _ _ (IH (Forall_impl _ _ innotdup) H) _).
+    1: intros [b tb] Hb ty Hin; exact (Hb ty (or_intror Hin)).
+    intros <-; refine (ntnevt' (f_equal _ _)); clear IH H2 ntnevt'; cbn in *.
+    exact (eq_sym (proj1 (Forall_forall _ _) innotdup _ H _ (or_introl eq_refl))).
+Defined.
+
 Definition check_node_prop (entry: Source.node): Result.t Target.node :=
-  do '(exist _ n_body assigned_vars_are_vars) <- check_body entry;
-  do check_assigned <- check_assigned_out entry n_body;
-  do n_out_is_not_an_input <- n_out_is_not_an_input entry;
-  do n_inputs_equations <- n_inputs_equations entry n_body;
-  do n_no_einputs_in_other <- n_no_einputs_in_other entry n_body;
+  let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
+  let n_out := (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
+  let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
+  do Henv <- check_Henv;
+  let temp := {|
+    orig := entry;
+    env := fold_left (fun acc '(n, t) => Dict.add n t acc) (n_in ++ n_out :: n_locals) (Dict.empty _);
+    Henv := Henv;
+    
+    n_in := n_in;
+    n_out := n_out;
+    n_locals := n_locals;
+    
+    Hnvars := eq_sym (map_app _ _ (_ :: _));
+  |} in
+  do '(exist _ n_body assigned_vars_are_vars) <- check_body temp entry;
+  do check_assigned <- check_assigned_out temp n_body;
+  do n_out_is_not_an_input <- n_out_is_not_an_input temp;
+  do n_inputs_equations <- n_inputs_equations temp n_body;
+  do n_no_einputs_in_other <- n_no_einputs_in_other temp n_body;
   Result.Ok {|
       Target.n_name := Source.n_name entry;
-      Target.n_in := map convert_binder (Source.n_in entry);
-      Target.n_out := convert_binder (Source.n_out entry);
-      Target.n_locals := map convert_binder (Source.n_locals entry);
+      Target.n_in := n_in;
+      Target.n_out := n_out;
+      Target.n_locals := n_locals;
       Target.n_body := n_body;
       Target.n_assigned_vars_are_vars := assigned_vars_are_vars;
       Target.n_assigned_out := check_assigned;
