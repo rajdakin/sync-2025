@@ -72,6 +72,7 @@ Lemma const_inv {ty} (x: const ty) :
 Proof using.
   destruct x as [|b|n]; [right|left; left|left; right]; exists eq_refl; [|exists b|exists n]; exact eq_refl.
 Defined.
+
 Lemma const_dec {ty} (x y: const ty) : {x = y} + {x <> y}.
 Proof.
   destruct x as [ | b | n ].
@@ -92,25 +93,28 @@ Defined.
 Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
   | Uop_neg: unop TInt TInt
+  | Uop_pre: unop TInt TInt
 .
 
 Lemma unop_inv {ty tout} (x: unop ty tout) :
   {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_not _ (eq_sym eq1)) _ (eq_sym eq2)} +
-  {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_neg _ (eq_sym eq1)) _ (eq_sym eq2)}.
+  {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_neg _ (eq_sym eq1)) _ (eq_sym eq2)} +
+  {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_pre _ (eq_sym eq1)) _ (eq_sym eq2)}.
 Proof using.
-  destruct x; [left|right]; exists eq_refl, eq_refl; exact eq_refl.
+  destruct x; [left|left|right]; [left|right|]; exists eq_refl, eq_refl; exact eq_refl.
 Defined.
+
 Lemma unop_dec {ty tout} (x y: unop ty tout) : {x = y} + {x <> y}.
 Proof.
-  destruct (unop_inv x) as [H1|H1].
-  all: destruct (unop_inv y) as [H2|H2].
-  1,4: left.
-  3,4: right.
+  destruct (unop_inv x) as [[H1|H1]|H1].
+  all: destruct (unop_inv y) as [[H2|H2]|H2].
+  1,5,9: left.
+  4-9: right.
   all: destruct H1 as [eq1 [eq2 ->]].
   all: destruct H2 as [-> [-> ->]].
   all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn.
   all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn.
-  1-2: reflexivity.
+  1-3: reflexivity.
   all: discriminate.
 Defined.
 
@@ -133,10 +137,14 @@ Inductive binop: type -> type -> type -> Set :=
 
   (** Relational binop *)
   | Bop_eq: binop TInt TInt TBool
+  | Bop_neq: binop TInt TInt TBool
   | Bop_le: binop TInt TInt TBool
   | Bop_lt: binop TInt TInt TBool
   | Bop_ge: binop TInt TInt TBool
   | Bop_gt: binop TInt TInt TBool
+
+  (** Timing bop *)
+  | Bop_arrow: binop TInt TInt TInt
 .
 
 Lemma binop_inv {ty1 ty2 tout} (x: binop ty1 ty2 tout) :
@@ -148,12 +156,16 @@ Lemma binop_inv {ty1 ty2 tout} (x: binop ty1 ty2 tout) :
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_mult _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_div _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_eq _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
+  {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_neq _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_le _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_lt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
   {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_ge _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
-  {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_gt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}.
+  {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_gt _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)} +
+  {exists (eq1 : ty1 = _) (eq2 : ty2 = _) (eqo : tout = _), x = eq_rect _ (binop _ _) (eq_rect _ (fun ty => binop _ ty _) (eq_rect _ (fun ty => binop ty _ _) Bop_arrow _ (eq_sym eq1)) _ (eq_sym eq2)) _ (eq_sym eqo)}.
 Proof using.
   destruct x.
+  1-13: left.
+  1-12: left.
   1-11: left.
   1-10: left.
   1-09: left.
@@ -165,7 +177,7 @@ Proof using.
   1-03: left.
   1-02: left.
   1-01: left.
-  2-12: right.
+  2-14: right.
   all: exists eq_refl, eq_refl, eq_refl; exact eq_refl.
 Defined.
 Lemma binop_dec {ty1 ty2 tout} (x y: binop ty1 ty2 tout) : {x = y} + {x <> y}.
@@ -173,6 +185,18 @@ Proof.
   pose proof (binop_inv x) as H1.
   repeat destruct H1 as [ H1 | H1 ].
   all: pose proof (binop_inv y) as H.
+  14: destruct H as [f|H]; [right|left]; destruct H1 as [eq1 [eq2 [eq3 ->]]]; [|destruct H as [-> [-> [-> ->]]]].
+  15: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-13: destruct H as [H|f]; [|
+    right; destruct H1 as [eq1 [eq2 [eq3 ->]]], f as [-> [-> [-> f]]]; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate
+  ].
+  13: destruct H as [f|H]; [right|left]; destruct H1 as [eq1 [eq2 [eq3 ->]]]; [|destruct H as [-> [-> [-> ->]]]].
+  14: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
+  1-12: destruct H as [H|f]; [|
+    right; destruct H1 as [eq1 [eq2 [eq3 ->]]], f as [-> [-> [-> f]]]; try discriminate; intros <-;
+    repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate
+  ].
   12: destruct H as [f|H]; [right|left]; destruct H1 as [eq1 [eq2 [eq3 ->]]]; [|destruct H as [-> [-> [-> ->]]]].
   13: do 3 (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn); reflexivity.
   1-11: destruct H as [H|f]; [|
@@ -358,8 +382,6 @@ Record node := mk_node {
   n_inputs_equations: incl (List.map (fun '((n, ty) as b) => (n, existT exp ty (EInput b))) n_in) n_body;
   n_no_einputs_in_other: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
 }.
-
-
 
 Definition node_eq (n1 n2: node) :=
   n_name n1 = n_name n2 /\

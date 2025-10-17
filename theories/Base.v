@@ -69,3 +69,5 @@ Definition incl_dec {A : Type} (dec : forall x y : A, {x = y} + {x <> y}) : fora
         end
       end)
     l1.
+
+Axiom ABORT_FIXME : forall A : Type, unit -> A.

@@ -23,8 +23,15 @@ Inductive const: Type :=
   returns an expression of type [tyout].
 *)
 Inductive unop: Type :=
+  (** Boolean unop *)
   | Uop_not: unop
-  | Uop_neg: unop.
+
+  (** Arithmetic unop *)
+  | Uop_neg: unop
+  
+  (** Timing unop *)
+  | Uop_pre: unop
+  .
 
 (** A binary operator
 
@@ -45,10 +52,16 @@ Inductive binop: Type :=
 
   (** Relational binop *)
   | Bop_eq: binop
+  | Bop_neq: binop
   | Bop_le: binop
   | Bop_lt: binop
   | Bop_ge: binop
-  | Bop_gt: binop.
+  | Bop_gt: binop
+
+  (** Timing binop *)
+  | Bop_arrow: binop
+  | Bop_fby: binop
+  .
 
 Inductive exp: Type :=
   | EConst: const -> exp
@@ -72,7 +85,6 @@ Definition equation := prod ident exp.
 
 Record node := mk_node {
   n_name: string;
-
   n_in: list (binder * type);
   n_out: (binder * type);
   n_locals: list (binder * type);
@@ -86,9 +98,6 @@ Definition node_eq (n1 n2: node) :=
   n_out n1 = n_out n2 /\
   Permutation (n_locals n1) (n_locals n2) /\
   Permutation (n_body n1) (n_body n2).
-
-
-Definition var_bool := (0, TBool).
 
 Definition name_dec := String.string_dec.
 
@@ -119,6 +128,14 @@ Definition type_eqb (x y: type): bool :=
     | _, _ => false
   end.
 
+Lemma type_eqb_eq (x y: type):
+  type_eqb x y = true <-> x = y.
+Proof.
+  destruct x, y.
+  all: firstorder.
+  all: discriminate.
+Qed.
+
 Lemma type_eqb_refl (t: type):
   type_eqb t t = true.
 Proof.
@@ -128,11 +145,17 @@ Qed.
 Lemma type_dec (x y: type): {x = y} + {x <> y}.
 Proof.
   destruct x, y.
-  1, 5, 9: left; reflexivity.
+  all: try (left; reflexivity).
   all: right; inversion 1.
 Defined.
 
 Definition binder_eqb (x y: binder): bool := (x =? y).
+
+Lemma binder_eqb_eq (x y: binder):
+  binder_eqb x y = true <-> x = y.
+Proof.
+  apply PeanoNat.Nat.eqb_eq.
+Qed.
 
 Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
 Proof.
@@ -167,13 +190,29 @@ Definition unop_eqb (x y: unop): bool :=
   match x, y with
     | Uop_not, Uop_not => true
     | Uop_neg, Uop_neg => true
+    | Uop_pre, Uop_pre => true
     | _, _ => false
   end.
+
+Lemma unop_eqb_eq (x y: unop):
+  unop_eqb x y = true <-> x = y.
+Proof.
+  destruct x, y.
+  all: firstorder.
+  all: discriminate.
+Qed.
+
+Lemma unop_eqb_refl (op: unop):
+  unop_eqb op op = true.
+Proof.
+  destruct op; reflexivity.
+Qed.
 
 Lemma unop_dec (x y: unop) : {x = y} + {x <> y}.
 Proof.
   destruct x, y.
-  all: try (right; discriminate); try (left; reflexivity).
+  all: try (right; discriminate).
+  all: left; reflexivity.
 Defined.
 
 Definition binop_eqb (x y: binop): bool :=
@@ -186,17 +225,35 @@ Definition binop_eqb (x y: binop): bool :=
     | Bop_mult, Bop_mult => true
     | Bop_div, Bop_div => true
     | Bop_eq, Bop_eq => true
+    | Bop_neq, Bop_neq => true
     | Bop_lt, Bop_lt => true
     | Bop_le, Bop_le => true
     | Bop_gt, Bop_gt => true
     | Bop_ge, Bop_ge => true
+    | Bop_arrow, Bop_arrow => true
+    | Bop_fby, Bop_fby => true
     | _, _ => false
   end.
+
+Lemma binop_eqb_eq (x y: binop):
+  binop_eqb x y = true <-> x = y.
+Proof.
+  destruct x, y.
+  all: firstorder.
+  all: discriminate.
+Qed.
+
+Lemma binop_eqb_refl (op: binop):
+  binop_eqb op op = true.
+Proof.
+  destruct op; reflexivity.
+Qed.
 
 Lemma binop_dec (x y: binop) : {x = y} + {x <> y}.
 Proof.
   destruct x, y.
-  all: try (right; discriminate); try (left; reflexivity).
+  all: try (right; discriminate).
+  all: left; reflexivity.
 Defined.
 
 Definition const_eqb (c1 c2: const): bool :=
@@ -206,6 +263,35 @@ Definition const_eqb (c1 c2: const): bool :=
     | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
     | _, _ => false
   end.
+
+Lemma const_eqb_eq (c1 c2: const):
+  const_eqb c1 c2 = true <-> c1 = c2.
+Proof.
+  unfold const_eqb.
+  destruct c1, c2.
+  all: firstorder.
+  all: try discriminate.
+  - apply Bool.eqb_prop in H.
+    subst.
+    reflexivity.
+  - inversion H.
+    subst.
+    apply Bool.Is_true_eq_true.
+    apply Bool.eqb_refl.
+  - apply PeanoNat.Nat.eqb_eq in H.
+    subst.
+    reflexivity.
+  - inversion H.
+    subst.
+    apply PeanoNat.Nat.eqb_refl.
+Qed.
+
+Lemma const_eqb_refl (c: const):
+  const_eqb c c = true.
+Proof.
+  apply const_eqb_eq.
+  reflexivity.
+Qed.
 
 Lemma const_dec (c1 c2: const) : {c1 = c2} + {c1 <> c2}.
 Proof.
@@ -239,95 +325,85 @@ Proof.
   revert e2.
   induction e1, e2.
   all: try (right; discriminate).
-  - destruct (const_dec c c0).
-    + left. rewrite e. reflexivity.
-    + right. inversion 1. contradiction.
-  - destruct (binder_dec b b0).
-    + left. rewrite e. reflexivity.
-    + right. inversion 1. contradiction.
-  - destruct (binder_dec b b0).
-    + left. rewrite e. reflexivity.
-    + right. inversion 1. contradiction.
-  - destruct (unop_dec u u0).
-    2: {right. inversion 1. contradiction. }
-    destruct (IHe1 e2).
-    2: {right. inversion 1. contradiction. }
-    left. rewrite e, e0. reflexivity.
-  - destruct (binop_dec b b0).
-    2: {right. inversion 1. contradiction. }
-    destruct (IHe1_1 e2_1).
-    2: {right. inversion 1. contradiction. }
-    destruct (IHe1_2 e2_2).
-    2: {right. inversion 1. contradiction. }
-    left. rewrite e, e0, e1. reflexivity.
-  - destruct (IHe1_1 e2_1).
-    2: {right. inversion 1. contradiction. }
-    destruct (IHe1_2 e2_2).
-    2: {right. inversion 1. contradiction. }
-    destruct (IHe1_3 e2_3).
-    2: {right. inversion 1. contradiction. }
-    left. rewrite e, e0, e1. reflexivity.
-Defined.
-
-Lemma unop_eqb_refl (op: unop):
-  unop_eqb op op = true.
-Proof.
-  destruct op; reflexivity.
-Qed.
-
-Lemma unop_eqb_to_eq (op1 op2: unop):
-  unop_eqb op1 op2 = true -> op1 = op2.
-Proof.
-  intros H.
-  destruct op1, op2; (reflexivity || inversion H).
-Qed.
-
-Lemma binop_eqb_refl (op: binop):
-  binop_eqb op op = true.
-Proof.
-  destruct op; reflexivity.
-Qed.
-
-Lemma binop_eqb_to_eq (op1 op2: binop):
-  binop_eqb op1 op2 = true -> op1 = op2.
-Proof.
-  intros H.
-  destruct op1, op2; reflexivity || inversion H.
-Qed.
-
-Lemma const_eqb_refl (c: const):
-  const_eqb c c = true.
-Proof.
-  destruct c as [ | b | n ].
-  - reflexivity.
-  - apply Bool.eqb_true_iff.
-    reflexivity.
-  - apply PeanoNat.Nat.eqb_refl.
-Qed.
-
-Lemma const_eqb_to_eq (c1 c2: const):
-  const_eqb c1 c2 = true -> c1 = c2.
-Proof.
-  intros H.
-  destruct c1.
-  - destruct c2.
-    + reflexivity.
-    + inversion H.
-    + inversion H.
-  - destruct c2.
-    + inversion H.
-    + simpl in H.
-      f_equal.
-      apply Bool.eqb_true_iff.
-      assumption.
-    + inversion H.
-  - destruct c2.
-    + inversion H.
-    + inversion H.
-    + apply PeanoNat.Nat.eqb_eq in H.
-      subst.
+  - destruct (const_dec c c0) as [c_c0 |].
+    + left.
+      rewrite c_c0.
       reflexivity.
-Qed.
+    + right.
+      inversion 1.
+      contradiction.
+  - destruct (binder_dec b b0) as [b_b0 |].
+    + left.
+      rewrite b_b0.
+      reflexivity.
+    + right.
+      inversion 1.
+      contradiction.
+  - destruct (binder_dec b b0) as [b_b0 |].
+    + left.
+      rewrite b_b0.
+      reflexivity.
+    + right.
+      inversion 1.
+      contradiction.
+  - destruct (unop_dec u u0) as [u_u0 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    destruct (IHe1 e2) as [e1_e2 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    left.
+    rewrite u_u0, e1_e2.
+    reflexivity.
+  - destruct (binop_dec b b0) as [b_b0 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    destruct (IHe1_1 e2_1) as [e11_e21 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    destruct (IHe1_2 e2_2) as [e12_e22 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    left.
+    rewrite b_b0, e11_e21, e12_e22.
+    reflexivity.
+  - destruct (IHe1_1 e2_1) as [e11_e21 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    destruct (IHe1_2 e2_2) as [e12_e22 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    destruct (IHe1_3 e2_3) as [e13_e23 |].
+    2: {
+      right.
+      inversion 1.
+      contradiction.
+    }
+    left.
+    rewrite e11_e21, e12_e22, e13_e23.
+    reflexivity.
+Defined.
 
 Lemma exp_eqb_refl (e: exp):
   exp_eqb e e = true.
@@ -349,44 +425,45 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma exp_eqb_to_eq (e1 e2: exp):
-  exp_eqb e1 e2 = true -> e1 = e2.
+Lemma exp_eqb_eq (e1 e2: exp):
+  exp_eqb e1 e2 = true <-> e1 = e2.
 Proof.
-  intros H.
-  revert e2 H.
-  induction e1 as [ c1 | b1 | b1 | op1 e1 IH | op1 e11 IH1 e12 IH2 | e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
-  - destruct e2; try inversion H.
-    apply const_eqb_to_eq in H1.
+  split.
+  - intro H.
+    revert e2 H.
+    induction e1 as [ c1 | b1 | b1 | op1 e1 IH | op1 e11 IH1 e12 IH2 | e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
+    all: destruct e2; try inversion H.
+    + apply const_eqb_eq in H1.
+      subst.
+      reflexivity.
+    + apply binder_eqb_eq in H1.
+      subst.
+      reflexivity.
+    + apply binder_eqb_eq in H1.
+      subst.
+      reflexivity.
+    + apply andb_prop in H1 as [ H1 H2 ].
+      apply unop_eqb_eq in H1.
+      apply IH in H2.
+      rewrite H1, H2.
+      reflexivity.
+    + apply andb_prop in H1 as [ H1 H2 ].
+      apply andb_prop in H1 as [ H3 H1 ].
+      apply IH1 in H1.
+      apply IH2 in H2.
+      apply binop_eqb_eq in H3.
+      rewrite H1, H2, H3.
+      reflexivity.
+    + apply andb_prop in H1 as [ H1 H3 ].
+      apply andb_prop in H1 as [ H1 H2 ].
+      apply IH1 in H1.
+      apply IH2 in H2.
+      apply IH3 in H3.
+      rewrite H1, H2, H3.
+      reflexivity.
+  - intro.
     subst.
-    reflexivity.
-  - destruct e2; try inversion H.
-    apply binder_eqb_to_eq in H1.
-    subst.
-    reflexivity.
-  - destruct e2; try inversion H.
-    apply binder_eqb_to_eq in H1.
-    subst.
-    reflexivity.
-  -  destruct e2; try inversion H.
-    apply andb_prop in H1 as [ H1 H2 ].
-    apply unop_eqb_to_eq in H1.
-    apply IH in H2.
-    f_equal; assumption.
-  - destruct e2; try inversion H.
-    apply andb_prop in H1 as [ H1 H2 ].
-    apply andb_prop in H1 as [ H3 H1 ].
-    apply IH1 in H1.
-    apply IH2 in H2.
-    apply binop_eqb_to_eq in H3.
-    rewrite H1, H2, H3.
-    reflexivity.
-  - destruct e2; try inversion H.
-    apply andb_prop in H1 as [ H1 H3 ].
-    apply andb_prop in H1 as [ H1 H2 ].
-    apply IH1 in H1.
-    apply IH2 in H2.
-    apply IH3 in H3.
-    f_equal; assumption.
+    apply exp_eqb_refl.
 Qed.
 
 Definition equation_eqb (eq1 eq2: equation): bool :=
@@ -396,7 +473,7 @@ Lemma equation_dec (e1 e2: equation) : { e1 = e2 } + {e1 <> e2}.
 Proof.
   destruct e1 as [ e1_name e1_exp].
   destruct e2 as [e2_name e2_exp ].
-  pose proof (PeanoNat.Nat.eq_dec e1_name e2_name).
+  pose proof (PeanoNat.Nat.eq_dec e1_name e2_name) as H.
   destruct H.
   2: {
     right.
@@ -416,19 +493,6 @@ Proof.
   reflexivity.
 Defined.
 
-Lemma equation_eqb_to_eq (eq1 eq2: equation):
-  equation_eqb eq1 eq2 = true -> eq1 = eq2.
-Proof.
-  intros H.
-  destruct eq1, eq2.
-  apply andb_prop in H as [ H1 H2 ].
-  apply PeanoNat.Nat.eqb_eq in H1.
-  apply exp_eqb_to_eq in H2.
-  simpl in H1, H2.
-  rewrite H1, H2.
-  reflexivity.
-Qed.
-
 Lemma equation_eqb_refl (eq: equation):
   equation_eqb eq eq = true.
 Proof.
@@ -437,6 +501,29 @@ Proof.
   split.
   - apply PeanoNat.Nat.eqb_refl.
   - apply exp_eqb_refl.
+Qed.
+
+Lemma equation_eqb_eq (eq1 eq2: equation):
+  equation_eqb eq1 eq2 = true <-> eq1 = eq2.
+Proof.
+  split.
+  - intro H.
+    destruct eq1, eq2.
+    apply andb_prop in H as [ H1 H2 ].
+    apply PeanoNat.Nat.eqb_eq in H1.
+    apply exp_eqb_eq in H2.
+    simpl in H1, H2.
+    rewrite H1, H2.
+    reflexivity.
+  - intro.
+    subst.
+    apply equation_eqb_refl.
+Qed.
+
+Lemma equation_eqb_to_eq (eq1 eq2: equation):
+  equation_eqb eq1 eq2 = true -> eq1 = eq2.
+Proof.
+  apply equation_eqb_eq.
 Qed.
 
 Lemma equation_eq_to_eqb (eq1 eq2: equation):

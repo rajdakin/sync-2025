@@ -30,6 +30,7 @@ let pp_binop fmt op =
   | Bop_mult -> fprintf fmt "*"
   | Bop_div -> fprintf fmt "/"
   | Bop_eq -> fprintf fmt "=="
+  | Bop_neq -> fprintf fmt "<>"
   | Bop_le -> fprintf fmt "<="
   | Bop_lt -> fprintf fmt "<"
   | Bop_ge -> fprintf fmt ">="
@@ -71,10 +72,10 @@ let needs_paren_binary op parent_op =
   | Some (BinaryAndL | BinaryOrL | BinaryAndR | BinaryOrR), _ -> true
   (* Xor is not a boolean operator... *)
   (* Comparisons operators *)
-  | _, (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) -> true
+  | _, (Bop_eq | Bop_neq | Bop_le | Bop_lt | Bop_ge | Bop_gt) -> true
   | ( Some
-        ( BinaryL (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt)
-        | BinaryR (Bop_eq | Bop_le | Bop_lt | Bop_ge | Bop_gt) ),
+        ( BinaryL (Bop_eq | Bop_neq | Bop_le | Bop_lt | Bop_ge | Bop_gt)
+        | BinaryR (Bop_eq | Bop_neq | Bop_le | Bop_lt | Bop_ge | Bop_gt) ),
       _ ) ->
       false
   (* Arithmetic operators *)

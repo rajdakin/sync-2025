@@ -25,8 +25,10 @@ Definition translate_binder (b: Source.binder): Target.binder :=
 
 Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop (translate_type ty) (translate_type tout) :=
   match op with
-  | Source.Lustre.Uop_not => Target.Uop_not
+  (* ???? *)
+  | Source.Lustre.Uop_not => Target.Uop_not : Target.unop (translate_type Source.Lustre.TInt) (translate_type Source.Lustre.TInt)
   | Source.Lustre.Uop_neg => Target.Uop_neg
+  | Source.Lustre.Uop_pre => ABORT_FIXME _ tt
   end.
 
 Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
@@ -41,10 +43,12 @@ Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
   | Source.Lustre.Bop_mult => fun _ => Target.Bop_mult
   | Source.Lustre.Bop_div => fun _ => Target.Bop_div
   | Source.Lustre.Bop_eq => fun _ => Target.Bop_eq
+  | Source.Lustre.Bop_neq => fun _ => Target.Bop_neq
   | Source.Lustre.Bop_lt => fun _ => Target.Bop_lt
   | Source.Lustre.Bop_le => fun _ => Target.Bop_le
   | Source.Lustre.Bop_gt => fun _ => Target.Bop_gt
   | Source.Lustre.Bop_ge => fun _ => Target.Bop_ge
+  | Source.Lustre.Bop_arrow => fun _ => ABORT_FIXME _ tt
   end.
 
 Fixpoint translate_value {ty} (v: Source.value ty): Target.value (translate_type ty) :=
