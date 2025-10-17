@@ -1,4 +1,4 @@
-node test_int_cond(i1: int, i2: int, cond: bool) return a: bool
+node test_int_cond(i1: int, i2: int, cond: bool) returns (a: bool)
 var b: bool; c: int;
 let
   c = if i1 >= i2 then i1 else i2;  

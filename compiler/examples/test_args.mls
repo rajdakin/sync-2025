@@ -1,4 +1,4 @@
-node my_and(b: bool, c:bool ) return a: bool
+node my_and(b: bool, c:bool ) returns (a: bool)
 let
   a = b && c;
 tel

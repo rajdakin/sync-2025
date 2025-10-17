@@ -286,12 +286,12 @@ Record method := mk_method {
   m_name: string;
 
   m_in: list binder;
-  m_out: binder;
+  m_out: list binder;
   m_vars: list binder;
 
   m_body: stmt;
 
-  m_out_assign: exists (e: exp _), is_substmt (SAssign m_out e) m_body = true
+  m_out_assign: forall b, In b m_out -> exists (e: exp _), is_substmt (SAssign b e) m_body = true
 }.
 
 

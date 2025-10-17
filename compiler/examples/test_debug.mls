@@ -1,4 +1,4 @@
-node test_int_cond() return a: bool
+node test_int_cond() returns (a: bool)
 var c : bool;
 let
   c = false;
