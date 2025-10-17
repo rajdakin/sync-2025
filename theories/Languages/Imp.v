@@ -81,7 +81,7 @@ Lemma unop_inv {ty tout} (x: unop ty tout) :
   {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_neg _ (eq_sym eq1)) _ (eq_sym eq2)}.
 Proof using.
   destruct x; [left|right]; exists eq_refl, eq_refl; exact eq_refl.
-Qed.
+Defined.
 Lemma unop_dec {ty tout} (x y: unop ty tout) : {x = y} + {x <> y}.
 Proof.
   destruct (unop_inv x) as [H1|H1].
@@ -94,7 +94,7 @@ Proof.
   all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn.
   1-2: reflexivity.
   all: discriminate.
-Qed.
+Defined.
 
 Definition unop_eqb {tyx toutx} (x: unop tyx toutx) {tyy touty} (y: unop tyy touty): bool :=
   match x, y with
@@ -127,7 +127,7 @@ Proof using.
   1-01: left.
   2-10: right.
   all: exists eq_refl, eq_refl, eq_refl; exact eq_refl.
-Qed.
+Defined.
 Lemma binop_dec {ty1 ty2 tout} (x y: binop ty1 ty2 tout) : {x = y} + {x <> y}.
 Proof.
   pose proof (binop_inv x) as H1.
@@ -193,7 +193,7 @@ Proof.
   all: try solve [repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate f].
   all: destruct f as [? [? [? f]]]; try discriminate.
   all: repeat (rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; cbn in f); discriminate f.
-Qed.
+Defined.
 
 Definition binop_eqb {ty1x ty2x toutx} (x: binop ty1x ty2x toutx) {ty1y ty2y touty} (y: binop ty1y ty2y touty): bool :=
   match x, y with
@@ -216,7 +216,7 @@ Lemma const_inv {ty} (x: const ty) :
   {exists (eq : ty = _), x = eq_rect _ const CVoid _ (eq_sym eq)}.
 Proof using.
   destruct x as [|b|n]; [right|left; left|left; right]; exists eq_refl; [|exists b|exists n]; exact eq_refl.
-Qed.
+Defined.
 Lemma const_dec {ty} (x y: const ty) : {x = y} + {x <> y}.
 Proof.
   destruct x as [ | b | n ].
@@ -227,7 +227,7 @@ Proof.
   4: destruct (PeanoNat.Nat.eq_dec n n') as [eq|ne]; [left|right].
   all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn; try intros [=f]; auto.
   exact (f_equal _ eq).
-Qed.
+Defined.
 
 Definition const_eqb {ty1} (c1: const ty1) {ty2} (c2: const ty2): bool :=
   match c1, c2 with
@@ -317,7 +317,7 @@ Proof using.
   all: try solve [repeat eexists; exact eq_refl].
   1: exists b, eq_refl; exact eq_refl.
   1-2: exists eq_refl; exact (existT _ _ (exist _ _ eq_refl)).
-Qed.
+Defined.
 Lemma value_dec {ty} (e1 e2: value ty) : {e1 = e2} + {e1 <> e2}.
 Proof.
   revert e2.
@@ -373,7 +373,7 @@ Proof.
     destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
-Qed.
+Defined.
 
 Definition stack := Dict.t (sigT value).
 

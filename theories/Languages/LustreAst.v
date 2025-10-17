@@ -130,7 +130,7 @@ Proof.
   destruct x, y.
   1, 5, 9: left; reflexivity.
   all: right; inversion 1.
-Qed.
+Defined.
 
 Definition binder_eqb (x y: binder): bool :=
   andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
@@ -479,4 +479,3 @@ Proof.
   rewrite H.
   apply equation_eqb_refl.
 Qed.
-

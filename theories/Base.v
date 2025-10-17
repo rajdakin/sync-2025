@@ -2,6 +2,7 @@
 
 From Stdlib Require Export List Nat String.
 From Stdlib Require Export Lia.
+From Stdlib Require ListDec.
 
 Export ListNotations.
 Open Scope nat_scope.
@@ -50,3 +51,21 @@ Proof using.
 Qed.
 
 Definition ident := nat.
+
+Definition incl_dec {A : Type} (dec : forall x y : A, {x = y} + {x <> y}) : forall l l' : list A, {incl l l'} + {~ incl l l'} :=
+  fun l1 l2 =>
+  list_rec (fun l1 => {incl l1 l2} + {~ incl l1 l2})
+    (left (fun (x : A) (H : In x []) => match H return In x l2 with end))
+    (fun (hd: A) (tl: list A) (IH: {incl tl l2} + {~ incl tl l2}) => match ListDec.In_dec dec hd l2 with
+      | right hdnin => right (fun Hincl => hdnin (Hincl hd (or_introl _ eq_refl)))
+      | left hdin => match IH with
+        | right nincl => right (fun Hincl => nincl (fun (x: A) (H: In x tl) => Hincl x (or_intror _ H)))
+        | left incl =>
+          left
+            (fun (x: A) (H: In x (hd :: tl)) => match H with
+            | or_introl _ xeq => eq_ind_r (fun y => In y _ -> In x _) (fun p => p) xeq hdin
+            | or_intror _ xintl => incl x xintl
+            end)
+        end
+      end)
+    l1.

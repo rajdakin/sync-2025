@@ -92,10 +92,7 @@ Proof.
   inversion IHl as [ IHl' | err ].
   2: { apply Result.Err, err. }
 
-  destruct (in_dec (fun '(i, ty1) '(j, ty2) =>
-    match PeanoNat.Nat.eq_dec i j with right n => right (fun (f : (i, ty1) = (j, ty2)) => n (f_equal fst f))
-    | left ij => match Source.type_dec ty1 ty2 with right n => right (fun (f : (i, ty1) = (j, ty2)) => n (f_equal snd f))
-    | left ty => left (f_equal2 pair ij ty) end end) (y, ty') (map fst xs)).
+  destruct (in_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (y, ty') (map fst xs)).
   2: { apply Result.Err, "Identifier not bound". }
 
   apply Result.Ok, Ordered.append.

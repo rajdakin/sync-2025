@@ -3,7 +3,8 @@ From Reactive Require Import Base.
 From Reactive.Datatypes Require Result.
 From Reactive.Languages Require LustreAst Lustre.
 
-From Stdlib Require Import ListDec Bool Sorting Permutation.
+From Stdlib Require ListDec.
+From Stdlib Require Import Bool Sorting Permutation.
 
 Module Source := LustreAst.
 Module Target := Lustre.
@@ -101,7 +102,7 @@ Proof.
     refine (Result.bind IH _); clear IH.
     intros [ eqs IH ].
     cbn.
-    exact (match ListDec.incl_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) ((n, _) :: map (fun '(y, existT _ ty _) => (y, ty)) eqs) _ with
+    exact (match incl_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) ((n, _) :: map (fun '(y, existT _ ty _) => (y, ty)) eqs) _ with
       | left h => Result.Ok (exist (fun body => incl (map _ body) _) ((n, existT Target.exp ty e') :: eqs) (incl_cons (h _ (or_introl eq_refl)) IH))
       | right _ => Result.Err "A variable is never declared"
       end).
@@ -159,7 +160,7 @@ Defined.
 Definition n_inputs_equations (entry: Source.node) body:
   Result.t (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (map convert_binder (Source.n_in entry))) body).
 Proof.
-  refine (match ListDec.incl_dec _ _ _ with
+  refine (match incl_dec _ _ _ with
     | left h => Result.Ok h
     | right h => Result.Err "The output variable is never assigned"
   end).
