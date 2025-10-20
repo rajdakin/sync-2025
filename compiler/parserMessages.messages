@@ -73,7 +73,7 @@ node: NODE IDENT LPAREN IDENT COLON XOR
 ## ident COLON
 ##
 
-Unexpected token, the type of '$1'
+Unexpected token, expected the type of '$1'
 
 node: NODE IDENT LPAREN IDENT COLON BOOL XOR
 ##
