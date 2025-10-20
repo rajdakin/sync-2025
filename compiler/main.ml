@@ -21,7 +21,7 @@ let parse_file filename =
         n_out = ret;
         n_locals = locals;
         n_body =
-          Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
+          Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput (fst arg))) args @ eqs;
       }
   and fail checkpoint =
     close_in inx;
@@ -40,16 +40,15 @@ let parse_file filename =
       Format.printf "parser error: <unknown error message>";
       exit 1
   in
-  close_in inx;
-  LustreAst.
-    {
-      n_name = name;
-      n_in = args;
-      n_out = ret;
-      n_locals = locals;
-      n_body =
-        Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput (fst arg))) args @ eqs;
-    }
+  try
+    MI.loop_handle succeed fail supplier checkpoint
+  with Lexer.Error msg ->
+    close_in inx;
+    eprintf "lexer error: %s" msg;
+    exit 1
+  | e ->
+    Format.printf "%s@\n" (Printexc.to_string e);
+    exit 1
 
 let () =
   Arg.parse [] entry_file usage_message;
