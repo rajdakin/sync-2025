@@ -7,6 +7,9 @@ Module Lustre := Lustre.
 Definition type := Lustre.type.
 Definition sig2T_eq_type := @Lustre.sig2T_eq_type.
 Arguments sig2T_eq_type {_ _ _ _}.
+Definition binder := Lustre.binder.
+Definition sig2T_eq_binder := @Lustre.sig2T_eq_binder.
+Arguments sig2T_eq_binder {_ _ _ _}.
 Definition const := Lustre.const.
 Definition value := Lustre.value.
 Definition unop := Lustre.unop.

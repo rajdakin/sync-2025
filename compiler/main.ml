@@ -40,15 +40,16 @@ let parse_file filename =
       Format.printf "parser error: <unknown error message>";
       exit 1
   in
-  try
-    MI.loop_handle succeed fail supplier checkpoint
-  with Lexer.Error msg ->
-    close_in inx;
-    eprintf "lexer error: %s" msg;
-    exit 1
-  | e ->
-    Format.printf "%s@\n" (Printexc.to_string e);
-    exit 1
+  close_in inx;
+  LustreAst.
+    {
+      n_name = name;
+      n_in = args;
+      n_out = ret;
+      n_locals = locals;
+      n_body =
+        Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput (fst arg))) args @ eqs;
+    }
 
 let () =
   Arg.parse [] entry_file usage_message;
@@ -59,10 +60,10 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        printf "Error when node properties have been checked: %s\n" x;
+        printf "Error when node properties have been checked: %s@." x;
         exit 1
   in
 
   match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
-  | Err x -> printf "Error lustre ordering translate: %s\n" x
+  | Err x -> printf "Error lustre ordering translate: %s@." x

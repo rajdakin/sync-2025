@@ -10,7 +10,7 @@ Inductive type: Type :=
   | TBool
   | TInt.
 
-Definition binder := prod ident type.
+Definition binder := ident.
 
 Inductive const: Type :=
   | CVoid: const
@@ -85,9 +85,9 @@ Definition equation := prod ident exp.
 
 Record node := mk_node {
   n_name: string;
-  n_in: list binder;
-  n_out: binder;
-  n_locals: list binder;
+  n_in: list (binder * type);
+  n_out: (binder * type);
+  n_locals: list (binder * type);
   n_body: list equation;
 }.
 
@@ -106,7 +106,7 @@ Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
   match e with
     | EConst _ => acc
     | EInput _ => acc
-    | EVar (name, _) => name :: acc
+    | EVar name => name :: acc
     | EUnop _ e => var_of_exp_aux e acc
     | EBinop _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
@@ -147,74 +147,40 @@ Proof.
   destruct x, y.
   all: try (left; reflexivity).
   all: right; inversion 1.
-Qed.
+Defined.
 
-Definition binder_eqb (x y: binder): bool :=
-  andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
+Definition binder_eqb (x y: binder): bool := (x =? y).
 
 Lemma binder_eqb_eq (x y: binder):
   binder_eqb x y = true <-> x = y.
 Proof.
-  unfold binder_eqb.
-  split.
-  - destruct (fst x =? fst y) eqn:Heq; [| discriminate].
-    unfold andb.
-    rewrite type_eqb_eq.
-    destruct x, y.
-    rewrite PeanoNat.Nat.eqb_eq in Heq.
-    simpl in Heq.
-    simpl.
-    intro.
-    subst.
-    reflexivity.
-  - intro.
-    subst.
-    destruct y.
-    rewrite Bool.andb_true_iff.
-    rewrite type_eqb_refl.
-    rewrite PeanoNat.Nat.eqb_refl.
-    split; reflexivity.
+  apply PeanoNat.Nat.eqb_eq.
 Qed.
 
 Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
 Proof.
-  destruct x, y.
-
-  pose proof (PeanoNat.Nat.eq_dec i i0) as H.
-  destruct H.
-  2: {
-    right.
-    inversion 1.
-    contradiction.
-  }
-
-  destruct (type_dec t t0).
-  2: {
-    right.
-    inversion 1.
-    contradiction.
-  }
-
-  subst.
-  left.
-  reflexivity.
+  exact (PeanoNat.Nat.eq_dec x y).
 Defined.
 
 Lemma binder_eqb_refl (b: binder):
   binder_eqb b b = true.
 Proof.
-  apply binder_eqb_eq.
-  reflexivity.
+  apply PeanoNat.Nat.eqb_refl.
 Qed.
 
 Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
 Proof.
-  apply binder_eqb_eq.
+  unfold binder_eqb, andb.
+  destruct (x =? y) eqn:Heq; [| discriminate ].
+
+  now rewrite PeanoNat.Nat.eqb_eq in Heq.
 Qed.
 
 Lemma binder_eq_to_eqb (x y : binder): x = y -> binder_eqb x y = true.
 Proof.
-  apply binder_eqb_eq.
+  unfold binder_eqb.
+  intros ->.
+  apply PeanoNat.Nat.eqb_refl.
 Qed.
 
 
