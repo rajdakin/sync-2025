@@ -86,7 +86,7 @@ Definition equation := prod ident exp.
 Record node := mk_node {
   n_name: string;
   n_in: list (binder * type);
-  n_out: (binder * type);
+  n_out: list (binder * type);
   n_locals: list (binder * type);
   n_body: list equation;
 }.
@@ -95,7 +95,7 @@ Record node := mk_node {
 Definition node_eq (n1 n2: node) :=
   n_name n1 = n_name n2 /\
   Permutation (n_in n1) (n_in n2) /\
-  n_out n1 = n_out n2 /\
+  Permutation (n_out n1) (n_out n2) /\
   Permutation (n_locals n1) (n_locals n2) /\
   Permutation (n_body n1) (n_body n2).
 

@@ -369,16 +369,16 @@ Record node := mk_node {
   n_name: string;
 
   n_in: list binder;
-  n_out: binder;
+  n_out: list binder;
   n_locals: list binder;
   n_body: list equation;
 
-  n_vars: list binder := n_in ++ n_out :: n_locals;
-  n_assigned_vars: list binder := map (fun '(n, existT _ ty _) => (n, ty)) n_body;
+  n_vars: list binder := n_in ++ n_out ++ n_locals;
+  n_assigned_vars: list binder := map equation_dest n_body;
 
   n_assigned_vars_are_vars: incl n_assigned_vars n_vars;
-  n_assigned_out: In n_out n_assigned_vars;
-  n_out_is_not_an_input: ~ In (fst n_out) (map fst n_in);
+  n_assigned_out: incl n_out n_assigned_vars;
+  n_out_is_not_an_input: Forall (fun b => ~ In (fst b) (map fst n_in)) n_out;
   n_inputs_equations: incl (List.map (fun '((n, ty) as b) => (n, existT exp ty (EInput b))) n_in) n_body;
   n_no_einputs_in_other: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
 }.

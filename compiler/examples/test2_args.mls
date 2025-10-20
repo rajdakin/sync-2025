@@ -1,4 +1,4 @@
-node test(f: bool, g: bool) return a: bool
+node test(f: bool, g: bool) returns (a: bool)
 var b: bool; c: bool;
 let
   b = c;

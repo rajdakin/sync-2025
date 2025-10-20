@@ -55,7 +55,7 @@ Proof.
   destruct (list_eq_dec_binder in1 in2).
   2: { apply Result.Err, "Node inputs are not equal". }
 
-  destruct (Source.binder_dec out1 out2).
+  destruct (list_eq_dec_binder out1 out2).
   2: { apply Result.Err, "Node outputs are not equal". }
 
   destruct (list_eq_dec_binder locals1 locals2).

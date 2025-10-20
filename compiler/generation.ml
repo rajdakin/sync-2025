@@ -2,6 +2,7 @@ open Extracted.Imp
 open Format
 
 let pretty_printer m = printf "Ok: %s\n" (m_name m)
+let pp_return fmt ident = fprintf fmt "ret_%i" ident
 let pp_ident fmt ident = fprintf fmt "var_%i" ident
 let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
 
@@ -161,13 +162,44 @@ let pp_binder fmt binder = fprintf fmt "%a" pp_ident (fst binder)
 let pp_arg fmt arg = fprintf fmt "%a %a" pp_typ (snd arg) pp_binder arg
 
 let pp_args fmt (args : binder list) =
-  Format.pp_print_list
+  pp_print_list
     ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
     (fun fmt arg -> fprintf fmt "%a" pp_arg arg)
     fmt args
 
-let pp_coq_method cm =
-  printf "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn %a;@]@\n}@\n@]" pp_typ
-    (snd (m_out cm))
-    pp_fun_name (m_name cm) pp_args (m_in cm) (pp_stmt cm) (m_body cm) pp_var
-    (m_out cm)
+let pp_struct_typ fmt (args : binder list) =
+  pp_print_list
+    ~pp_sep:(fun _fmt () -> ())
+    (fun fmt (argn, argt : binder) -> fprintf fmt "@\n%a %a;" pp_typ argt pp_return argn)
+    fmt args
+
+let pp_struct_val sname fmt (args : binder list) =
+  fprintf fmt "(%s){ @[<hv>%a@] }"
+    sname
+    (pp_print_list
+      ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
+      (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
+
+let pp_coq_method cm = match m_out cm with
+  | [] -> (* Warning, no output! *)
+      printf "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
+        pp_fun_name (m_name cm)
+        pp_args (m_in cm)
+        (pp_stmt cm) (m_body cm)
+  | [m_out] ->
+      printf "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+        pp_typ (snd m_out)
+        pp_fun_name (m_name cm)
+        pp_args (m_in cm)
+        (pp_stmt cm) (m_body cm)
+        pp_var m_out
+  | _ :: _ :: _ ->
+      let return_name = asprintf "return_%s" (m_name cm) in
+      printf "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+        return_name
+        pp_struct_typ (m_out cm)
+        return_name
+        pp_fun_name (m_name cm)
+        pp_args (m_in cm)
+        (pp_stmt cm) (m_body cm)
+        (pp_struct_val return_name) (m_out cm)

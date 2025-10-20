@@ -1,4 +1,4 @@
-node add(x: int, y:int) return z:int
+node add(x: int, y:int) returns (z:int)
 let
 	z = x + y;
 tel
