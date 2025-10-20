@@ -134,9 +134,9 @@ Proof.
     + assumption.
 Qed.
 
-Lemma in_map_fstsnd {A B} {C : B -> Type} (y: A * B) (xs: list (A * sigT C)):
-  In y (List.map (fun '(x, existT _ y _) => (x, y)) xs) ->
-    exists ys, In (fst y, existT C (snd y) ys) xs.
+Lemma in_map_fstsnd y xs:
+  In y (List.map Source.Lustre.equation_dest xs) ->
+    exists ys, In (fst y, existT Source.Lustre.exp (snd y) ys) xs.
 Proof.
   induction xs as [| x xs IHxs ].
   { intros []. }
@@ -165,13 +165,21 @@ Proof.
     Target.m_name := n_name;
 
     Target.m_in := map translate_binder n_in;
-    Target.m_out := translate_binder n_out;
+    Target.m_out := map translate_binder n_out;
     Target.m_vars := map translate_binder n_vars;
 
     Target.m_body := translate_node_body n_body
   |}).
 
-  apply in_map_fstsnd in n_assigned_out as Hexp.
+  intros b Hb.
+  assert (tmp : exists b', In b' n_out /\ b = translate_binder b').
+  { clear - Hb.
+    induction n_out as [|hd tl IH]; [contradiction Hb|].
+    destruct Hb as [Hb|Hb]; [exists hd; split; [left; exact eq_refl|exact (eq_sym Hb)]|].
+    destruct (IH Hb) as [b' [H1 H2]]; exists b'; split; [right; exact H1|exact H2]. }
+  destruct tmp as [b' [Hb' ->]]; clear Hb; rename b' into b, Hb' into Hb.
+  specialize (n_assigned_out b Hb) as Hexp.
+  apply in_map_fstsnd in Hexp.
   destruct Hexp as [ exp Hexp ].
   exists (translate_exp exp).
   replace n_body with (Source.Lustre.n_body (Source.node_ordered_is_node n')); [ | reflexivity ].
@@ -478,7 +486,7 @@ Proof.
     fold Source.equations_to_dag in ordered_inner_body.
     apply translation_ordered_body with (h := h) in ordered as Htrans; [ | assumption ].
 
-    assert (incl (map (fun '(n, existT _ ty _) => (n, ty)) n_body) n_vars) as Hincl.
+    assert (incl (map Source.Lustre.equation_dest n_body) n_vars) as Hincl.
     { intros x Hx.
       apply n_assigned_vars_are_vars.
       right.

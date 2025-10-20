@@ -17,7 +17,7 @@
 %token TIMES DIV
 %token TRUE FALSE
 %token SEMI_COLON COLON COMMA
-%token NODE RETURN VAR
+%token NODE RETURNS VAR
 %token BOOL INT VOID
 %token LET TEL EOF
 %token IF THEN ELSE
@@ -36,7 +36,7 @@
 %nonassoc NOT
 
 (* (Node name) * (Node arguments) * (Local variables) * (Return) * (Equations) *)
-%start<string * ((binder * coq_type) list) * ((binder * coq_type) list) * (binder * coq_type) * ((int * exp) list)> node
+%start<string * ((binder * coq_type) list) * ((binder * coq_type) list) * ((binder * coq_type) list) * ((int * exp) list)> node
 
 %on_error_reduce expr
 
@@ -66,8 +66,13 @@ node:
     TEL EOF
     { (name, args, [], ret, eqs) }
 
-returns: (* TODO: support multiple return values *)
-  | RETURN ret=ident COLON typ=typ { (ret, typ) }
+returns:
+  | RETURNS LPAREN ret=out_list RPAREN { ret }
+
+out_list: (* TODO: last *)
+  | id=ident COLON typ=typ COMMA args=args { (id, typ) :: args }
+  | id=ident COLON typ=typ { (id, typ) :: [] }
+  | { [] }
 
 args:
   | id=ident COLON typ=typ COMMA args=args { (id, typ) :: args }

@@ -35,7 +35,7 @@ rule token = parse
   | "fby"       { FBY }
   | "node"      { NODE }
   | "var"       { VAR }
-  | "return"    { RETURN }
+  | "returns"   { RETURNS }
   | "let"       { LET }
   | "tel"       { TEL }
   | "bool"      { BOOL }
