@@ -1,5 +1,5 @@
 open Extracted
-open Printf
+open Format
 
 let usage_message = "compiler <file>"
 let input_file = ref ""
@@ -26,7 +26,7 @@ let parse_file filename =
       n_out = ret;
       n_locals = locals;
       n_body =
-        Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput arg)) args @ eqs;
+        Stdlib.List.map (fun ((id, _) as arg) -> (id, EInput (fst arg))) args @ eqs;
     }
 
 let () =
@@ -38,10 +38,10 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        printf "Error when node properties have been checked: %s\n" x;
+        printf "Error when node properties have been checked: %s@." x;
         exit 1
   in
 
   match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
-  | Err x -> printf "Error lustre ordering translate: %s\n" x
+  | Err x -> printf "Error lustre ordering translate: %s@." x

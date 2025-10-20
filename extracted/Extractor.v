@@ -7,6 +7,7 @@ From Stdlib Require Import ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlNativeString.
 
 
 Extract Constant LustreOrdering.node_ordering => "Ordered.node_ordering".
+Extract Constant Base.ABORT_FIXME => "Abort.aBORT_FIXME".
 
 Separate Extraction
   LustreOrdering.translate_node
