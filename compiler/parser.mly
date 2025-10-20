@@ -107,7 +107,7 @@ const:
 
 %inline unop:
   | NOT   { Uop_not }
-  | MINUS { Uop_minus }
+  | MINUS { Uop_neg }
   | PRE   { Uop_pre }
 
 %inline binop:
@@ -116,7 +116,7 @@ const:
   | XOR   { Bop_xor }
   | PLUS  { Bop_plus }
   | MINUS { Bop_minus }
-  | TIMES { Bop_times }
+  | TIMES { Bop_mult }
   | DIV   { Bop_div }
   | GE    { Bop_ge }
   | LE    { Bop_le }
