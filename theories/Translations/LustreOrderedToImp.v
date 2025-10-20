@@ -39,6 +39,7 @@ Definition translate_binop (op: LustreAst.binop): Target.binop :=
   | LustreAst.Bop_mult => Target.Bop_mult
   | LustreAst.Bop_div => Target.Bop_div
   | LustreAst.Bop_eq => Target.Bop_eq
+  | LustreAst.Bop_neq => Target.Bop_neq
   | LustreAst.Bop_lt => Target.Bop_lt
   | LustreAst.Bop_le => Target.Bop_le
   | LustreAst.Bop_gt => Target.Bop_gt
