@@ -14,8 +14,8 @@ node: NODE XOR
 ##
 ## Ends in an error in state: 1.
 ##
-## node -> NODE . ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE . ident_node LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+## node -> NODE . node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE . node_name LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE
@@ -27,27 +27,27 @@ node: NODE IDENT XOR
 ##
 ## Ends in an error in state: 3.
 ##
-## node -> NODE ident_node . LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE ident_node . LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+## node -> NODE node_name . LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE node_name . LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node
+## NODE node_name
 ##
 
-Unexpected token, expected '('
+Unexpected token, expected '(' followed by the arguments of the node
 
 node: NODE IDENT LPAREN XOR
 ##
 ## Ends in an error in state: 4.
 ##
-## node -> NODE ident_node LPAREN . args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE ident_node LPAREN . args RPAREN returns LET equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN . args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN . args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN
+## NODE node_name LPAREN
 ##
 
-Unexpected token, expected identifier
+Unexpected token, expected identifier or ')' (Node arguments list)
 
 node: NODE IDENT LPAREN IDENT XOR
 ##
@@ -60,7 +60,7 @@ node: NODE IDENT LPAREN IDENT XOR
 ## ident
 ##
 
-Unexpected token, expected ':'
+Unexpected token, expected ':' followed by the type of argument '$0'
 
 node: NODE IDENT LPAREN IDENT COLON XOR
 ##
@@ -73,7 +73,7 @@ node: NODE IDENT LPAREN IDENT COLON XOR
 ## ident COLON
 ##
 
-Unexpected token, expected type
+Unexpected token, the type of '$1'
 
 node: NODE IDENT LPAREN IDENT COLON BOOL XOR
 ##
@@ -86,7 +86,7 @@ node: NODE IDENT LPAREN IDENT COLON BOOL XOR
 ## ident COLON typ
 ##
 
-Unexpected token, expected ',' or ')'
+Unexpected token, expected ',' or ')' as continuation of the node argument list
 
 node: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
 ##
@@ -98,97 +98,136 @@ node: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
 ## ident COLON typ COMMA
 ##
 
-Unexpected token, expected identifier
+Unexpected token, expected node argument name
 
 node: NODE IDENT LPAREN RPAREN XOR
 ##
 ## Ends in an error in state: 15.
 ##
-## node -> NODE ident_node LPAREN args RPAREN . returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE ident_node LPAREN args RPAREN . returns LET equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN . returns VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN . returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN
+## NODE node_name LPAREN args RPAREN
 ##
 
-Unexpected token, expected 'return'
+Unexpected token, expected 'returns'
 
-node: NODE IDENT LPAREN RPAREN RETURN XOR
+node: NODE IDENT LPAREN RPAREN RETURNS XOR
 ##
 ## Ends in an error in state: 16.
 ##
-## returns -> RETURN . ident COLON typ [ VAR LET ]
+## returns -> RETURNS . LPAREN out_list RPAREN [ VAR LET ]
 ##
 ## The known suffix of the stack is as follows:
-## RETURN
+## RETURNS
 ##
 
-Unexpected token, expected identifier
+Unexpected token, expected '('
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN XOR
 ##
 ## Ends in an error in state: 17.
 ##
-## returns -> RETURN ident . COLON typ [ VAR LET ]
+## returns -> RETURNS LPAREN . out_list RPAREN [ VAR LET ]
 ##
 ## The known suffix of the stack is as follows:
-## RETURN ident
+## RETURNS LPAREN
 ##
 
-Unexpected token, expected ':'
+Unexpected token, expected return value identifier
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON XOR
-##
-## Ends in an error in state: 18.
-##
-## returns -> RETURN ident COLON . typ [ VAR LET ]
-##
-## The known suffix of the stack is as follows:
-## RETURN ident COLON
-##
-
-Unexpected token, expected type
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT XOR
 ##
 ## Ends in an error in state: 20.
 ##
-## node -> NODE ident_node LPAREN args RPAREN returns . VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE ident_node LPAREN args RPAREN returns . LET equation_list TEL EOF [ # ]
+## out_list -> ident . COLON typ COMMA args [ RPAREN ]
+## out_list -> ident . COLON typ [ RPAREN ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns
+## ident
+##
+
+Unexpected token, expected ':' followed by the type of return value '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON XOR
+##
+## Ends in an error in state: 21.
+##
+## out_list -> ident COLON . typ COMMA args [ RPAREN ]
+## out_list -> ident COLON . typ [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON
+##
+
+Unexpected token, expected the type of return value '$1'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL XOR
+##
+## Ends in an error in state: 22.
+##
+## out_list -> ident COLON typ . COMMA args [ RPAREN ]
+## out_list -> ident COLON typ . [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ
+##
+
+Unexpected token, expected ')' or ',' to continue the return value list 
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL COMMA XOR
+##
+## Ends in an error in state: 23.
+##
+## out_list -> ident COLON typ COMMA . args [ RPAREN ]
+##
+## The known suffix of the stack is as follows:
+## ident COLON typ COMMA
+##
+
+Unexpected token, expected return value name
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN XOR
+##
+## Ends in an error in state: 25.
+##
+## node -> NODE node_name LPAREN args RPAREN returns . VAR local_vars LET equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN returns . LET equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE node_name LPAREN args RPAREN returns
 ##
 
 Unexpected token, expected 'var' or 'let'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR XOR
 ##
-## Ends in an error in state: 21.
+## Ends in an error in state: 26.
 ##
-## node -> NODE ident_node LPAREN args RPAREN returns VAR . local_vars LET equation_list TEL EOF [ # ]
-##
-## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns VAR
-##
-
-Unexpected token, expected identifier
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON LET XOR
-##
-## Ends in an error in state: 23.
-##
-## node -> NODE ident_node LPAREN args RPAREN returns VAR local_vars LET . equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN returns VAR . local_vars LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns VAR local_vars LET
+## NODE node_name LPAREN args RPAREN returns VAR
 ##
 
-Unexpected token, expected identifier
+Unexpected token, expected local variable name
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET XOR
 ##
-## Ends in an error in state: 24.
+## Ends in an error in state: 28.
+##
+## node -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET . equation_list TEL EOF [ # ]
+##
+## The known suffix of the stack is as follows:
+## NODE node_name LPAREN args RPAREN returns VAR local_vars LET
+##
+
+Unexpected token, expected identifier for the left-hand side of an equation
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT XOR
+##
+## Ends in an error in state: 29.
 ##
 ## equation_list -> ident . EQ expr SEMI_COLON [ TEL ]
 ## equation_list -> ident . EQ expr SEMI_COLON equation_list [ TEL ]
@@ -197,11 +236,11 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT XOR
 ## ident
 ##
 
-Unexpected token, expected '='
+Unexpected token, expected '=' for equation '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ XOR
 ##
-## Ends in an error in state: 25.
+## Ends in an error in state: 30.
 ##
 ## equation_list -> ident EQ . expr SEMI_COLON [ TEL ]
 ## equation_list -> ident EQ . expr SEMI_COLON equation_list [ TEL ]
@@ -210,324 +249,384 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ XOR
 ## ident EQ
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression for equation '1'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ NOT XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ PRE XOR
 ##
-## Ends in an error in state: 28.
+## Ends in an error in state: 32.
 ##
-## expr -> NOT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> PRE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## PRE
+##
+
+Unexpected token, expected expression after unary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ NOT XOR
+##
+## Ends in an error in state: 34.
+##
+## expr -> NOT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## NOT
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after unary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ MINUS XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ MINUS XOR
 ##
-## Ends in an error in state: 29.
+## Ends in an error in state: 35.
 ##
-## expr -> MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## MINUS
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after unary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ LPAREN XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN XOR
 ##
-## Ends in an error in state: 30.
+## Ends in an error in state: 36.
 ##
-## expr -> LPAREN . expr RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> LPAREN . expr RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression followed by a closing parenthesis
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF XOR
 ##
-## Ends in an error in state: 31.
+## Ends in an error in state: 37.
 ##
-## expr -> IF . expr THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> IF . expr THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## IF
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression for the condition of the if expression
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE VOID
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE VOID
 ##
-## Ends in an error in state: 35.
+## Ends in an error in state: 41.
 ##
-## expr -> expr . AND expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . OR expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . XOR expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . PLUS expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . MINUS expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . TIMES expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . DIV expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GE expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LE expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GT expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LT expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . EQ expr [ XOR TIMES THEN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> IF expr . THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . AND expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . OR expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . XOR expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . PLUS expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . MINUS expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . TIMES expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . DIV expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GE expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LE expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GT expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LT expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . EQ expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . NEQ expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . FBY expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . ARROW expr [ XOR TIMES THEN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> IF expr . THEN expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## IF expr
 ##
 
-Unexpected token, expected binary operator or 'then'
+Unexpected token, expected binary operator to continue expression '$0' or keyword 'then'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE XOR XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE XOR XOR
 ##
-## Ends in an error in state: 36.
+## Ends in an error in state: 42.
 ##
-## expr -> expr XOR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr XOR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## expr XOR
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE TIMES XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE TIMES XOR
 ##
-## Ends in an error in state: 38.
+## Ends in an error in state: 45.
 ##
-## expr -> expr TIMES . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr TIMES . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## expr TIMES
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE EQ XOR
-##
-## Ends in an error in state: 40.
-##
-## expr -> expr EQ . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr EQ
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE PLUS XOR
-##
-## Ends in an error in state: 43.
-##
-## expr -> expr PLUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr PLUS
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE MINUS XOR
-##
-## Ends in an error in state: 45.
-##
-## expr -> expr MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr MINUS
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LT XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE FBY XOR
 ##
 ## Ends in an error in state: 47.
 ##
-## expr -> expr LT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr FBY . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
-## expr LT
+## expr FBY
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE DIV XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN XOR
 ##
 ## Ends in an error in state: 49.
 ##
-## expr -> expr DIV . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr DIV
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE LE XOR
-##
-## Ends in an error in state: 51.
-##
-## expr -> expr LE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr LE
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GT XOR
-##
-## Ends in an error in state: 53.
-##
-## expr -> expr GT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr GT
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE GE XOR
-##
-## Ends in an error in state: 55.
-##
-## expr -> expr GE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-##
-## The known suffix of the stack is as follows:
-## expr GE
-##
-
-Unexpected token, expected expression
-
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN XOR
-##
-## Ends in an error in state: 57.
-##
-## expr -> IF expr THEN . expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> IF expr THEN . expr ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## IF expr THEN
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after keyword 'then'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN FALSE VOID
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE VOID
 ##
-## Ends in an error in state: 58.
+## Ends in an error in state: 50.
 ##
-## expr -> expr . AND expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . OR expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . XOR expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . PLUS expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . MINUS expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . TIMES expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . DIV expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . GE expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . LE expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . GT expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . LT expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . EQ expr [ XOR TIMES PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> IF expr THEN expr . ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr . AND expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . OR expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . XOR expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . PLUS expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . MINUS expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . TIMES expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . DIV expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . GE expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . LE expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . GT expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . LT expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . EQ expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . NEQ expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . FBY expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . ARROW expr [ XOR TIMES PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> IF expr THEN expr . ELSE expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## IF expr THEN expr
 ##
 
-Unexpected token, expected binary operator or 'else'
+Unexpected token, expected binary operator to continue expression '$0' or keyword 'else'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE OR XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE PLUS XOR
 ##
-## Ends in an error in state: 59.
+## Ends in an error in state: 51.
 ##
-## expr -> expr OR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr PLUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr PLUS
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE DIV XOR
+##
+## Ends in an error in state: 53.
+##
+## expr -> expr DIV . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr DIV
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE OR XOR
+##
+## Ends in an error in state: 55.
+##
+## expr -> expr OR . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## expr OR
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ IF FALSE THEN FALSE ELSE XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE NEQ XOR
+##
+## Ends in an error in state: 57.
+##
+## expr -> expr NEQ . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr NEQ
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE MINUS XOR
+##
+## Ends in an error in state: 59.
+##
+## expr -> expr MINUS . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr MINUS
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LT XOR
 ##
 ## Ends in an error in state: 61.
 ##
-## expr -> IF expr THEN expr ELSE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr LT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
-## IF expr THEN expr ELSE
+## expr LT
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE AND XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LE XOR
 ##
 ## Ends in an error in state: 63.
 ##
-## expr -> expr AND . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
+## expr -> expr LE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr LE
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GT XOR
+##
+## Ends in an error in state: 65.
+##
+## expr -> expr GT . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GT
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GE XOR
+##
+## Ends in an error in state: 67.
+##
+## expr -> expr GE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr GE
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE EQ XOR
+##
+## Ends in an error in state: 69.
+##
+## expr -> expr EQ . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr EQ
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE AND XOR
+##
+## Ends in an error in state: 71.
+##
+## expr -> expr AND . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## expr AND
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ LPAREN FALSE VOID
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE ELSE XOR
 ##
-## Ends in an error in state: 65.
+## Ends in an error in state: 73.
 ##
-## expr -> LPAREN expr . RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR MINUS LT LE GT GE EQ ELSE DIV AND ]
-## expr -> expr . AND expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . OR expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . XOR expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . PLUS expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . MINUS expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . TIMES expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . DIV expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GE expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LE expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GT expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LT expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . EQ expr [ XOR TIMES RPAREN PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> IF expr THEN expr ELSE . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## IF expr THEN expr ELSE
+##
+
+Unexpected token, expected expression after 'else'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE ARROW XOR
+##
+## Ends in an error in state: 75.
+##
+## expr -> expr ARROW . expr [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+##
+## The known suffix of the stack is as follows:
+## expr ARROW
+##
+
+Unexpected token, expected expression after binary operator '$0'
+
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN FALSE VOID
+##
+## Ends in an error in state: 77.
+##
+## expr -> LPAREN expr . RPAREN [ XOR TIMES THEN SEMI_COLON RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ ELSE DIV ARROW AND ]
+## expr -> expr . AND expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . OR expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . XOR expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . PLUS expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . MINUS expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . TIMES expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . DIV expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GE expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LE expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GT expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LT expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . EQ expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . NEQ expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . FBY expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . ARROW expr [ XOR TIMES RPAREN PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## LPAREN expr
 ##
 
-Unexpected token, expected binary operator or ')'
+Unexpected token, expected expression, followed by a closing parenthesis
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE VOID
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE VOID
 ##
-## Ends in an error in state: 69.
+## Ends in an error in state: 82.
 ##
 ## equation_list -> ident EQ expr . SEMI_COLON [ TEL ]
 ## equation_list -> ident EQ expr . SEMI_COLON equation_list [ TEL ]
-## expr -> expr . AND expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . OR expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . XOR expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . PLUS expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . MINUS expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . TIMES expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . DIV expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GE expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LE expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . GT expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . LT expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
-## expr -> expr . EQ expr [ XOR TIMES SEMI_COLON PLUS OR MINUS LT LE GT GE EQ DIV AND ]
+## expr -> expr . AND expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . OR expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . XOR expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . PLUS expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . MINUS expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . TIMES expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . DIV expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GE expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LE expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . GT expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . LT expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . EQ expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . NEQ expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . FBY expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
+## expr -> expr . ARROW expr [ XOR TIMES SEMI_COLON PLUS OR NEQ MINUS LT LE GT GE FBY EQ DIV ARROW AND ]
 ##
 ## The known suffix of the stack is as follows:
 ## ident EQ expr
 ##
 
-Unexpected token, expected binary operator or ';'
+Unexpected token, expected binary operator to continue expression '$0' or ';'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE SEMI_COLON XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON XOR
 ##
-## Ends in an error in state: 70.
+## Ends in an error in state: 83.
 ##
 ## equation_list -> ident EQ expr SEMI_COLON . [ TEL ]
 ## equation_list -> ident EQ expr SEMI_COLON . equation_list [ TEL ]
@@ -536,23 +635,23 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE SEMI_C
 ## ident EQ expr SEMI_COLON
 ##
 
-Unexpected token, expected expression
+Unexpected token, expected equation or keyword 'tel'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON LET IDENT EQ FALSE SEMI_COLON TEL XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET IDENT EQ FALSE SEMI_COLON TEL XOR
 ##
-## Ends in an error in state: 73.
+## Ends in an error in state: 86.
 ##
-## node -> NODE ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL . EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL . EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns VAR local_vars LET equation_list TEL
+## NODE node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL
 ##
 
-Unexpected token, expected end of input
+Unexpected token, expected end of file
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT XOR
 ##
-## Ends in an error in state: 75.
+## Ends in an error in state: 88.
 ##
 ## local_vars -> ident . COLON typ SEMI_COLON [ LET ]
 ## local_vars -> ident . COLON typ SEMI_COLON local_vars [ LET ]
@@ -561,11 +660,11 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT XOR
 ## ident
 ##
 
-Unexpected token, expected '=''
+Unexpected token, expected ':' followed by the type of local variable '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON XOR
 ##
-## Ends in an error in state: 76.
+## Ends in an error in state: 89.
 ##
 ## local_vars -> ident COLON . typ SEMI_COLON [ LET ]
 ## local_vars -> ident COLON . typ SEMI_COLON local_vars [ LET ]
@@ -574,11 +673,11 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON XOR
 ## ident COLON
 ##
 
-Unexpected token, expected type
+Unexpected token, expected type of local variable '$1'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL XOR
 ##
-## Ends in an error in state: 77.
+## Ends in an error in state: 90.
 ##
 ## local_vars -> ident COLON typ . SEMI_COLON [ LET ]
 ## local_vars -> ident COLON typ . SEMI_COLON local_vars [ LET ]
@@ -587,11 +686,11 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL XOR
 ## ident COLON typ
 ##
 
-Unexpected token, expected ';'
+Unexpected token, expected ';' after declaration of local variable '$2'
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI_COLON XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON XOR
 ##
-## Ends in an error in state: 78.
+## Ends in an error in state: 91.
 ##
 ## local_vars -> ident COLON typ SEMI_COLON . [ LET ]
 ## local_vars -> ident COLON typ SEMI_COLON . local_vars [ LET ]
@@ -600,28 +699,28 @@ node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL VAR IDENT COLON BOOL SEMI
 ## ident COLON typ SEMI_COLON
 ##
 
-Unexpected token, expected identifier or 'let'
+Unexpected token, expected local variable definition or keyword 'let'.
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET XOR
 ##
-## Ends in an error in state: 80.
+## Ends in an error in state: 93.
 ##
-## node -> NODE ident_node LPAREN args RPAREN returns LET . equation_list TEL EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN returns LET . equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns LET
+## NODE node_name LPAREN args RPAREN returns LET
 ##
 
-Unexpected token, expected identifier
+Unexpected token, expected equation
 
-node: NODE IDENT LPAREN RPAREN RETURN IDENT COLON BOOL LET IDENT EQ FALSE SEMI_COLON TEL XOR
+node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON TEL XOR
 ##
-## Ends in an error in state: 82.
+## Ends in an error in state: 95.
 ##
-## node -> NODE ident_node LPAREN args RPAREN returns LET equation_list TEL . EOF [ # ]
+## node -> NODE node_name LPAREN args RPAREN returns LET equation_list TEL . EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
-## NODE ident_node LPAREN args RPAREN returns LET equation_list TEL
+## NODE node_name LPAREN args RPAREN returns LET equation_list TEL
 ##
 
-Unexpected token, expected end of input
+Unexpected token, expected end of file
