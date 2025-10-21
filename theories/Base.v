@@ -52,6 +52,9 @@ Qed.
 
 Definition ident := nat.
 
+Definition next_ident: ident -> ident :=
+  fun n => (S n).
+
 Definition incl_dec {A : Type} (dec : forall x y : A, {x = y} + {x <> y}) : forall l l' : list A, {incl l l'} + {~ incl l l'} :=
   fun l1 l2 =>
   list_rec (fun l1 => {incl l1 l2} + {~ incl l1 l2})
