@@ -15,6 +15,14 @@ Definition convert_type (t : Source.type) : Target.type := match t with
   | Source.TInt => Target.TInt
 end.
 
+Lemma type_conversion (t1 t2 : Source.type):
+  t1 = t2 <-> convert_type t1 = convert_type t2.
+Proof.
+  destruct t1, t2.
+  all: firstorder.
+  all: discriminate.
+Qed.
+
 Record common_temp : Set := {
   orig :> Source.node;
   env: Dict.t Target.type;

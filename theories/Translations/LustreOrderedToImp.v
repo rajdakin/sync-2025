@@ -13,6 +13,14 @@ Definition translate_type (ty: Source.type): Target.type :=
   | Source.Lustre.TInt => Target.TInt
   end.
 
+Lemma type_conversion (t1 t2: Source.type):
+  t1 = t2 <-> translate_type t1 = translate_type t2.
+Proof.
+  destruct t1, t2.
+  all: firstorder.
+  all: discriminate.
+Qed.
+
 Definition translate_const {ty} (c: Source.const ty): Target.const (translate_type ty) :=
   match c with
   | Source.Lustre.CVoid => Target.CVoid
@@ -22,6 +30,24 @@ Definition translate_const {ty} (c: Source.const ty): Target.const (translate_ty
 
 Definition translate_binder (b: Source.binder): Target.binder :=
   (fst b, translate_type (snd b)).
+
+Lemma binder_conversion (b1 b2: Source.binder):
+  b1 = b2 <-> translate_binder b1 = translate_binder b2.
+Proof.
+  destruct b1, b2.
+  unfold translate_binder.
+  unfold fst, snd.
+  split.
+  - intro h.
+    inversion h.
+    subst.
+    reflexivity.
+  - intro h.
+    inversion h.
+    apply type_conversion in H1.
+    subst.
+    reflexivity.
+Qed.
 
 Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop (translate_type ty) (translate_type tout) :=
   match op with
