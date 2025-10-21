@@ -894,6 +894,24 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma deps_of_exp_binop_eq {ty1 ty2 ty} (e1 e2: exp _) (b: binop ty1 ty2 ty):
+  deps_of_exp (EBinop b e1 e2) = deps_of_exp e1 ++ deps_of_exp e2.
+Proof.
+  unfold deps_of_exp.
+  simpl.
+  rewrite deps_of_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma deps_of_exp_ifte_eq {ty} (e1 : exp TBool) (e2 e3: exp ty):
+  deps_of_exp (EIfte e1 e2 e3) = deps_of_exp e1 ++ deps_of_exp e2 ++ deps_of_exp e3.
+Proof.
+  unfold deps_of_exp.
+  simpl.
+  do 2 rewrite deps_of_exp_aux_eq.
+  reflexivity.
+Qed.
+
 Lemma sub_deps_of_exp_aux_gen {ty} (e: exp ty) (l1 l2: list (ident * type)):
   Sublist l1 l2 -> Sublist l1 (deps_of_exp_aux e l2).
 Proof.
