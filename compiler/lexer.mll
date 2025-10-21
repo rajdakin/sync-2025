@@ -4,7 +4,8 @@
 }
 
 rule token = parse
-  | [ ' ' '\t' '\n' ] { token lexbuf }
+  | [ ' ' '\t' ] { token lexbuf }
+  | '\n' { Lexing.new_line lexbuf; token lexbuf }
   | "&&"        { AND }
   | "and"       { AND }
   | "||"        { OR }
