@@ -1,5 +1,6 @@
 From Reactive Require Import Base.
 From Reactive.Datatypes Require Dict Stream.
+From Reactive.Datatypes Require Import Sublist.
 From Reactive.Languages Require LustreAst.
 
 
@@ -557,6 +558,22 @@ Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident
 Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
   var_of_exp_aux e [].
 
+Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ => acc
+    | EInput _ => acc
+    | EVar (name, ty) => (name, ty) :: acc
+    | EUnop Uop_pre e => acc
+    | EUnop _ e => deps_of_exp_aux e acc
+    | EBinop _ e1 e2 =>
+      deps_of_exp_aux e1 (deps_of_exp_aux e2 acc)
+    | EIfte e1 e2 e3 =>
+      deps_of_exp_aux e1 (deps_of_exp_aux e2 (deps_of_exp_aux e3 acc))
+  end.
+
+Definition deps_of_exp {ty} (e: exp ty): list (ident * type) :=
+  deps_of_exp_aux e [].
+
 (** ** Lemmas *)
 
 Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
@@ -851,4 +868,110 @@ Proof.
       simpl.
       rewrite (IH1 _ H6), (IH2 _ H7), (IH3 _ H8).
       reflexivity.
+Qed.
+
+Lemma deps_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
+  deps_of_exp_aux e l = deps_of_exp e ++ l.
+Proof.
+  revert l.
+  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - reflexivity.
+  - destruct op.
+    + apply IH.
+    + apply IH.
+    + reflexivity.
+  - unfold deps_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold deps_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
+Qed.
+
+Lemma sub_deps_of_exp_aux_gen {ty} (e: exp ty) (l1 l2: list (ident * type)):
+  Sublist l1 l2 -> Sublist l1 (deps_of_exp_aux e l2).
+Proof.
+  revert l1 l2.
+  induction e as [ | | b | tin tout u e Ih | ty1 ty2 tout b e1 Ih1 e2 Ih2 | t e1 Ih1 e2 Ih2 e3 Ih3 ].
+  all: intros l1 l2 s12.
+  1, 2: intros; simpl; assumption.
+  - destruct b.
+    constructor 2.
+    assumption.
+  - destruct u.
+    + simpl.
+      apply Ih.
+      assumption.
+    + simpl.
+      apply Ih.
+      assumption.
+    + simpl.
+      assumption.
+  - simpl.
+    apply Ih1.
+    apply Ih2.
+    assumption.
+  - simpl.
+    apply Ih1.
+    apply Ih2.
+    apply Ih3.
+    assumption.
+Qed.
+
+Lemma sub_deps_of_exp_aux {ty} (e: exp ty) (aux: list (ident * type)):
+  Sublist aux (deps_of_exp_aux e aux).
+Proof.
+  apply sub_deps_of_exp_aux_gen.
+  apply sublist_refl.
+Qed.
+
+Lemma deps_var_aux_sublist {ty} (e: exp ty) (lexp: list (ident * type)) (ldeps: list (ident * type)):
+  Sublist ldeps lexp -> Sublist (deps_of_exp_aux e ldeps) (var_of_exp_aux e lexp).
+Proof.
+  revert lexp.
+  revert ldeps.
+  induction e as [ | | [] | tin tout u e He | ty1 ty2 tout b e1 H1 e2 H2 | t e1 H1 e2 H2 e3 H3 ].
+  all: intros ldeps lexp sub.
+  - simpl.
+    assumption.
+  - simpl.
+    assumption.
+  - simpl.
+    constructor 3.
+    assumption.
+  - destruct u.
+    + simpl.
+      apply He.
+      assumption.
+    + simpl.
+      apply He.
+      assumption.
+    + simpl.
+      eapply sublist_trans.
+      * eapply sub_deps_of_exp_aux.
+      * apply He.
+        assumption.
+  - simpl.
+    apply H1.
+    apply H2.
+    assumption.
+  - simpl.
+    apply H1.
+    apply H2.
+    apply H3.
+    assumption.
+Qed.
+
+Lemma deps_var_sublist {ty} (e: exp ty):
+  Sublist (deps_of_exp e) (var_of_exp e).
+Proof.
+  unfold deps_of_exp, var_of_exp.
+  apply deps_var_aux_sublist.
+  constructor 1.
 Qed.
