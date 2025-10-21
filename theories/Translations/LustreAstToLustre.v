@@ -28,11 +28,38 @@ Record common_temp : Set := {
   Hnvars: nvars = map (fun '(x, t) => (x, convert_type t)) (orig.(Source.n_in) ++ orig.(Source.n_out) ++ orig.(Source.n_locals));
 }.
 
-Open Scope string_scope.
+Definition translate_unop (op: Source.unop): { tin & { tout & Target.unop tin tout } } := match op with
+  | Source.Uop_neg => existT _ _ (existT _ _ Target.Uop_neg)
+  | Source.Uop_not => existT _ _ (existT _ _ Target.Uop_not)
+  | Source.Uop_pre => existT _ _ (existT _ _ Target.Uop_pre)
+end.
+Definition translate_binop (op: Source.binop): { tin1 & { tin2 & { tout & Target.binop tin1 tin2 tout } } } := match op with
+  | Source.Bop_and => existT _ _ (existT _ _ (existT _ _ Target.Bop_and))
+  | Source.Bop_or => existT _ _ (existT _ _ (existT _ _ Target.Bop_or))
+  | Source.Bop_xor => existT _ _ (existT _ _ (existT _ _ Target.Bop_xor))
+  | Source.Bop_plus => existT _ _ (existT _ _ (existT _ _ Target.Bop_plus))
+  | Source.Bop_minus => existT _ _ (existT _ _ (existT _ _ Target.Bop_minus))
+  | Source.Bop_mult => existT _ _ (existT _ _ (existT _ _ Target.Bop_mult))
+  | Source.Bop_div => existT _ _ (existT _ _ (existT _ _ Target.Bop_div))
+  | Source.Bop_eq => existT _ _ (existT _ _ (existT _ _ Target.Bop_eq))
+  | Source.Bop_neq => existT _ _ (existT _ _ (existT _ _ Target.Bop_neq))
+  | Source.Bop_le => existT _ _ (existT _ _ (existT _ _ Target.Bop_le))
+  | Source.Bop_lt => existT _ _ (existT _ _ (existT _ _ Target.Bop_lt))
+  | Source.Bop_ge => existT _ _ (existT _ _ (existT _ _ Target.Bop_ge))
+  | Source.Bop_gt => existT _ _ (existT _ _ (existT _ _ Target.Bop_gt))
+  | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
+  | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
+end.
+Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: Target.type): Result.t Target.type (Target.exp t) := match e, t with
+  | existT _ Target.TVoid e, Target.TVoid => Result.Ok e
+  | existT _ Target.TBool e, Target.TBool => Result.Ok e
+  | existT _ Target.TInt e, Target.TInt => Result.Ok e
+  | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
+end.
 
-Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type (sigT Target.exp).
 Proof.
-  destruct e as [ c | n | n | op e | op e1 e2 | e1 e2 e3 ].
+  destruct e as [ l c | l n | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
     + exists Target.TVoid.
@@ -42,77 +69,63 @@ Proof.
     + exists Target.TInt.
       exact (Target.EConst (Target.CInt n)).
   - destruct (Dict.find n (env temp)) as [ ty | ].
-    2: right; exact "An input variable is not declared".
+    2: right; exact [(l, Result.UndeclaredInput n)].
     left.
     exists ty.
     exact (Target.EInput (n, ty)).
   - destruct (Dict.find n (env temp)) as [ ty | ].
-    2: right; exact "A variable is not declared".
+    2: right; exact [(l, Result.UndeclaredVariable n)].
     left.
     exists ty.
     exact (Target.EVar (n, ty)).
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
-    exact (match op, e' with
-      | Source.Uop_neg, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_neg e))
-      | Source.Uop_not, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_not e))
-      | Source.Uop_pre, existT _ Target.TInt e => Result.Ok (existT _ _ (Target.EUnop Target.Uop_pre e))
-      | _, _ => Result.Err "Untypeable expression"
-    end).
+    destruct (translate_unop op) as [ tin [ tout top ]].
+    refine (Result.bind (typecheck_exp l e' tin) _).
+    intros e''.
+    exact (Result.Ok (existT _ tout (Target.EUnop top e''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
-    exact (match op, e1', e2' with
-      | Source.Bop_and, existT _ Target.TBool e1, existT _ Target.TBool e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_and e1 e2))
-      | Source.Bop_or, existT _ Target.TBool e1, existT _ Target.TBool e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_or e1 e2))
-      | Source.Bop_xor, existT _ Target.TBool e1, existT _ Target.TBool e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_xor e1 e2))
-      | Source.Bop_plus, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_plus e1 e2))
-      | Source.Bop_minus, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_minus e1 e2))
-      | Source.Bop_mult, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_mult e1 e2))
-      | Source.Bop_div, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_div e1 e2))
-      | Source.Bop_eq, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_eq e1 e2))
-      | Source.Bop_neq, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_neq e1 e2))
-      | Source.Bop_le, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_le e1 e2))
-      | Source.Bop_lt, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_lt e1 e2))
-      | Source.Bop_ge, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_ge e1 e2))
-      | Source.Bop_gt, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_gt e1 e2))
-      | Source.Bop_arrow, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_arrow e1 e2))
-      | Source.Bop_fby, existT _ Target.TInt e1, existT _ Target.TInt e2 => Result.Ok (existT _ _ (Target.EBinop Target.Bop_arrow e1 (Target.EUnop Target.Uop_pre e2)))
-      | _, _, _ => Result.Err "Untypeable expression"
-    end).
+    destruct (translate_binop op) as [ tin1 [ tin2 [ tout top ]]].
+    refine (Result.bind (typecheck_exp l e1' tin1) _).
+    intros e1''.
+    refine (Result.bind (typecheck_exp l e2' tin2) _).
+    intros e2''.
+    exact (Result.Ok (existT _ tout (Target.EBinop top e1'' e2''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
+    refine (Result.bind (typecheck_exp l e1' Target.TBool) _).
+    intros e1''.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     refine (Result.bind (check_exp temp e3) _).
     intros e3'.
-    exact (match e1', e2', e3' with
-      | existT _ Target.TBool e1, existT _ t2 e2, existT _ t3 e3 =>
-          match Target.type_dec t2 t3 with
-          | left e => Result.Ok (existT _ _ (Target.EIfte e1 (eq_rect _ _ e2 _ e) e3))
-          | right _ => Result.Err "Untypeable expression"
-          end
-      | _, _, _ => Result.Err "Untypeable expression"
-    end).
+    destruct e2' as [t e2''].
+    refine (Result.bind (typecheck_exp l e3' t) _).
+    intros e3''.
+    exact (Result.Ok (existT _ t (Target.EIfte e1'' e2'' e3''))).
 Defined.
 
-Definition check_body (temp: common_temp) (entry: Source.node): Result.t
+Definition check_body (temp: common_temp) (entry: Source.node): Result.t Target.type
   { body : list Target.equation | incl (map Target.equation_dest body) (nvars temp) }.
 Proof.
   destruct entry.
-  induction n_body as [ | [ n e ] tl IH ].
+  induction n_body as [ | [ l [ n e ] ] tl IH ].
   - left.
     exists [].
     exact (incl_nil_l _).
-  - refine (Result.bind (check_exp temp e) _).
-    intros [ ty e' ].
+  - refine (Result.bind (Result.combine (check_exp temp e) IH) _); clear IH.
+    intros [ [ ty e' ] [ eqs IH ] ].
     destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) (n, ty) (nvars temp)) as [Hin|_].
-    2: destruct (In_dec PeanoNat.Nat.eq_dec n (map fst (nvars temp))) as [Hin|_].
-    2:  exact (Result.Err "A variable is assigned to an expression of an incompatible type").
-    2: exact (Result.Err "A variable is assigned to but not declared").
-    refine (Result.bind IH _); clear IH.
-    intros [ eqs IH ].
+    2: refine (Result.Err [(l, _)]).
+    2: destruct temp as [? ? ? ? ? ? nvars H]; cbn; fold nvars; clear H IH; generalize dependent nvars; intros nvars; clear - l n ty nvars.
+    2: induction nvars as [|[hdn hdt] tl IH].
+    2:  exact (Result.NeverAssigned n ty).
+    2: destruct (PeanoNat.Nat.eq_dec n hdn) as [neqhdn|_].
+    2:  exact (Result.IncompatibleTypeAssignment hdn hdt ty).
+    2: exact IH.
     left.
     exists ((n, existT Target.exp ty e') :: eqs).
     intros a [<-|H]; [exact Hin|exact (IH _ H)].
@@ -143,56 +156,42 @@ End EquationOrder.
 
 Module Import EquationSort := Sort EquationOrder.
 
-Definition list_eq_dec_binder :=
-  list_eq_dec _ Source.binder_eqb Source.binder_eqb_to_eq Source.binder_eq_to_eqb.
-
-Definition list_eq_dec_equation :=
-  list_eq_dec _ Source.equation_eqb Source.equation_eqb_to_eq Source.equation_eq_to_eqb.
-
-Definition check_assigned_out (temp: common_temp) body: Result.t (incl (n_out temp) (n_assigned_vars body)).
+Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t Target.type (incl (n_out temp) (n_assigned_vars body)).
 Proof.
-  exact (match incl_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) _ _ with
-    | left h => Result.Ok h
-    | right h => Result.Err "The output variable is never assigned"
-  end).
+  refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
+  intros b.
+  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
+  1: exact (Result.Ok Hin).
+  exact (Result.Err [(l, Result.NeverAssigned (fst b) (snd b))]).
 Defined.
 
-Definition n_out_is_not_an_input (temp: common_temp) :
-  Result.t (Forall (fun b => ~ In (fst b) (map fst (n_in temp))) (n_out temp)) :=
-  match Forall_dec _ (fun b => dec_not (In_dec PeanoNat.Nat.eq_dec (fst b) _)) _ with
-  | right h => Result.Err "The output variable is also an input"
-  | left h => Result.Ok h
-  end.
+Definition n_out_is_not_an_input (l: Result.location) (temp: common_temp) :
+  Result.t Target.type (Forall (fun b => ~ In (fst b) (map fst (n_in temp))) (n_out temp)) :=
+  Result.list_map (fun b => match In_dec PeanoNat.Nat.eq_dec _ _ with
+    | left _ => Result.Err [(l, Result.MultipleDeclaration (fst b) Result.DeclInput Result.DeclOutput)]
+    | right h => Result.Ok h
+  end) _.
 
 
-Definition n_inputs_equations (temp: common_temp) body:
-  Result.t (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (n_in temp)) body).
+Definition n_inputs_equations (l: Result.location) (temp: common_temp) body:
+  Result.t Target.type (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (n_in temp)) body).
 Proof.
-  refine (match incl_dec _ _ _ with
-    | left h => Result.Ok h
-    | right h => Result.Err "The output variable is never assigned"
-  end).
-  intros [n1 [ty1 e1]] [n2 [ty2 e2]].
-  destruct (PeanoNat.Nat.eq_dec n1 n2) as [ <- | n ]; [ | right; injection as e _; contradiction (n e) ].
-  destruct (Target.type_dec ty1 ty2) as [ <- | n ]; [ | right; injection as _ e; contradiction (n (projT1_eq e)) ].
-  destruct (Target.exp_dec e1 e2) as [ <- | n ]; [ left; reflexivity | ].
-  right; intros [=f]; exact (n (Target.sig2T_eq_type f)).
-Defined.
-
-
-Definition n_no_einputs_in_other (temp: common_temp) (body: list Target.equation):
-  Result.t (Forall (fun '(name, existT _ _ exp) => ~ In name (map fst (n_in temp)) -> Target.has_einput exp = false) body).
-Proof.
-  refine (match Forall_dec _ _ _ with
-    | left h => Result.Ok h
-    | right _ => Result.Err "A variable not present in inputs has an EInput subexpression"
-  end).
+  refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
   intros [n [ty e]].
-  refine (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with left h => left (fun f => False_ind _ (f h)) | right h => _ end).
-  destruct (Target.has_einput e); [ right | left; reflexivity ].
-  intros f.
-  apply f in h.
-  discriminate h.
+  exact (match In_dec (prod_dec PeanoNat.Nat.eq_dec (sigT_dec Target.type_dec (@Target.exp_dec))) _ _ with
+    | left h => Result.Ok h
+    | right _ => Result.Err [(l, Result.InternalError "Missing extra input equation")]
+    end).
+Defined.
+
+
+Definition n_no_einputs_in_other (l: Result.location) (temp: common_temp) (body: list Target.equation):
+  Result.t Target.type (Forall (fun '(name, existT _ _ exp) => ~ In name (map fst (n_in temp)) -> Target.has_einput exp = false) body).
+Proof.
+  refine (Result.list_map _ _).
+  intros [n [ty e]].
+  refine (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with left h => Result.Ok (fun f => False_ind _ (f h)) | right h => _ end).
+  destruct (Target.has_einput e); [ refine (Result.Err [(l, Result.InternalError "Non-input equation contains an EInput")]) | left; reflexivity ].
 Defined.
 
 Lemma forall_type_dec : forall (P : Source.type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
@@ -210,71 +209,40 @@ Lemma check_Henv {entry} :
   let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
   let n_out := map (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
   let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
-  Result.t (forall n t,
+  Result.t Target.type (forall n t,
     Dict.maps_to n (convert_type t)
       (fold_left (fun acc '(n, t) => Dict.add n t acc)
       (n_in ++ n_out ++ n_locals)
       (Dict.empty Target.type)) <->
     In (n, t) (Source.n_in entry ++ Source.n_out entry ++ Source.n_locals entry)).
 Proof using.
-  destruct entry as [? nin nout nloc ?]; cbn; clear.
-  destruct (Forall_Exists_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
-    (fun v => forall ty', In (fst v, ty') nin -> ty' = snd v)
-    (fun v =>
-      match forall_type_dec
-        (fun ty' => In (fst v, ty') nin -> ty' = snd v)
+  destruct entry as [l ? nin nout nloc ?]; cbn; clear - l.
+  refine (Result.bind
+    (Result.combine_prop (Result.list_map (P := fun v => forall ty', In (fst v, ty') nin -> ty' = snd v) _ nin)
+    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nout)) _ nin)
+    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nloc)) _ nin)
+    (Result.combine_prop (Result.list_map (P := fun v => forall ty', In (fst v, ty') nout -> ty' = snd v) _ nout)
+    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nloc)) _ nout)
+                         (Result.list_map (P := fun v => forall ty', In (fst v, ty') nloc -> ty' = snd v) _ nloc)))))) _).
+  all: try refine (fun v => match In_dec PeanoNat.Nat.eq_dec _ _ with left _ => _ | right h => Result.Ok h end).
+  1: rename nin into nlist.
+  4: rename nout into nlist.
+  6: rename nloc into nlist.
+  1-6: try (intros [b t]; refine (match forall_type_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
+        (fun ty' => In (b, ty') nlist -> ty' = t)
         ltac:(
           intros ty;
-          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (fst v, ty) nin) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
-          destruct (Source.type_dec ty (snd v)) as [eqty|nety]; [left; intros _; exact eqty|];
+          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (b, ty) nlist) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
+          destruct (Source.type_dec ty t) as [eqty|nety]; [left; intros _; exact eqty|];
           right; intros f; exact (nety (f Hin)))
-      with
-      | left H => left H
-      | right H => right (fun f => match H with ex_intro _ ty Hty => Hty (f ty) end)
-      end)
-    nin) as [innotdup'|_].
-  2: right; exact "An input variable is present multiple times in the input list".
-  destruct (Forall_Exists_dec (fun v => ~ In (fst v) (map fst nout))
-    (fun v => dec_not (In_dec PeanoNat.Nat.eq_dec (fst v) (map fst nout))) nin) as [innotout'|_].
-  2: right; exact "An input variable is also an output variable".
-  destruct (Forall_Exists_dec (fun v => ~ In (fst v) (map fst nloc))
-    (fun v => dec_not (In_dec PeanoNat.Nat.eq_dec (fst v) (map fst nloc))) nin) as [innotloc'|_].
-  2: right; exact "An input variable is also a local variable".
-  destruct (Forall_Exists_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
-    (fun v => forall ty', In (fst v, ty') nout -> ty' = snd v)
-    (fun v =>
-      match forall_type_dec
-        (fun ty' => In (fst v, ty') nout -> ty' = snd v)
-        ltac:(
-          intros ty;
-          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (fst v, ty) nout) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
-          destruct (Source.type_dec ty (snd v)) as [eqty|nety]; [left; intros _; exact eqty|];
-          right; intros f; exact (nety (f Hin)))
-      with
-      | left H => left H
-      | right H => right (fun f => match H with ex_intro _ ty Hty => Hty (f ty) end)
-      end)
-    nout) as [outnotdup'|_].
-  2: right; exact "An output variable is present multiple times in the output list".
-  destruct (Forall_Exists_dec (fun v => ~ In (fst v) (map fst nloc))
-    (fun v => dec_not (In_dec PeanoNat.Nat.eq_dec (fst v) (map fst nloc))) nout) as [outnotloc'|_].
-  2: right; exact "An output variable is also a local variable".
-  destruct (Forall_Exists_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
-    (fun vloc => forall ty', In (fst vloc, ty') nloc -> ty' = snd vloc)
-    (fun vloc =>
-      match forall_type_dec
-        (fun ty' => In (fst vloc, ty') nloc -> ty' = snd vloc)
-        ltac:(
-          intros ty;
-          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (fst vloc, ty) nloc) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
-          destruct (Source.type_dec ty (snd vloc)) as [eqty|nety]; [left; intros _; exact eqty|];
-          right; intros f; exact (nety (f Hin)))
-      with
-      | left H => left H
-      | right H => right (fun f => match H with ex_intro _ ty Hty => Hty (f ty) end)
-      end)
-    nloc) as [locnotdup'|_].
-  2: right; exact "A local variable is present multiple times in the locals list".
+        with left h => Result.Ok h | right _ => _ end)).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclInput Result.DeclInput)]).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclInput Result.DeclOutput)]).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclInput Result.DeclLocal)]).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclOutput Result.DeclOutput)]).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclOutput Result.DeclLocal)]).
+  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclLocal Result.DeclLocal)]).
+  intros (innotdup' & innotout' & innotloc' & outnotdup' & outnotloc' & locnotdup').
   left; intros n t.
   match goal with |- Dict.maps_to _ _ (fold_left ?f ?l ?d) <-> _ =>
   rewrite <-(fold_left_rev_right (fun x y => f y x) l d) end.
@@ -290,7 +258,7 @@ Proof using.
   remember (rev nin) as l3 eqn:eq3.
   remember (rev nout) as l2 eqn:eq2.
   remember (rev nloc) as l1 eqn:eq1.
-  clear nin nout nloc eq1 eq2 eq3 innotdup' innotout' innotloc' outnotdup' outnotloc' locnotdup'.
+  clear l nin nout nloc eq1 eq2 eq3 innotdup' innotout' innotloc' outnotdup' outnotloc' locnotdup'.
   split.
   - intros H.
     clear innotout innotloc outnotloc.
@@ -353,7 +321,7 @@ Proof using.
     1-3: clear; intros x H t Hin; exact (H _ (or_intror Hin)).
 Defined.
 
-Definition check_node_prop (entry: Source.node): Result.t Target.node :=
+Definition check_node_prop (entry: Source.node): Result.t Target.type Target.node :=
   let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
   let n_out := map (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
   let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
@@ -370,11 +338,13 @@ Definition check_node_prop (entry: Source.node): Result.t Target.node :=
     Hnvars := eq_sym (eq_trans (map_app _ _ _) (f_equal _ (map_app _ _ _)));
   |} in
   do '(exist _ n_body assigned_vars_are_vars) <- check_body temp entry;
-  do check_assigned <- check_assigned_out temp n_body;
-  do n_out_is_not_an_input <- n_out_is_not_an_input temp;
-  do n_inputs_equations <- n_inputs_equations temp n_body;
-  do n_no_einputs_in_other <- n_no_einputs_in_other temp n_body;
+  do '(conj check_assigned (conj n_out_is_not_an_input (conj n_inputs_equations n_no_einputs_in_other))) <-
+    Result.combine_prop (check_assigned_out (Source.n_loc entry) temp n_body) (
+    Result.combine_prop (n_out_is_not_an_input (Source.n_loc entry) temp) (
+    Result.combine_prop (n_inputs_equations (Source.n_loc entry) temp n_body) (
+                        (n_no_einputs_in_other (Source.n_loc entry) temp n_body))));
   Result.Ok {|
+      Target.n_loc := Source.n_loc entry;
       Target.n_name := Source.n_name entry;
       Target.n_in := n_in;
       Target.n_out := n_out;

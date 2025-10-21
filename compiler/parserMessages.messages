@@ -1,47 +1,47 @@
-node: XOR
+file: XOR
 ##
 ## Ends in an error in state: 0.
 ##
-## node' -> . node [ # ]
+## file' -> . file [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ##
 ##
 
-Unexpected token, expected 'node'.
+Unexpected token, expected 'file'.
 
-node: NODE XOR
+file: NODE XOR
 ##
 ## Ends in an error in state: 1.
 ##
-## node -> NODE . node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE . node_name LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+## file -> NODE . node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE . node_name LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE
 ##
 
-Unexpected token, expected node name.
+Unexpected token, expected file name.
 
-node: NODE IDENT XOR
+file: NODE IDENT XOR
 ##
 ## Ends in an error in state: 3.
 ##
-## node -> NODE node_name . LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE node_name . LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
+## file -> NODE node_name . LPAREN args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE node_name . LPAREN args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name
 ##
 
-Unexpected token, expected '(' followed by the arguments of the node
+Unexpected token, expected '(' followed by the arguments of the file
 
-node: NODE IDENT LPAREN XOR
+file: NODE IDENT LPAREN XOR
 ##
 ## Ends in an error in state: 4.
 ##
-## node -> NODE node_name LPAREN . args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE node_name LPAREN . args RPAREN returns LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN . args RPAREN returns VAR local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN . args RPAREN returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN
@@ -49,7 +49,7 @@ node: NODE IDENT LPAREN XOR
 
 Unexpected token, expected identifier or ')' (Node arguments list)
 
-node: NODE IDENT LPAREN IDENT XOR
+file: NODE IDENT LPAREN IDENT XOR
 ##
 ## Ends in an error in state: 6.
 ##
@@ -62,7 +62,7 @@ node: NODE IDENT LPAREN IDENT XOR
 
 Unexpected token, expected ':' followed by the type of argument '$0'
 
-node: NODE IDENT LPAREN IDENT COLON XOR
+file: NODE IDENT LPAREN IDENT COLON XOR
 ##
 ## Ends in an error in state: 7.
 ##
@@ -75,7 +75,7 @@ node: NODE IDENT LPAREN IDENT COLON XOR
 
 Unexpected token, expected the type of '$1'
 
-node: NODE IDENT LPAREN IDENT COLON BOOL XOR
+file: NODE IDENT LPAREN IDENT COLON BOOL XOR
 ##
 ## Ends in an error in state: 11.
 ##
@@ -86,9 +86,9 @@ node: NODE IDENT LPAREN IDENT COLON BOOL XOR
 ## ident COLON typ
 ##
 
-Unexpected token, expected ',' or ')' as continuation of the node argument list
+Unexpected token, expected ',' or ')' as continuation of the file argument list
 
-node: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
+file: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
 ##
 ## Ends in an error in state: 12.
 ##
@@ -98,14 +98,14 @@ node: NODE IDENT LPAREN IDENT COLON BOOL COMMA XOR
 ## ident COLON typ COMMA
 ##
 
-Unexpected token, expected node argument name
+Unexpected token, expected file argument name
 
-node: NODE IDENT LPAREN RPAREN XOR
+file: NODE IDENT LPAREN RPAREN XOR
 ##
 ## Ends in an error in state: 15.
 ##
-## node -> NODE node_name LPAREN args RPAREN . returns VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE node_name LPAREN args RPAREN . returns LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN . returns VAR local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN . returns LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN
@@ -113,7 +113,7 @@ node: NODE IDENT LPAREN RPAREN XOR
 
 Unexpected token, expected 'returns'
 
-node: NODE IDENT LPAREN RPAREN RETURNS XOR
+file: NODE IDENT LPAREN RPAREN RETURNS XOR
 ##
 ## Ends in an error in state: 16.
 ##
@@ -125,7 +125,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS XOR
 
 Unexpected token, expected '('
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN XOR
 ##
 ## Ends in an error in state: 17.
 ##
@@ -137,7 +137,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN XOR
 
 Unexpected token, expected return value identifier
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT XOR
 ##
 ## Ends in an error in state: 20.
 ##
@@ -150,7 +150,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT XOR
 
 Unexpected token, expected ':' followed by the type of return value '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON XOR
 ##
 ## Ends in an error in state: 21.
 ##
@@ -163,7 +163,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON XOR
 
 Unexpected token, expected the type of return value '$1'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL XOR
 ##
 ## Ends in an error in state: 22.
 ##
@@ -176,7 +176,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL XOR
 
 Unexpected token, expected ')' or ',' to continue the return value list 
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL COMMA XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL COMMA XOR
 ##
 ## Ends in an error in state: 23.
 ##
@@ -188,12 +188,12 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN IDENT COLON BOOL COMMA XOR
 
 Unexpected token, expected return value name
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN XOR
 ##
 ## Ends in an error in state: 25.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns . VAR local_vars LET equation_list TEL EOF [ # ]
-## node -> NODE node_name LPAREN args RPAREN returns . LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns . VAR local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns . LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns
@@ -201,11 +201,11 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN XOR
 
 Unexpected token, expected 'var' or 'let'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR XOR
 ##
 ## Ends in an error in state: 26.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns VAR . local_vars LET equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns VAR . local_vars LET equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns VAR
@@ -213,11 +213,11 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR XOR
 
 Unexpected token, expected local variable name
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET XOR
 ##
 ## Ends in an error in state: 28.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET . equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET . equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns VAR local_vars LET
@@ -225,7 +225,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_C
 
 Unexpected token, expected identifier for the left-hand side of an equation
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT XOR
 ##
 ## Ends in an error in state: 29.
 ##
@@ -238,7 +238,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT XOR
 
 Unexpected token, expected '=' for equation '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ XOR
 ##
 ## Ends in an error in state: 30.
 ##
@@ -251,7 +251,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ XOR
 
 Unexpected token, expected expression for equation '1'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ PRE XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ PRE XOR
 ##
 ## Ends in an error in state: 32.
 ##
@@ -263,7 +263,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ PRE XOR
 
 Unexpected token, expected expression after unary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ NOT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ NOT XOR
 ##
 ## Ends in an error in state: 34.
 ##
@@ -275,7 +275,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ NOT XOR
 
 Unexpected token, expected expression after unary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ MINUS XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ MINUS XOR
 ##
 ## Ends in an error in state: 35.
 ##
@@ -287,7 +287,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ MINUS XOR
 
 Unexpected token, expected expression after unary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN XOR
 ##
 ## Ends in an error in state: 36.
 ##
@@ -299,7 +299,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN XOR
 
 Unexpected token, expected expression followed by a closing parenthesis
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF XOR
 ##
 ## Ends in an error in state: 37.
 ##
@@ -311,7 +311,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF XOR
 
 Unexpected token, expected expression for the condition of the if expression
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE VOID
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE VOID
 ##
 ## Ends in an error in state: 41.
 ##
@@ -338,7 +338,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE VOID
 
 Unexpected token, expected binary operator to continue expression '$0' or keyword 'then'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE XOR XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE XOR XOR
 ##
 ## Ends in an error in state: 42.
 ##
@@ -350,7 +350,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE XOR XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE TIMES XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE TIMES XOR
 ##
 ## Ends in an error in state: 45.
 ##
@@ -362,7 +362,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE TIMES XO
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE FBY XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE FBY XOR
 ##
 ## Ends in an error in state: 47.
 ##
@@ -374,7 +374,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE FBY XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN XOR
 ##
 ## Ends in an error in state: 49.
 ##
@@ -386,7 +386,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN 
 
 Unexpected token, expected expression after keyword 'then'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE VOID
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE VOID
 ##
 ## Ends in an error in state: 50.
 ##
@@ -413,7 +413,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN 
 
 Unexpected token, expected binary operator to continue expression '$0' or keyword 'else'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE PLUS XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE PLUS XOR
 ##
 ## Ends in an error in state: 51.
 ##
@@ -425,7 +425,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE PLUS XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE DIV XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE DIV XOR
 ##
 ## Ends in an error in state: 53.
 ##
@@ -437,7 +437,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE DIV XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE OR XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE OR XOR
 ##
 ## Ends in an error in state: 55.
 ##
@@ -449,7 +449,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE OR XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE NEQ XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE NEQ XOR
 ##
 ## Ends in an error in state: 57.
 ##
@@ -461,7 +461,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE NEQ XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE MINUS XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE MINUS XOR
 ##
 ## Ends in an error in state: 59.
 ##
@@ -473,7 +473,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE MINUS XO
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LT XOR
 ##
 ## Ends in an error in state: 61.
 ##
@@ -485,7 +485,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LT XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LE XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LE XOR
 ##
 ## Ends in an error in state: 63.
 ##
@@ -497,7 +497,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE LE XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GT XOR
 ##
 ## Ends in an error in state: 65.
 ##
@@ -509,7 +509,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GT XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GE XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GE XOR
 ##
 ## Ends in an error in state: 67.
 ##
@@ -521,7 +521,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE GE XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE EQ XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE EQ XOR
 ##
 ## Ends in an error in state: 69.
 ##
@@ -533,7 +533,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE EQ XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE AND XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE AND XOR
 ##
 ## Ends in an error in state: 71.
 ##
@@ -545,7 +545,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE AND XOR
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE ELSE XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN FALSE ELSE XOR
 ##
 ## Ends in an error in state: 73.
 ##
@@ -557,7 +557,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ IF FALSE THEN 
 
 Unexpected token, expected expression after 'else'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE ARROW XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE ARROW XOR
 ##
 ## Ends in an error in state: 75.
 ##
@@ -569,7 +569,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE ARROW XO
 
 Unexpected token, expected expression after binary operator '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN FALSE VOID
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN FALSE VOID
 ##
 ## Ends in an error in state: 77.
 ##
@@ -596,7 +596,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ LPAREN FALSE V
 
 Unexpected token, expected expression, followed by a closing parenthesis
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE VOID
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE VOID
 ##
 ## Ends in an error in state: 82.
 ##
@@ -624,7 +624,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE VOID
 
 Unexpected token, expected binary operator to continue expression '$0' or ';'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON XOR
 ##
 ## Ends in an error in state: 83.
 ##
@@ -637,11 +637,11 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COL
 
 Unexpected token, expected equation or keyword 'tel'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET IDENT EQ FALSE SEMI_COLON TEL XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON LET IDENT EQ FALSE SEMI_COLON TEL XOR
 ##
 ## Ends in an error in state: 86.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL . EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL . EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns VAR local_vars LET equation_list TEL
@@ -649,7 +649,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_C
 
 Unexpected token, expected end of file
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT XOR
 ##
 ## Ends in an error in state: 88.
 ##
@@ -662,7 +662,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT XOR
 
 Unexpected token, expected ':' followed by the type of local variable '$0'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON XOR
 ##
 ## Ends in an error in state: 89.
 ##
@@ -675,7 +675,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON XOR
 
 Unexpected token, expected type of local variable '$1'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL XOR
 ##
 ## Ends in an error in state: 90.
 ##
@@ -688,7 +688,7 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL XOR
 
 Unexpected token, expected ';' after declaration of local variable '$2'
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_COLON XOR
 ##
 ## Ends in an error in state: 91.
 ##
@@ -701,11 +701,11 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN VAR IDENT COLON BOOL SEMI_C
 
 Unexpected token, expected local variable definition or keyword 'let'.
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET XOR
 ##
 ## Ends in an error in state: 93.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns LET . equation_list TEL EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns LET . equation_list TEL EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns LET
@@ -713,11 +713,11 @@ node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET XOR
 
 Unexpected token, expected equation
 
-node: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON TEL XOR
+file: NODE IDENT LPAREN RPAREN RETURNS LPAREN RPAREN LET IDENT EQ FALSE SEMI_COLON TEL XOR
 ##
 ## Ends in an error in state: 95.
 ##
-## node -> NODE node_name LPAREN args RPAREN returns LET equation_list TEL . EOF [ # ]
+## file -> NODE node_name LPAREN args RPAREN returns LET equation_list TEL . EOF [ # ]
 ##
 ## The known suffix of the stack is as follows:
 ## NODE node_name LPAREN args RPAREN returns LET equation_list TEL
