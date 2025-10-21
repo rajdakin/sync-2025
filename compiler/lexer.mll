@@ -1,6 +1,5 @@
 {
     open Parser
-    exception Eof
     exception Error of string
 }
 
