@@ -6,12 +6,10 @@ From Reactive.Languages Require Lustre LustreOrdered.
 From Stdlib Require Import Sorting Permutation.
 
 
-Open Scope string_scope.
-
 Module Source := Lustre.
 Module Target := LustreOrdered.
 
-Parameter node_ordering: Source.node -> Result.t (Source.node).
+Parameter node_ordering: Source.node -> Result.t Lustre.type (Source.node).
 
 
 Scheme Equality for list.
@@ -43,26 +41,26 @@ Definition list_eq_dec_binder :=
 Definition list_eq_dec_equation :=
   List.list_eq_dec Source.equation_dec.
 
-Definition check_eq_node (source guess: Source.node): Result.t (Source.node_eq source guess).
+Definition check_eq_node (source guess: Source.node): Result.t Source.type (Source.node_eq source guess).
 Proof.
-  destruct source as [name1 in1 out1 locals1 body1].
-  destruct guess as [name2 in2 out2 locals2 body2].
+  destruct source as [loc1 name1 in1 out1 locals1 body1].
+  destruct guess as [loc2 name2 in2 out2 locals2 body2].
   unfold Source.node_eq; simpl.
 
   destruct (Source.name_dec name1 name2).
-  2: { apply Result.Err, "Node names are not equal". }
+  2: { exact (Result.Err [(loc1, Result.InternalError "Node names are not equal")]). }
 
   destruct (list_eq_dec_binder in1 in2).
-  2: { apply Result.Err, "Node inputs are not equal". }
+  2: { exact (Result.Err [(loc1, Result.InternalError "Node inputs are not equal")]). }
 
   destruct (list_eq_dec_binder out1 out2).
-  2: { apply Result.Err, "Node outputs are not equal". }
+  2: { exact (Result.Err [(loc1, Result.InternalError "Node outputs are not equal")]). }
 
   destruct (list_eq_dec_binder locals1 locals2).
-  2: { apply Result.Err, "Node locals are not equal". }
+  2: { exact (Result.Err [(loc1, Result.InternalError "Node locals are not equal")]). }
 
   destruct (list_eq_dec_equation (sort body1) (sort body2)).
-  2: { apply Result.Err, "Node equations are not permutations". }
+  2: { exact (Result.Err [(loc1, Result.InternalError "Node equations are not permutations")]). }
 
   apply Result.Ok; subst.
   repeat split; try (assumption || apply Permutation_refl).
@@ -74,7 +72,7 @@ Proof.
   now apply perm_trans with (sort body2).
 Defined.
 
-Definition check_dag_ordered (guess: Target.dag): Result.t (Ordered.t guess).
+Definition check_dag_ordered (loc: Result.location) (guess: Target.dag): Result.t Lustre.type (Ordered.t guess).
 Proof.
   induction guess as [| x xs IHguess ].
   { apply Result.Ok, Ordered.nil. }
@@ -84,7 +82,7 @@ Proof.
 
   destruct x as [ [ i ty ] l].
   destruct (in_dec PeanoNat.Nat.eq_dec i (map (fun '(y, _, _) => y) xs)).
-  { apply Result.Err, "Identifier is in list". }
+  { exact (Result.Err [(loc, Result.InternalError "Identifier is in list")]). }
 
   induction l as [| [ y ty' ] ? IHl ].
   { apply Result.Ok, Ordered.append; [ assumption | assumption | constructor ]. }
@@ -93,7 +91,7 @@ Proof.
   2: { apply Result.Err, err. }
 
   destruct (in_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (y, ty') (map fst xs)).
-  2: { apply Result.Err, "Identifier not bound". }
+  2: { exact (Result.Err [(loc, Result.InternalError "Identifier not bound")]). }
 
   apply Result.Ok, Ordered.append.
   { assumption. }
@@ -109,15 +107,15 @@ Defined.
 
 Import Result.notations.
 
-Definition check_order (source guess: Source.node): Result.t Target.node_ordered :=
+Definition check_order (source guess: Source.node): Result.t Lustre.type Target.node_ordered :=
   let dag := Target.equations_to_dag (Source.n_body guess) in
   do _ <- check_eq_node source guess;
-  do ordered <- check_dag_ordered dag;
+  do ordered <- check_dag_ordered (Source.n_loc source) dag;
 
   Result.Ok {|
     Target.node_ordered_is_node := guess;
     Target.ordered := ordered;
   |}.
 
-Definition translate_node (source: Source.node): Result.t Target.node_ordered :=
+Definition translate_node (source: Source.node): Result.t Lustre.type Target.node_ordered :=
   node_ordering source >>= check_order source.

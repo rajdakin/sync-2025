@@ -1,10 +1,18 @@
 %{
     open Extracted.LustreAst
+    open LocationInfo
 
     let ident_map = Hashtbl.create 19
     let gen_id =
       let i = ref 0 in
       fun () -> incr i; !i - 1
+    
+    let loc_of_ext (((_, ls, cs), (_, le, ce)): extent): Extracted.Result.location = Extracted.Result.{
+      loc_start_line = ls;
+      loc_start_col = cs;
+      loc_end_line = le;
+      loc_end_col = ce;
+    }
 %}
 
 %token<string> IDENT
@@ -35,23 +43,33 @@
 %left XOR
 %nonassoc NOT
 
-(* (Node name) * (Node arguments) * (Local variables) * (Return) * (Equations) *)
-%start<string * ((binder * coq_type) list) * ((binder * coq_type) list) * ((binder * coq_type) list) * ((int * exp) list)> node
+(* (Node location) * (Node name) * (Node arguments) * (Local variables) * (Return) * (Equations) *)
+%start<
+  Extracted.Result.location *
+  string *
+  ((binder * coq_type) list) *
+  ((binder * coq_type) list) *
+  ((binder * coq_type) list) *
+  ((Extracted.Result.location * (int * exp)) list)
+> file
 
 %on_error_reduce expr
 
 %%
 
+file:
+  node = node { fst node }
+
 typ:
-  | BOOL { TBool }
-  | INT  { TInt }
-  | VOID { TVoid }
+  | BOOL { (TBool, (extent_of_len 4 $endpos)) }
+  | INT  { (TInt, (extent_of_len 3 $endpos)) }
+  | VOID { (TVoid, (extent_of_len 4 $endpos)) }
 
 local_vars:
   | id=ident COLON typ=typ SEMI_COLON
-    { (id, typ) :: [] }
+    { ((fst id, fst typ) :: [], extend_to_pos (snd id) $endpos) }
   | id=ident COLON typ=typ SEMI_COLON vars=local_vars
-    { (id, typ) :: vars }
+    { ((fst id, fst typ) :: fst vars, extend_to_ext (snd id) (snd vars)) }
 
 node:
   | NODE name=node_name LPAREN args=args RPAREN ret=returns
@@ -59,56 +77,59 @@ node:
     LET
       eqs=equation_list
     TEL EOF (* TODO: support multiple nodes in a single file *)
-    { (name, args, locals, ret, eqs) }
+    { let p = extend_to_pos (extent_of_len 4 $endpos($1)) $endpos in
+      ((loc_of_ext p, fst name, fst args, fst locals, fst ret, fst eqs), p) }
   | NODE name=node_name LPAREN args=args RPAREN ret=returns
     LET
       eqs=equation_list
     TEL EOF
-    { (name, args, [], ret, eqs) }
+    { let p = extend_to_pos (extent_of_len 4 $endpos($1)) $endpos in
+      ((loc_of_ext p, fst name, fst args, [], fst ret, fst eqs), p) }
 
 returns:
   | RETURNS LPAREN ret=out_list RPAREN { ret }
 
 out_list: (* TODO: last *)
-  | id=ident COLON typ=typ COMMA args=args { (id, typ) :: args }
-  | id=ident COLON typ=typ { (id, typ) :: [] }
-  | { [] }
+  | id=ident COLON typ=typ COMMA args=args { ((fst id, fst typ) :: fst args, extend_to_ext (snd id) (snd args)) }
+  | id=ident COLON typ=typ { ((fst id, fst typ) :: [], extend_to_ext (snd id) (snd typ)) }
+  | { ([], extent_of_len 0 $endpos) }
 
 args:
-  | id=ident COLON typ=typ COMMA args=args { (id, typ) :: args }
-  | id=ident COLON typ=typ { (id, typ) :: [] }
-  | { [] }
+  | id=ident COLON typ=typ COMMA args=args { ((fst id, fst typ) :: fst args, extend_to_ext (snd id) (snd args)) }
+  | id=ident COLON typ=typ { ((fst id, fst typ) :: [], extend_to_ext (snd id) (snd typ)) }
+  | { ([], extent_of_len 0 $endpos) }
 
 
 ident:
   | id=IDENT
-    { match Hashtbl.find_opt ident_map id with
+    { ((match Hashtbl.find_opt ident_map id with
       | Some x -> x
       | None -> let new_id = gen_id () in
          Hashtbl.add ident_map id new_id;
-         new_id }
+         new_id),
+      extent_of_len (String.length id) $endpos) }
 
 node_name:
-  | name=IDENT { name }
+  | name=IDENT { (name, extent_of_len (String.length name) $endpos) }
 
 equation_list:
   | id=ident EQ e=expr SEMI_COLON
-    { [(id, e)] }
+    { ([loc_of_ext (extend_to_pos (snd id) $endpos($4)), (fst id, fst e)], extend_to_pos (snd id) $endpos) }
   | id=ident EQ e=expr SEMI_COLON eqs=equation_list
-    { (id, e) :: eqs }
+    { ((loc_of_ext (extend_to_pos (snd id) $endpos($4)), (fst id, fst e)) :: fst eqs, extend_to_ext (snd id) (snd eqs)) }
 
 var:
   | id=ident { id }
 
 const:
-  | TRUE    { CBool true }
-  | FALSE   { CBool false }
-  | num=NUM { CInt num }
+  | TRUE    { (CBool true, extent_of_len 4 $endpos) }
+  | FALSE   { (CBool false, extent_of_len 5 $endpos) }
+  | num=NUM { (CInt num, extent_of_len (String.length (string_of_int num)) $endpos) }
 
 %inline unop:
-  | NOT   { Uop_not }
-  | MINUS { Uop_neg }
-  | PRE   { Uop_pre }
+  | NOT   { (Uop_not, extent_of_len 3 $endpos) }
+  | MINUS { (Uop_neg, extent_of_len 5 $endpos) }
+  | PRE   { (Uop_pre, extent_of_len 3 $endpos) }
 
 %inline binop:
   | AND   { Bop_and }
@@ -128,10 +149,10 @@ const:
   | ARROW { Bop_arrow }
 
 expr:
-  | LPAREN e=expr RPAREN    { e }
-  | c=const                 { EConst c }
-  | v=var                   { EVar v }
-  | o=unop e1=expr          { EUnop(o, e1) }
-  | e1=expr o=binop e2=expr { EBinop(o, e1, e2) }
-  | IF cond=expr THEN e1=expr ELSE e2=expr { EIfte(cond, e1, e2) }
+  | LPAREN e=expr RPAREN    { (fst e, extend_to_pos (extent_of_len 1 $endpos($1)) $endpos) }
+  | c=const                 { (EConst (loc_of_ext (snd c), fst c), snd c) }
+  | v=var                   { (EVar (loc_of_ext (snd v), fst v), snd v) }
+  | o=unop e1=expr          { let p = extend_to_ext (snd o) (snd e1) in (EUnop (loc_of_ext p, fst o, fst e1), p) }
+  | e1=expr o=binop e2=expr { let p = extend_to_ext (snd e1) (snd e2) in (EBinop (loc_of_ext p, o, fst e1, fst e2), p) }
+  | IF cond=expr THEN e1=expr ELSE e2=expr { let p = extend_to_ext (extent_of_len 2 $endpos($1)) (snd e2) in (EIfte (loc_of_ext p, fst cond, fst e1, fst e2), p) }
 ;
