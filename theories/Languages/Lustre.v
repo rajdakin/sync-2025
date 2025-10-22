@@ -367,6 +367,7 @@ Proof.
 Defined.
 
 Record node := mk_node {
+  n_loc: Result.location;
   n_name: string;
 
   n_in: list binder;

@@ -1,6 +1,6 @@
 
 From Reactive Require Import Base.
-From Reactive.Datatypes Require Dict Stream.
+From Reactive.Datatypes Require Dict Result Stream.
 
 
 From Stdlib Require Import Permutation String.
@@ -64,31 +64,32 @@ Inductive binop: Type :=
   .
 
 Inductive exp: Type :=
-  | EConst: const -> exp
-  | EInput: binder -> exp
-  | EVar: binder -> exp
-  | EUnop: unop -> exp -> exp
-  | EBinop: binop -> exp -> exp -> exp
-  | EIfte: exp -> exp -> exp -> exp.
+  | EConst: Result.location -> const -> exp
+  | EInput: Result.location -> binder -> exp
+  | EVar: Result.location -> binder -> exp
+  | EUnop: Result.location -> unop -> exp -> exp
+  | EBinop: Result.location -> binop -> exp -> exp -> exp
+  | EIfte: Result.location -> exp -> exp -> exp -> exp.
 
 Fixpoint has_einput (e: exp): bool :=
   match e with
-    | EInput _ => true
-    | EConst _ | EVar _ => false
-    | EUnop _ e => has_einput e
-    | EBinop _ e1 e2 => has_einput e1 || has_einput e2
-    | EIfte e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
+    | EInput _ _ => true
+    | EConst _ _ | EVar _ _ => false
+    | EUnop _ _ e => has_einput e
+    | EBinop _ _ e1 e2 => has_einput e1 || has_einput e2
+    | EIfte _ e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
   end.
 
-Definition equation := prod ident exp.
+Definition equation: Set := ident * exp.
 
 
 Record node := mk_node {
+  n_loc: Result.location;
   n_name: string;
   n_in: list (binder * type);
   n_out: list (binder * type);
   n_locals: list (binder * type);
-  n_body: list equation;
+  n_body: list (Result.location * equation);
 }.
 
 
@@ -104,13 +105,13 @@ Definition name_dec := String.string_dec.
 
 Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
   match e with
-    | EConst _ => acc
-    | EInput _ => acc
-    | EVar name => name :: acc
-    | EUnop _ e => var_of_exp_aux e acc
-    | EBinop _ e1 e2 =>
+    | EConst _ _ => acc
+    | EInput _ _ => acc
+    | EVar _ name => name :: acc
+    | EUnop _ _ e => var_of_exp_aux e acc
+    | EBinop _ _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte e1 e2 e3 =>
+    | EIfte _ e1 e2 e3 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
   end.
 
@@ -308,41 +309,56 @@ Defined.
 
 Fixpoint exp_eqb (e1 e2: exp): bool :=
   match e1, e2 with
-    | EConst c1, EConst c2 => const_eqb c1 c2
-    | EInput b1, EInput b2 => binder_eqb b1 b2
-    | EVar b1, EVar b2 => binder_eqb b1 b2
-    | EUnop op1 e1, EUnop op2 e2 =>
+    | EConst _ c1, EConst _ c2 => const_eqb c1 c2
+    | EInput _ b1, EInput _ b2 => binder_eqb b1 b2
+    | EVar _ b1, EVar _ b2 => binder_eqb b1 b2
+    | EUnop _ op1 e1, EUnop _ op2 e2 =>
       (unop_eqb op1 op2) && (exp_eqb e1 e2)
-    | EBinop op1 e11 e12, EBinop op2 e21 e22 =>
+    | EBinop _ op1 e11 e12, EBinop _ op2 e21 e22 =>
       (binop_eqb op1 op2) && (exp_eqb e11 e21) && (exp_eqb e12 e22)
-    | EIfte e11 e12 e13, EIfte e21 e22 e23 =>
+    | EIfte _ e11 e12 e13, EIfte _ e21 e22 e23 =>
       (exp_eqb e11 e21) && (exp_eqb e12 e22) && (exp_eqb e13 e23)
     | _, _ => false
   end.
 
-Lemma exp_dec (e1 e2: exp) : {e1 = e2} + {e1 <> e2}.
+Inductive exp_eq : exp -> exp -> Prop :=
+  | EeqConst : forall {l1 l2 c}, exp_eq (EConst l1 c) (EConst l2 c)
+  | EeqInput : forall {l1 l2 b}, exp_eq (EInput l1 b) (EInput l2 b)
+  | EeqVar : forall {l1 l2 b}, exp_eq (EVar l1 b) (EVar l2 b)
+  | EeqUnop : forall {l1 l2 op e1 e2}, exp_eq e1 e2 -> exp_eq (EUnop l1 op e1) (EUnop l2 op e2)
+  | EeqBinop : forall {l1 l2 op e11 e12 e21 e22}, exp_eq e11 e21 -> exp_eq e12 e22 -> exp_eq (EBinop l1 op e11 e12) (EBinop l2 op e21 e22)
+  | EeqIfte : forall {l1 l2 e11 e12 e13 e21 e22 e23},
+      exp_eq e11 e21 -> exp_eq e12 e22 -> exp_eq e13 e23 -> exp_eq (EIfte l1 e11 e12 e13) (EIfte l2 e21 e22 e23)
+.
+
+Lemma exp_eq_refl : forall e, exp_eq e e.
+Proof using.
+  intros e; induction e; constructor; assumption.
+Qed.
+
+Lemma exp_dec (e1 e2: exp) : {exp_eq e1 e2} + {~ exp_eq e1 e2}.
 Proof.
   revert e2.
   induction e1, e2.
-  all: try (right; discriminate).
+  all: try solve [right; inversion 1].
   - destruct (const_dec c c0) as [c_c0 |].
     + left.
       rewrite c_c0.
-      reflexivity.
+      constructor.
     + right.
       inversion 1.
       contradiction.
   - destruct (binder_dec b b0) as [b_b0 |].
     + left.
       rewrite b_b0.
-      reflexivity.
+      constructor.
     + right.
       inversion 1.
       contradiction.
   - destruct (binder_dec b b0) as [b_b0 |].
     + left.
       rewrite b_b0.
-      reflexivity.
+      constructor.
     + right.
       inversion 1.
       contradiction.
@@ -359,8 +375,9 @@ Proof.
       contradiction.
     }
     left.
-    rewrite u_u0, e1_e2.
-    reflexivity.
+    rewrite u_u0.
+    constructor.
+    assumption.
   - destruct (binop_dec b b0) as [b_b0 |].
     2: {
       right.
@@ -380,8 +397,8 @@ Proof.
       contradiction.
     }
     left.
-    rewrite b_b0, e11_e21, e12_e22.
-    reflexivity.
+    rewrite b_b0.
+    constructor; assumption.
   - destruct (IHe1_1 e2_1) as [e11_e21 |].
     2: {
       right.
@@ -401,8 +418,7 @@ Proof.
       contradiction.
     }
     left.
-    rewrite e11_e21, e12_e22, e13_e23.
-    reflexivity.
+    constructor; assumption.
 Defined.
 
 Lemma exp_eqb_refl (e: exp):
@@ -426,53 +442,58 @@ Proof.
 Qed.
 
 Lemma exp_eqb_eq (e1 e2: exp):
-  exp_eqb e1 e2 = true <-> e1 = e2.
+  exp_eqb e1 e2 = true <-> exp_eq e1 e2.
 Proof.
   split.
   - intro H.
     revert e2 H.
-    induction e1 as [ c1 | b1 | b1 | op1 e1 IH | op1 e11 IH1 e12 IH2 | e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
+    induction e1 as [ l1 c1 | l1 b1 | l1 b1 | l1 op1 e1 IH | l1 op1 e11 IH1 e12 IH2 | l1 e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
     all: destruct e2; try inversion H.
     + apply const_eqb_eq in H1.
       subst.
-      reflexivity.
+      constructor.
     + apply binder_eqb_eq in H1.
       subst.
-      reflexivity.
+      constructor.
     + apply binder_eqb_eq in H1.
       subst.
-      reflexivity.
+      constructor.
     + apply andb_prop in H1 as [ H1 H2 ].
       apply unop_eqb_eq in H1.
       apply IH in H2.
-      rewrite H1, H2.
-      reflexivity.
+      rewrite H1.
+      constructor; assumption.
     + apply andb_prop in H1 as [ H1 H2 ].
       apply andb_prop in H1 as [ H3 H1 ].
       apply IH1 in H1.
       apply IH2 in H2.
       apply binop_eqb_eq in H3.
-      rewrite H1, H2, H3.
-      reflexivity.
+      rewrite H3.
+      constructor; assumption.
     + apply andb_prop in H1 as [ H1 H3 ].
       apply andb_prop in H1 as [ H1 H2 ].
       apply IH1 in H1.
       apply IH2 in H2.
       apply IH3 in H3.
-      rewrite H1, H2, H3.
-      reflexivity.
-  - intro.
-    subst.
-    apply exp_eqb_refl.
+      constructor; assumption.
+  - intros H.
+    induction H.
+    1: exact (const_eqb_refl _).
+    1,2: exact (binder_eqb_refl _).
+    1: cbn; rewrite IHexp_eq, Bool.andb_true_r; exact (unop_eqb_refl _).
+    1: cbn; rewrite IHexp_eq1, IHexp_eq2, !Bool.andb_true_r; exact (binop_eqb_refl _).
+    cbn; rewrite IHexp_eq1, IHexp_eq2; exact IHexp_eq3.
 Qed.
 
 Definition equation_eqb (eq1 eq2: equation): bool :=
   (fst eq1 =? fst eq2) && (exp_eqb (snd eq1) (snd eq2)).
 
-Lemma equation_dec (e1 e2: equation) : { e1 = e2 } + {e1 <> e2}.
+Definition equation_eq : equation -> equation -> Prop := fun eq1 eq2 => (fst eq1 = fst eq2) /\ (exp_eq (snd eq1) (snd eq2)).
+
+Lemma equation_dec (e1 e2: equation) : { equation_eq e1 e2 } + { ~ equation_eq e1 e2 }.
 Proof.
-  destruct e1 as [ e1_name e1_exp].
-  destruct e2 as [e2_name e2_exp ].
+  destruct e1 as [ e1_name e1_exp ].
+  destruct e2 as [ e2_name e2_exp ].
   pose proof (PeanoNat.Nat.eq_dec e1_name e2_name) as H.
   destruct H.
   2: {
@@ -490,7 +511,7 @@ Proof.
 
   left.
   subst.
-  reflexivity.
+  split; [reflexivity|assumption].
 Defined.
 
 Lemma equation_eqb_refl (eq: equation):
@@ -504,7 +525,7 @@ Proof.
 Qed.
 
 Lemma equation_eqb_eq (eq1 eq2: equation):
-  equation_eqb eq1 eq2 = true <-> eq1 = eq2.
+  equation_eqb eq1 eq2 = true <-> equation_eq eq1 eq2.
 Proof.
   split.
   - intro H.
@@ -513,23 +534,27 @@ Proof.
     apply PeanoNat.Nat.eqb_eq in H1.
     apply exp_eqb_eq in H2.
     simpl in H1, H2.
-    rewrite H1, H2.
-    reflexivity.
-  - intro.
-    subst.
-    apply equation_eqb_refl.
+    rewrite H1.
+    split; [reflexivity|assumption].
+  - destruct eq1 as [i e1], eq2 as [i' e2].
+    intros [eq H]; cbn in eq, H; subst i'.
+    apply andb_true_intro.
+    split.
+    1: exact (PeanoNat.Nat.eqb_refl _).
+    apply exp_eqb_eq in H.
+    exact H.
 Qed.
 
 Lemma equation_eqb_to_eq (eq1 eq2: equation):
-  equation_eqb eq1 eq2 = true -> eq1 = eq2.
+  equation_eqb eq1 eq2 = true -> equation_eq eq1 eq2.
 Proof.
   apply equation_eqb_eq.
 Qed.
 
 Lemma equation_eq_to_eqb (eq1 eq2: equation):
-  eq1 = eq2 -> equation_eqb eq1 eq2 = true.
+  equation_eq eq1 eq2 -> equation_eqb eq1 eq2 = true.
 Proof.
   intros H.
-  rewrite H.
-  apply equation_eqb_refl.
+  apply equation_eqb_eq.
+  exact H.
 Qed.

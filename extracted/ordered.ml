@@ -75,7 +75,7 @@ let node_to_graph (node : Lustre.node) : graph * (int, vertex) Hashtbl.t =
   (g, index_table)
 
 (** Orders the equations in a node *)
-let node_ordering (node : Lustre.node) : LustreOrdered.node_ordered Result.t =
+let node_ordering (node : Lustre.node) : (Lustre.coq_type, LustreOrdered.node_ordered) Result.t =
   let graph, index_table = node_to_graph node in
   match has_cycle graph with
   | None ->
@@ -89,4 +89,4 @@ let node_ordering (node : Lustre.node) : LustreOrdered.node_ordered Result.t =
       Result.Ok new_node
   | Some (u, v) ->
       Result.Err
-        (Printf.sprintf "The variables %d and %d are mutually recursive" u v)
+        [node.n_loc, Result.InternalError (Format.sprintf "The variables %d and %d are mutually recursive" u v)]
