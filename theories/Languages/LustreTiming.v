@@ -76,21 +76,18 @@ Record node := mk_node {
   n_in: list binder;
   n_out: list binder;
   n_locals: list binder; (* Also includes additionally created binders for pre *)
-  n_init_pre: list equation; (* Happens before n_init *)
+  n_pre: list equation; (* Happens before n_init and n_step *)
   n_init: list equation;
-  n_step_pre: list equation; (* Happens before n_step *)
   n_step: list equation;
 
   n_vars: list binder := n_in ++ n_out ++ n_locals;
   n_assigned_vars_init: list binder := map equation_dest n_init;
-  n_assigned_vars_init_pre: list binder := map equation_dest n_init_pre;
+  n_assigned_vars_pre: list binder := map equation_dest n_pre;
   n_assigned_vars_step: list binder := map equation_dest n_step;
-  n_assigned_vars_step_pre: list binder := map equation_dest n_step_pre;
 
   n_assigned_vars_init_are_vars: incl n_assigned_vars_init n_vars;
-  n_assigned_vars_init_pre_are_vars: incl n_assigned_vars_init_pre n_vars;
+  n_assigned_vars_pre_are_vars: incl n_assigned_vars_pre n_vars;
   n_assigned_vars_step_are_vars: incl n_assigned_vars_step n_vars;
-  n_assigned_vars_step_pre_are_vars: incl n_assigned_vars_step_pre n_vars;
 
   n_assigned_out_init: incl n_out n_assigned_vars_init;
   n_assigned_out_step: incl n_out n_assigned_vars_step;
@@ -103,8 +100,7 @@ Record node := mk_node {
   n_no_einputs_in_other_init: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_init;
   n_no_einputs_in_other_step: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_step;
 
-  n_no_einputs_in_init_pre: Forall (fun '(name, existT _ ty exp) => has_einput exp = false) n_init_pre;
-  n_no_einputs_in_step_pre: Forall (fun '(name, existT _ ty exp) => has_einput exp = false) n_step_pre;
+  n_no_einputs_in_pre: Forall (fun '(name, existT _ ty exp) => has_einput exp = false) n_pre;
 }.
 
 
@@ -133,7 +129,7 @@ Fixpoint raw_to_comb_aux {ty} (exp: raw_exp ty) (ident_origin: ident) (pre_binde
     | Raw_EInput e => (EInput e, EInput e, ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations)
     | Raw_EVar v => (EVar v, EVar v, ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations)
     | Raw_EUnop u e => let '(ei, es, orig, binders, equations_pre, init_equations_post, step_equations_post) := raw_to_comb_aux e ident_origin pre_binders pre_equations init_post_equations step_post_equations in
-      (EUnop u ei, EUnop u ei, orig, binders, equations_pre, init_equations_post, step_equations_post)
+      (EUnop u ei, EUnop u es, orig, binders, equations_pre, init_equations_post, step_equations_post)
     | Raw_EBinop b e1 e2 => let '(e1i, e1s, orig1, binders1, equations_pre1, init_equations_post1, step_equations_post1) := raw_to_comb_aux e1 ident_origin pre_binders pre_equations init_post_equations step_post_equations in
       let '(e2i, e2s, orig2, binders2, equations_pre2, init_equations_post2, step_equations_post2) := raw_to_comb_aux e2 orig1 binders1 equations_pre1 init_equations_post1 step_equations_post1 in
         (EBinop b e1i e2i, EBinop b e1s e2s, orig2, binders2, equations_pre2, init_equations_post2, step_equations_post2)
@@ -160,7 +156,23 @@ Fixpoint raw_to_comb_aux {ty} (exp: raw_exp ty) (ident_origin: ident) (pre_binde
         (e1i, e2s, orig2, binders2, equations_pre2, init_equations_post2, step_equations_post2)
   end.
 
-Definition raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident) :=
-  raw_to_comb_aux exp ident_origin [] [] [].
+Definition raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident): (
+    comb_exp ty (* init *)
+    * comb_exp ty (* step *)
+    * ident (* New identifier origin *)
+    * (list binder) (* Variables created for pre *)
+    * (list equation) (* pre equations *)
+    (* Equations to merge with the regular equations *)
+    (* for init: 
+      prex = undef (a variable initialised later)
+
+      for step:
+      prex = eqx (eqx being updated later with the current values)
+    *)
+    (* Equations NOT to be merged, but can be ordered separately *)
+    * (list equation) (* init_post equations *)
+    * (list equation) (* step_post equations *)
+  ) :=
+  raw_to_comb_aux exp ident_origin [] [] [] [].
 
 (** Properties *)
