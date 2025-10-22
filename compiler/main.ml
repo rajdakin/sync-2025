@@ -22,8 +22,7 @@ let parse_file filename =
         n_in = args;
         n_out = ret;
         n_locals = locals;
-        n_body =
-          Stdlib.List.map (fun ((id, _) as arg) -> loc, (id, EInput (loc, fst arg))) args @ eqs;
+        n_body = eqs;
       }
   and fail checkpoint =
     close_in inx;
@@ -62,8 +61,6 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(locati
   | IncompatibleTypeAssignment (i, t1, t2) ->
       fprintf fmt "assigned expression with type %a to variable %d with type %a"
         pp_type t2 i pp_type t1
-  | UndeclaredInput i ->
-      fprintf fmt "use of undeclared input %d" i
   | UndeclaredVariable i ->
       fprintf fmt "use of undeclared variable %d" i
   | NeverAssigned (i, t) ->
