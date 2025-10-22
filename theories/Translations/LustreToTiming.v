@@ -1,6 +1,6 @@
 From Reactive Require Import Base.
 From Reactive.Languages Require Lustre LustreTiming.
-From Reactive.Datatypes Require Import Sublist Inclusion.
+From Reactive.Datatypes Require Import Inclusion.
 
 Module Lustre := Lustre.
 Module LustreTiming := LustreTiming.
@@ -88,33 +88,6 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (ident_origin: ident): 
             )
     end.
 
-(* Properties of the translation *)
-Lemma raw_binders_conservation {ty} (e: LustreTiming.raw_exp ty) (ident_origin: ident) (pre_binders: list LustreTiming.binder) (pre_equations init_post_equations step_post_equations: list LustreTiming.equation) (ei es: LustreTiming.comb_exp ty) (new_pre_equations new_init_post_equations new_step_post_equations: list LustreTiming.equation) (new_ident_origin: ident) (new_pre_binders: list LustreTiming.binder):
-  LustreTiming.raw_to_comb_aux e ident_origin pre_binders pre_equations init_post_equations step_post_equations = (ei, es, new_ident_origin, new_pre_binders, new_pre_equations, new_init_post_equations, new_step_post_equations)
-  -> Sublist pre_binders new_pre_binders.
-Proof.
-  intro translation.
-  induction e in ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations, ei, es, new_pre_equations, new_init_post_equations, new_step_post_equations, new_ident_origin, new_pre_binders, translation |- *.
-  - simpl in translation.
-    injection translation as <- <- <- <- <- <- <-.
-    apply sublist_refl.
-  - simpl in translation.
-    injection translation as <- <- <- <- <- <- <-.
-    apply sublist_refl.
-  - simpl in translation.
-    injection translation as <- <- <- <- <- <- <-.
-    apply sublist_refl.
-  - simpl in translation.
-    refine (IHe ident_origin pre_binders pre_equations init_post_equations step_post_equations _ _ new_pre_equations new_init_post_equations new_step_post_equations new_ident_origin new_pre_binders _).
-Admitted.
-
-Lemma binders_conservation {ty} (e: Lustre.exp ty) (ident_origin: ident) (pre_binders: list LustreTiming.binder) (pre_equations init_post_equations step_post_equations: list LustreTiming.equation) (ei es: LustreTiming.comb_exp ty) (new_pre_equations new_init_post_equations new_step_post_equations: list LustreTiming.equation) (new_ident_origin: ident) (new_pre_binders: list LustreTiming.binder):
-  translate_expr_aux e ident_origin pre_binders pre_equations init_post_equations step_post_equations = (ei, es, new_ident_origin, new_pre_binders, new_pre_equations, new_init_post_equations, new_step_post_equations)
-  -> Sublist pre_binders new_pre_binders.
-Proof.
-  unfold translate_expr_aux.
-  apply raw_binders_conservation.
-Qed.
 
 Definition translate_node (node: Lustre.node) (ident_origin: ident) : LustreTiming.node.
 Proof.
@@ -182,38 +155,367 @@ Proof.
         simpl.
         assumption.
       * simpl.
-      (*
-        apply incl_app.
-        -- assert (sublist_e := eqe).
-           apply binders_conservation in sublist_e.
-           apply sublist_incl in sublist_e.
-           apply incl_app_inv in IHn_body.
-           destruct IHn_body as [incl_init inc_post].
-           eapply incl_trans_app_r.
-           1: apply incl_init.
-           eapply incl_trans_app_r.
-           1: apply incl_refl.
-           eapply incl_trans_app_l.
-           1: apply incl_refl.
-           assumption.
-        -- 
-      *)
-        refine (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ IHn_body).
         destruct u.
-        -- unfold translate_expr_aux in eqe.
-           simpl in eqe.
-           fold @translate_expr_aux in eqe.
-           destruct (LustreTiming.raw_to_comb_aux (expr_to_raw e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-2: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
 step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
-           fold @translate_expr_aux in e_unfold.
-           admit.
-        -- admit.
-        -- admit.
-      * admit.
-      * admit.
-  - admit.
-  - admit.
-  - admit.
+        3: destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
+        all: injection eqe as <- <- <- <- <- <- <-.
+        1-2: refine (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        simpl.
+        specialize (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        apply incl_app.
+        -- apply incl_app_inv in IHe.
+          destruct IHe as [incl_init _].
+          apply (incl_trans _ _ _ incl_init).
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          do 2 apply incl_tl.
+          apply incl_refl.
+        -- apply incl_app_inv in IHe.
+          destruct IHe as [_ incl_l1].
+          unfold LustreTiming.equation_dest, fst, snd, projT1.
+          apply incl_cons.
+          ++ do 2 (apply in_or_app; right).
+              apply in_cons.
+              apply in_eq.
+          ++ apply (incl_trans _ _ _ incl_l1).
+              apply incl_app.
+              1: apply incl_appl; apply incl_refl.
+              apply incl_appr.
+              apply incl_app.
+              1: apply incl_appl; apply incl_refl.
+              apply incl_appr.
+              do 2 apply incl_tl.
+              apply incl_refl.
+      * simpl.
+        destruct b.
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        1-13: injection eqe as <- <- <- <- <- <- <-.
+        1-13: refine (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        specialize (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+        apply incl_app.
+        ++ apply incl_app_inv in IHe2.
+          destruct IHe2 as [incl_init _].
+          apply (incl_trans _ _ _ incl_init).
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_refl.
+        ++ apply incl_app_inv in IHe2.
+          destruct IHe2 as [_ incl_l1].
+          apply incl_l1.
+      * unfold translate_expr_aux in eqe.
+        simpl in eqe.
+        destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[? ?] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
+  - clear n_no_einputs_in_other n_out_is_not_an_input n_inputs_equations n_assigned_out.
+    induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
+    + unfold translate_equations in translation.
+      injection translation as <- <- <- <- <- <- <-.
+      simpl.
+      intros ? [].
+    + assert (H := n_assigned_vars_are_vars).
+      rewrite map_cons in H.
+      apply incl_cons_inv in H.
+      destruct H as [ina incl_nbody].
+      cbn in translation.
+      destruct (translate_equations n_body ident_origin) as [[[[[[init_eqs0 step_eqs0] new_ident_origin0] pre_binders0] pre_eqs0] init_post_eqs0] step_post_eqs0] eqn: eqIh.
+      destruct a as [i [ty e]].
+      specialize (IHn_body incl_nbody _ _ _ _ _ _ _ _ eqIh).
+      unfold Lustre.equation_dest, fst, snd, projT1 in ina.
+      clear -translation IHn_body ina.
+      destruct (translate_expr_aux e new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei es] orig] binders] equations_pre] init_equations_post] step_equations_post] eqn: eqe.
+      injection translation as <- <- <- <- <- <- <-.
+
+      simpl.
+      clear ina i step_eqs0 init_eqs0.
+      induction e in n_in, eqe, n_out, n_locals, new_ident_origin0, pre_binders0, pre_eqs0, init_post_eqs0, step_post_eqs0, IHn_body, ei, es, orig, binders, equations_pre, init_equations_post, step_equations_post |- *.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * simpl.
+        destruct u.
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-2: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
+        3: destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
+        all: injection eqe as <- <- <- <- <- <- <-.
+        1-2: refine (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        simpl.
+        specialize (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        apply incl_cons.
+        -- unfold LustreTiming.equation_dest, fst, snd, projT1.
+           do 2 (apply in_or_app; right).
+           apply in_eq.
+        -- apply (incl_trans _ _ _ IHe).
+           apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          do 2 apply incl_tl.
+          apply incl_refl.
+      * destruct b.
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        1-13: injection eqe as <- <- <- <- <- <- <-.
+        1-13: refine (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        specialize (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+        apply IHe2.
+      * unfold translate_expr_aux in eqe.
+        simpl in eqe.
+        destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[? ?] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
+  - rewrite map_app.
+    clear n_no_einputs_in_other n_out_is_not_an_input n_inputs_equations n_assigned_out.
+    induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
+    + unfold translate_equations in translation.
+      injection translation as <- <- <- <- <- <- <-.
+      simpl.
+      intros ? [].
+    + assert (H := n_assigned_vars_are_vars).
+      rewrite map_cons in H.
+      apply incl_cons_inv in H.
+      destruct H as [ina incl_nbody].
+      cbn in translation.
+      destruct (translate_equations n_body ident_origin) as [[[[[[init_eqs0 step_eqs0] new_ident_origin0] pre_binders0] pre_eqs0] init_post_eqs0] step_post_eqs0] eqn: eqIh.
+      destruct a as [i [ty e]].
+      specialize (IHn_body incl_nbody _ _ _ _ _ _ _ _ eqIh).
+      unfold Lustre.equation_dest, fst, snd, projT1 in ina.
+      clear -translation IHn_body ina.
+      destruct (translate_expr_aux e new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei es] orig] binders] equations_pre] init_equations_post] step_equations_post] eqn: eqe.
+      injection translation as <- <- <- <- <- <- <-.
+
+      simpl.
+      apply incl_cons.
+      1: {
+        unfold LustreTiming.equation_dest, fst, snd, projT1.
+        rewrite !in_app_iff in ina.
+        rewrite !in_app_iff.
+        tauto.
+      }
+      clear ina i init_eqs0.
+      induction e in n_in, eqe, n_out, n_locals, step_eqs0, new_ident_origin0, pre_binders0, pre_eqs0, init_post_eqs0, step_post_eqs0, IHn_body, ei, es, orig, binders, equations_pre, init_equations_post, step_equations_post |- *.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        assumption.
+      * simpl.
+        destruct u.
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-2: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
+        3: destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[]]]]]] eqn: e_unfold.
+        all: injection eqe as <- <- <- <- <- <- <-.
+        1-2: refine (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        simpl.
+        specialize (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e_unfold IHn_body).
+        apply incl_app.
+        -- apply incl_app_inv in IHe.
+          destruct IHe as [incl_init _].
+          apply (incl_trans _ _ _ incl_init).
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          do 2 apply incl_tl.
+          apply incl_refl.
+        -- apply incl_app_inv in IHe.
+          destruct IHe as [_ incl_l1].
+          unfold LustreTiming.equation_dest, fst, snd, projT1.
+          apply incl_cons.
+          ++ do 2 (apply in_or_app; right).
+              apply in_cons.
+              apply in_eq.
+          ++ apply (incl_trans _ _ _ incl_l1).
+              apply incl_app.
+              1: apply incl_appl; apply incl_refl.
+              apply incl_appr.
+              apply incl_app.
+              1: apply incl_appl; apply incl_refl.
+              apply incl_appr.
+              do 2 apply incl_tl.
+              apply incl_refl.
+      * simpl.
+        destruct b.
+        all: unfold translate_expr_aux in eqe.
+        all: simpl in eqe.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        1-13: injection eqe as <- <- <- <- <- <- <-.
+        1-13: refine (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        simpl.
+        specialize (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body)).
+        apply incl_app.
+        ++ apply incl_app_inv in IHe2.
+          destruct IHe2 as [incl_init _].
+          apply (incl_trans _ _ _ incl_init).
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_app.
+          1: apply incl_appl; apply incl_refl.
+          apply incl_appr.
+          apply incl_refl.
+        ++ apply incl_app_inv in IHe2.
+          destruct IHe2 as [_ incl_l1].
+          apply incl_l1.
+      * unfold translate_expr_aux in eqe.
+        simpl in eqe.
+        destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) new_ident_origin0 pre_binders0 pre_eqs0 init_post_eqs0
+step_post_eqs0) as [[[[[[? ?] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
+        destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
+        injection eqe as <- <- <- <- <- <- <-.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
+  - clear n_no_einputs_in_other n_out_is_not_an_input n_inputs_equations n_assigned_vars_are_vars n_in n_locals n_name.
+    induction n_out in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_out |- *.
+    1: apply incl_nil_l.
+    apply incl_cons_inv in n_assigned_out.
+    destruct n_assigned_out as [a_assigned n_assigned_out].
+    apply incl_cons.
+    2: refine (IHn_out n_assigned_out _ _ _ _ _ _ _ _ translation).
+    clear IHn_out n_out n_assigned_out.
+    induction n_body as [ | eq n_body IHn_body] in a, a_assigned, ident_origin, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, translation |- *.
+    1: contradiction.
+    simpl in a_assigned.
+    simpl in translation.
+    destruct (translate_equations n_body ident_origin) as [[[[[[init_eq step_eq] origin_ident] binders_pre] equations_pre] post_init_equations] post_step_equations] eqn: translate_nbody.
+    destruct eq as [i [ty e]].
+    destruct (translate_expr_aux e origin_ident binders_pre equations_pre post_init_equations post_step_equations) as [[[[[[]]]]]] eqn: unfold_translate.
+    injection translation as <- <- <- <- <- <- <-.
+    unfold Lustre.equation_dest at 1, fst, snd, projT1 in a_assigned.
+    simpl.
+
+    destruct a_assigned as [a_dest_eq | a_assigned].
+    1: left; assumption.
+    right.
+    specialize (IHn_body _ a_assigned _ _ _ _ _ _ _ _ translate_nbody).
+    rewrite map_app.
+    apply in_app_iff.
+    rewrite map_app in IHn_body.
+    apply in_app_iff in IHn_body.
+    destruct IHn_body as [in_init | in_post_init].
+    1: left; assumption.
+    right.
+    clear -unfold_translate in_post_init.
+    rename c into init_eq, c0 into step_eq, i0 into new_origin_ident, l into new_binders_pre, l0 into new_equations_pre, l1 into new_post_init_equations, l2 into new_post_step_equations.
+    rename unfold_translate into translation.
+
+    induction e in a, origin_ident, binders_pre, equations_pre, post_init_equations, post_step_equations, init_eq, step_eq, new_origin_ident, new_binders_pre, new_equations_pre, new_post_init_equations, new_post_step_equations, translation, in_post_init |- *.
+    1-3: unfold translate_expr_aux in translation.
+    1-3: simpl in translation.
+    1-3: injection translation as <- <- <- <- <- <- <-.
+    1-3: assumption.
+
+    + unfold translate_expr_aux in translation.
+      destruct u.
+      all: simpl in translation.
+      1-2: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e) origin_ident binders_pre equations_pre
+post_init_equations post_step_equations) as [[[[[[]]]]]] eqn: unfold_e.
+      1-2: injection translation as <- <- <- <- <- <- <-.
+      1-2: refine (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ unfold_e in_post_init).
+
+      destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e) origin_ident binders_pre equations_pre
+post_init_equations post_step_equations) as [[[[[[]]]]]] eqn: unfold_e.
+
+      injection translation as <- <- <- <- <- <- <-.
+      specialize (IHe _ _ _ _ _ _ _ _ _ _ _ _ _ unfold_e in_post_init).
+      simpl.
+      right.
+      assumption.
+    + unfold translate_expr_aux in translation.
+      destruct b.
+      all: simpl in translation.
+      1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) origin_ident binders_pre equations_pre post_init_equations
+post_step_equations) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+      1-3: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+      4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e1) origin_ident binders_pre equations_pre post_init_equations
+post_step_equations) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+      4-13: destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+      14: destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e1) origin_ident binders_pre equations_pre post_init_equations
+post_step_equations) as [[[[[[c1 c2] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+      14: destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[]]]]]] eqn: e2_unfold.
+      all: injection translation as <- <- <- <- <- <- <-.
+      all: refine (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init)).
+    + unfold translate_expr_aux in translation.
+      simpl in translation.
+      destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool e1) origin_ident binders_pre equations_pre post_init_equations
+post_step_equations) as [[[[[[? ?] ident_e1] binders_e1] eqs_e1] init_e1] step_e1] eqn: e1_unfold.
+      destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
+      destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
+      injection translation as <- <- <- <- <- <- <-.
+      refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))).
   - admit.
   - admit.
   - 
