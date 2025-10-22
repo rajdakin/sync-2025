@@ -148,3 +148,17 @@ Proof.
       constructor 3.
       assumption.
 Qed.
+
+Lemma sublist_incl {A} (l1 l2: list A):
+  Sublist l1 l2 -> incl l1 l2.
+Proof.
+  intro sub.
+  induction sub.
+  - apply incl_nil_l.
+  - apply incl_tl.
+    assumption.
+  - apply incl_cons.
+    + apply in_eq.
+    + apply incl_tl.
+      assumption.
+Qed.
