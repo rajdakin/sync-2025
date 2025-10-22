@@ -50,7 +50,7 @@ let parse_file filename =
     Format.printf "%s@\n" (Printexc.to_string e);
     exit 1
 
-let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(location * 'a r)) =
+let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
   fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
@@ -62,17 +62,19 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(locati
   | IncompatibleTypeAssignment (i, t1, t2) ->
       fprintf fmt "assigned expression with type %a to variable %d with type %a"
         pp_type t2 i pp_type t1
-  | UndeclaredInput i ->
-      fprintf fmt "use of undeclared input %d" i
-  | UndeclaredVariable i ->
-      fprintf fmt "use of undeclared variable %d" i
-  | NeverAssigned (i, t) ->
-      fprintf fmt "variable %d with type %a is never assigned to" i pp_type t
-  | MultipleDeclaration (n, l1, l2) when l1 = l2 ->
-      fprintf fmt "variable %d is declared multiple times as %s" n
+  | UndeclaredInput (n, None) ->
+      fprintf fmt "use of undeclared input %s" n
+  | UndeclaredInput (n, Some i) ->
+      fprintf fmt "use of variable %s(%d) as input" n i
+  | UndeclaredVariable n ->
+      fprintf fmt "use of undeclared variable %s" n
+  | NeverAssigned (n, i, t) ->
+      fprintf fmt "variable %s(%d) with type %a is never assigned to" n i pp_type t
+  | MultipleDeclaration (n, i, l1, l2) when l1 = l2 ->
+      fprintf fmt "variable %s(%d) is declared multiple times as %s" n i
         (match l1 with DeclInput -> "inputs" | DeclOutput -> "outputs" | DeclLocal -> "locals")
-  | MultipleDeclaration (n, l1, l2) ->
-      fprintf fmt "variable %d is declared multiple times as %s and %s" n
+  | MultipleDeclaration (n, i, l1, l2) ->
+      fprintf fmt "variable %s(%d) is declared multiple times as %s and %s" n i
         (match l1 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
         (match l2 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
   | InternalError e -> fprintf fmt "internal error: %s" e

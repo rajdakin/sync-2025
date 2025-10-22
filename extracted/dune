@@ -22,7 +22,8 @@
   Imp
   LustreAstToLustre
   LustreOrdering
-  LustreOrderedToImp)
+  LustreOrderedToImp
+  FMapList OrderedType OrdersTac)
  (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations))
 
 (library
@@ -32,4 +33,4 @@
 (env
  (dev
   (flags
-   (:standard -w -33))))
+   (:standard -w -33-39-67))))

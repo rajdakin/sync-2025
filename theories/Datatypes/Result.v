@@ -18,10 +18,10 @@ Inductive declaration_location: Set :=
 Inductive r {type: Set} | : Set :=
   | BadType (expected: list type) (got: type): r
   | IncompatibleTypeAssignment (vname: ident) (vtype: type) (etype: type): r
-  | UndeclaredInput (vname: ident): r
-  | UndeclaredVariable (vname: ident): r
-  | NeverAssigned (vname: ident) (vtype: type): r
-  | MultipleDeclaration (vname: ident) (loc1 loc2: declaration_location): r
+  | UndeclaredInput (vname: string) (vid: option ident): r
+  | UndeclaredVariable (vname: string): r
+  | NeverAssigned (vname: string) (vid: ident) (vtype: type): r
+  | MultipleDeclaration (vname: string) (vid: ident) (loc1 loc2: declaration_location): r
   | InternalError (msg: string): r
 .
 Arguments r _ : clear implicits.

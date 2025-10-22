@@ -383,6 +383,9 @@ Record node := mk_node {
   n_out_is_not_an_input: Forall (fun b => ~ In (fst b) (map fst n_in)) n_out;
   n_inputs_equations: incl (List.map (fun '((n, ty) as b) => (n, existT exp ty (EInput b))) n_in) n_body;
   n_no_einputs_in_other: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
+  
+  n_seed: ident;
+  n_seed_always_fresh: forall n, ~ In (iter n next_ident n_seed) (map fst n_vars);
 }.
 
 Definition node_eq (n1 n2: node) :=
