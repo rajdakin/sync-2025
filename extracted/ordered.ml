@@ -54,22 +54,25 @@ let topological_sort (g : graph) : vertex list =
 
 (** Converts a node's body into a graph *)
 let node_to_graph (node : Lustre.node) : graph * (int, vertex) Hashtbl.t =
-  let n = Stdlib.List.length node.n_in + Stdlib.List.length node.n_locals + 1 in
+  let excl = Stdlib.List.map fst node.n_in in
+  let n = Stdlib.List.length node.n_out + Stdlib.List.length node.n_locals in
   let g = Array.make n [] in
   let var_table = Hashtbl.create n in
   let index_table = Hashtbl.create n in
-  let var_idx (v : vertex) : int =
-    if Hashtbl.mem var_table v then Hashtbl.find var_table v
-    else
-      let value = v in
-      Hashtbl.add var_table v value;
-      Hashtbl.add index_table value v;
-      value
+  let var_idx =
+    let nxt = ref 0 in
+    fun (v : vertex) : int -> match Hashtbl.find_opt var_table v with
+    | Some value -> value
+    | None ->
+        let value = !nxt in
+        incr nxt;
+        Hashtbl.add var_table v value;
+        Hashtbl.add index_table value v;
+        value
   in
   Stdlib.List.iter
     (fun (v, Specif.Coq_existT (ty, exp)) ->
-      let vars = remove_dup @@ Stdlib.List.map fst @@ Lustre.var_of_exp ty exp in
-      Stdlib.List.iter (fun u -> ignore @@ var_idx u) vars;
+      let vars = remove_dup @@ Stdlib.List.filter_map (fun (v, _) -> if Stdlib.List.mem v excl then None else Some (var_idx v)) @@ Lustre.var_of_exp ty exp in
       g.(var_idx v) <- vars)
     node.n_body;
   (g, index_table)

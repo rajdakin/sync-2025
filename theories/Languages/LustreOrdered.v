@@ -34,21 +34,22 @@ Arguments var_of_exp_not_in_ifte {_} _ _ _ _ _.
 
 Definition dag := list ((ident * type) * list (ident * type)).
 
-Fixpoint equations_to_dag (equations: list equation): dag :=
+Fixpoint equations_to_dag_aux (equations: list equation): dag :=
   match equations with
     | [] => []
-    | (name, existT _ ty exp) :: remaining_eqs => ((name, ty), var_of_exp exp) :: equations_to_dag remaining_eqs
+    | (name, existT _ ty exp) :: remaining_eqs => ((name, ty), var_of_exp exp) :: equations_to_dag_aux remaining_eqs
   end.
+Definition equations_to_dag equations n_in: dag := equations_to_dag_aux equations ++ List.map (fun ity => (ity, [])) n_in.
 
 Record node_ordered := mk_node_ordered {
   node_ordered_is_node :> node;
-  ordered: Ordered.t (equations_to_dag (Lustre.n_body node_ordered_is_node));
+  ordered: Ordered.t (equations_to_dag (Lustre.n_body node_ordered_is_node) (Lustre.n_in node_ordered_is_node));
 }.
 
 (** Lemmas *)
 
 Lemma dag_names (equations: list equation):
-  map equation_dest equations = map fst (equations_to_dag equations).
+  map equation_dest equations = map fst (equations_to_dag_aux equations).
 Proof.
   induction equations as [ | [ i [ ty s ] ] equations IH ].
   - reflexivity.
@@ -58,7 +59,7 @@ Proof.
 Qed.
 
 Lemma dag_length (equations: list equation):
-  List.length equations = List.length (equations_to_dag equations).
+  List.length equations = List.length (equations_to_dag_aux equations).
 Proof.
   induction equations as [ | [ i [ ty s ] ] equations IH ].
   - simpl.
@@ -69,7 +70,7 @@ Proof.
 Qed.
 
 Lemma dag_nil (equations: list equation):
-  equations = [] <-> equations_to_dag equations = [].
+  equations = [] <-> equations_to_dag_aux equations = [].
 Proof.
   split.
   - intros eq.
@@ -86,7 +87,7 @@ Proof.
 Qed.
 
 Lemma equations_to_dag_is_map (equations: list equation):
-  equations_to_dag equations = map (fun '(name, existT _ ty exp) => ((name, ty), var_of_exp exp)) equations.
+  equations_to_dag_aux equations = map (fun '(name, existT _ ty exp) => ((name, ty), var_of_exp exp)) equations.
 Proof.
   induction equations as [ | (name, (ty, exp)) l IH ]; [ reflexivity | ].
   simpl.
@@ -124,15 +125,11 @@ Lemma sem_exp_with_useless_var {tys tye} (e: exp tye) (h: history) (name: ident)
 Proof.
   intros Hexp Hnin.
   revert v Hexp.
-  induction e as [ ty c | b | (i, t) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
+  induction e as [ ty c | (i, t) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
   - inversion Hexp.
     apply sig2T_eq_type in H2, H3.
     subst.
     apply Lustre.SeConst.
-  - inversion Hexp.
-    apply sig2T_eq_type in H4.
-    subst.
-    apply Lustre.SeInput.
   - inversion Hexp.
     apply sig2T_eq_type in H4.
     subst.
@@ -174,26 +171,29 @@ Proof.
     + apply IH3; assumption.
 Qed.
 
-Lemma var_of_last_exp_in_body {ty} (body: list equation) (name: ident) (e: exp ty):
-  Ordered.t (equations_to_dag ((name, existT exp _ e) :: body)) ->
-  Forall (fun v => In v (map equation_dest body)) (var_of_exp e).
+Lemma var_of_last_exp_in_body {ty} (body: list equation) (name: ident) (e: exp ty) n_in:
+  Ordered.t (equations_to_dag ((name, existT exp _ e) :: body) n_in) ->
+  Forall (fun v => In v (map equation_dest body) \/ In v n_in) (var_of_exp e).
 Proof.
-  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros Hord.
-  - constructor.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros Hord.
   - constructor.
   - constructor; [ | constructor ].
     simpl in Hord.
+    cbn in Hord.
     apply Ordered.var_cons_in_right_side with (y := i) (b := ty) in Hord.
     + destruct Hord as [ ly Hly ].
       apply in_map with (f := fst) in Hly.
+      rewrite map_app, map_map, map_id in Hly.
       rewrite <- dag_names in Hly.
+      apply in_app_or in Hly.
       assumption.
     + left.
       reflexivity.
   - apply IH.
     inversion Hord as [ | x lx l Hord' Hnin H ]; subst.
     constructor; assumption.
-  - simpl in Hord.
+  - unfold equations_to_dag in Hord.
+    simpl in Hord.
     rewrite var_of_exp_binop_eq in Hord |- *.
     apply Forall_app.
     split.
@@ -203,7 +203,8 @@ Proof.
     + apply IH2.
       apply Ordered.app_right_side_r in Hord.
       inversion Hord; constructor; assumption.
-  - simpl in Hord.
+  - unfold equations_to_dag in Hord.
+    simpl in Hord.
     rewrite var_of_exp_ifte_eq in Hord |- *.
     apply Forall_app.
     split.
@@ -221,36 +222,45 @@ Proof.
         assumption.
 Qed.
 
-Lemma minimal_history (body: list equation):
-  Ordered.t (equations_to_dag body) ->
+Lemma minimal_history (body: list equation) n_in h0:
+  (forall (i: ident) ty, in_history h0 (i, ty) <-> In (i, ty) n_in) ->
+  Ordered.t (equations_to_dag body n_in) ->
   exists (h: history),
-    (forall (i: ident) ty, in_history h (i, ty) <-> In (i, ty) (map equation_dest body)) /\
+    Dict.inclusion h0 h /\
+    (forall (i: ident) ty, in_history h (i, ty) <-> In (i, ty) (map equation_dest body ++ n_in)) /\
     (Forall (fun '(n, existT _ ty eq) =>
       exists (v': Stream.t (value ty)),
       Dict.maps_to n (existT _ ty v') h /\ Lustre.sem_exp h eq (Stream.hd v')
     ) body).
 Proof.
-  intros Hord.
+  intros Hhist0 Hord.
   induction body as [ | (name, (ty, exp)) body IH ].
-  - exists (Dict.empty _).
-    split; [ | constructor ].
-    intros i.
-    split.
-    2: { inversion 1. }
-    intros Hi.
-    inversion Hi.
-  - specialize (IH (Ordered.cons _ _ Hord)) as ( h & IH1 & IH2 ).
+  - exists h0.
+    split; [ intros ? ? h; exact h | split; [ | constructor ] ].
+    unfold equations_to_dag, equations_to_dag_aux, app in Hord.
+    intros i ty.
+    exact (Hhist0 i ty).
+  - specialize (IH (Ordered.cons _ _ Hord)) as ( h & IH1 & IH2 & IH3 ).
 
     assert (Forall (in_history h) (var_of_exp exp)) as Hforall.
-    { apply Forall_impl with (P := fun v => In v (map equation_dest body)).
-      - intros [ i tyv ]; apply IH1.
-      - apply var_of_last_exp_in_body with (name := name).
+    { apply Forall_impl with (P := fun v => In v (map equation_dest body ++ n_in)).
+      - intros [ i tyv ]; apply IH2.
+      - refine (Forall_impl _ (fun v => in_or_app _ _ _) _).
+        apply var_of_last_exp_in_body with (name := name).
         assumption. }
 
     pose proof (Lustre.exp_with_evaluable_vars_is_evaluable h exp Hforall) as [ v Hv ].
     
     exists (Dict.add name (existT _ _ (Stream.from v)) h).
-    split.
+    split; [|split].
+    + intros i [ty' e] H.
+      refine (Dict.maps_to_add _ _ _ _ _ (IH1 _ _ H) _).
+      intros <-.
+      cbn in Hord; refine (Ordered.vars_no_dups _ _ _ _ Hord _).
+      rewrite map_app, map_map.
+      refine (in_or_app _ _ _ (or_intror (in_map _ _ (_, _) (proj1 (Hhist0 i ty') _)))).
+      unfold in_history, Lustre.in_history.
+      rewrite H; exact eq_refl.
     + intros i.
       split.
       * rewrite in_history_iff.
@@ -266,7 +276,7 @@ Proof.
           assumption. }
         apply Dict.maps_to_not_last_added in Hx; [ | assumption ].
         right.
-        apply IH1.
+        apply IH2.
         apply in_history_iff.
         exists x.
         assumption.
@@ -280,15 +290,14 @@ Proof.
 
         assert (i <> name).
         { intros ieq; inversion Hord as [ | x y lx l H1 H2 H3 ]; subst.
-          rewrite equations_to_dag_is_map in H2.
           apply H2.
           apply in_map with (f := fst) in Hin.
+          rewrite map_app.
           refine (eq_ind _ _ Hin _ _).
           clear.
-          induction body as [ | (y & ty & l) body IH ]; [ reflexivity | ].
-          exact (f_equal _ IH). }
+          induction body as [ | (y & ty & l) body IH ]; [ rewrite map_map; exact eq_refl | exact (f_equal _ IH) ]. }
 
-        apply IH1, in_history_iff in Hin as [ x Hx ].
+        apply IH2, in_history_iff in Hin as [ x Hx ].
         exists x.
         apply Dict.maps_to_add; assumption.
 
@@ -300,9 +309,9 @@ Proof.
         simpl.
         apply Lustre.sem_eval_exp.
         apply sem_exp_with_useless_var.
-        2: now apply Ordered.var_not_need_itself with (y := ty) (l := equations_to_dag body).
+        2: now apply Ordered.var_not_need_itself with (y := ty) (l := equations_to_dag body n_in).
         now apply Lustre.sem_eval_exp.
-      * refine (Forall_impl_in _ _ _ _ IH2).
+      * refine (Forall_impl_in _ _ _ _ IH3).
         intros (i, (tyi, x)) Hin ( s & Hs1 & Hs2 ).
         simpl in *.
         
@@ -312,20 +321,25 @@ Proof.
           specialize (IH1 name).
           assert (in_history h (name, tyi)) as H.
           { unfold in_history, Lustre.in_history. rewrite Hs1. reflexivity. }
-          apply IH1 in H.
-          apply Ordered.vars_no_dups in Hord.
+          apply IH2 in H.
+          cbn in Hord; apply Ordered.vars_no_dups in Hord.
           rewrite dag_names in H.
           apply Hord; clear - H.
-          induction body as [ | [ ? [ ? ? ] ] ? IH ]; [ contradiction H | ].
-          destruct H as [ H | H ]; [ left; injection H as ? ?; assumption | right; apply IH; assumption ]. }
+          rewrite map_app, map_map; fold (@fst ident type).
+          refine (eq_ind _ _ (in_map fst _ _ H) _ _).
+          rewrite map_app, map_map; f_equal; apply map_ext.
+          intros [[]]; exact eq_refl. }
         
         exists s.
         split.
         { now apply Dict.maps_to_add. }
 
         apply sem_exp_with_useless_var; [ assumption | ].
+        cbn in Hord.
         refine (Ordered.vars_coherence _ i _ tyi _ (var_of_exp x) _ Hord _).
-        apply in_map with (f := fun '(i, existT _ ty x) => ((i, ty), var_of_exp x)) in Hin.
-        rewrite equations_to_dag_is_map.
-        assumption.
+        refine (in_or_app _ _ _ (or_introl _)).
+        clear - Hin.
+        induction body as [|[n [ty e]] tl IH]; [exact Hin|].
+        destruct Hin as [[=-> -> H]|H]; [apply sig2T_eq_type in H; subst; left; exact eq_refl|].
+        right; exact (IH H).
 Qed.
