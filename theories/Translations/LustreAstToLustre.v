@@ -128,7 +128,7 @@ end.
 
 Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type (sigT Target.exp).
 Proof.
-  destruct e as [ l c | l n | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
+  destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
     + exists Target.TVoid.
@@ -137,15 +137,6 @@ Proof.
       exact (Target.EConst (Target.CBool b)).
     + exists Target.TInt.
       exact (Target.EConst (Target.CInt n)).
-  - destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ].
-    2: right; exact [(l, Result.UndeclaredInput n None)].
-    refine (match l' with Result.DeclInput => _ | _ => Result.Err [(l, Result.UndeclaredInput n (Some i))] end).
-    clear l'.
-    destruct (Dict.find i (env temp)) as [ ty | ].
-    2: right; exact [(l, Result.InternalError ("Input " ++ n ++ " has an ID but no type"))].
-    left.
-    exists ty.
-    exact (Target.EInput (i, ty)).
   - destruct (StringMap.find n (smap temp)) as [ [ i _ ] | ].
     2: right; exact [(l, Result.UndeclaredVariable n)].
     destruct (Dict.find i (env temp)) as [ ty | ].
@@ -184,28 +175,35 @@ Proof.
 Defined.
 
 Definition check_body (temp: common_temp) (entry: Source.node): Result.t Target.type
-  { body : list Target.equation | incl (map Target.equation_dest body) (nvars temp) }.
+  { body : list Target.equation | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) }.
 Proof.
-  destruct entry.
-  induction n_body as [ | [ l [ n e ] ] tl IH ].
-  - left.
-    exists [].
-    exact (incl_nil_l _).
+  destruct entry as [nloc n nin out loc eqs]; clear n nin out loc.
+  refine (Result.bind ((_ :
+    Result.t _
+      { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) } }
+    )) (fun res => match res with
+      | existT _ [] ret => Result.Ok ret
+      | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.MissingAssignment "<information lost>" i ty)] end)).
+  induction eqs as [ | [ l [ n e ] ] tl IH ].
+  - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))).
+    rewrite app_nil_r; exact (Permutation_refl _).
   - refine (Result.bind (Result.combine (check_exp temp e) IH) _); clear IH.
-    intros [ [ ty e' ] [ eqs IH ] ].
+    intros [ [ ty e' ] [ rem [ eqs IH ] ] ].
     destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ].
     2: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
-    destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) (i, ty) (nvars temp)) as [Hin|_].
-    2: refine (Result.Err [(l, _)]).
-    2: destruct temp as [? ? ? ? ? nvars H ? H']; cbn; fold nvars; clear H H' IH; generalize dependent nvars; intros nvars; clear - n i ty nvars.
-    2: induction nvars as [|[hdn hdt] tl IH].
-    2:  exact (Result.UndeclaredVariable n).
-    2: destruct (PeanoNat.Nat.eq_dec i hdn) as [neqhdn|_].
-    2:  exact (Result.IncompatibleTypeAssignment hdn hdt ty).
-    2: exact IH.
-    left.
-    exists ((i, existT Target.exp ty e') :: eqs).
-    intros a [<-|H]; [exact Hin|exact (IH _ H)].
+    pose (rev_lhs := @nil (ident * Target.type)); change rem with (rev_lhs ++ rem) in IH.
+    generalize dependent rev_lhs; induction rem as [ | [ i' ty' ] rem IH ]; intros rev_lhs Hperm.
+    1: exact (Result.Err [(l, Result.MultipleAssignment n i ty)]).
+    destruct (PeanoNat.Nat.eq_dec i i') as [ <- | nnei ].
+    2: refine (IH ((i', ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
+    2: rewrite (app_assoc _ [_] _ : _ ++ (i', ty') :: _ = _).
+    2: exact (Permutation_app_tail _ (Permutation_cons_append _ _)).
+    destruct (Target.type_dec ty ty') as [ <- | nety ].
+    2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n i ty' ty)]).
+    refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((i, existT Target.exp ty e') :: eqs) _))).
+    rewrite (app_assoc _ [_] _ : _ ++ map Target.equation_dest ((_, _) :: _) = (_ ++ _) ++ map _ _), rev_append_rev.
+    refine (Permutation_trans (Permutation_app_tail _ _) Hperm); unfold Target.equation_dest, fst, snd, projT1.
+    rewrite <-app_assoc; exact (Permutation_sym (Permutation_app (Permutation_rev _) (Permutation_cons_append _ _))).
 Defined.
 
 Definition n_assigned_vars (body: list Target.equation) :=
@@ -219,37 +217,46 @@ Proof.
   intros b.
   destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
   1: exact (Result.Ok Hin).
-  exact (Result.Err [(l, Result.NeverAssigned "<information lost>" (fst b) (snd b))]).
+  exact (Result.Err [(l, Result.MissingAssignment "<information lost>" (fst b) (snd b))]).
 Defined.
 
-Definition n_out_is_not_an_input (l: Result.location) (temp: common_temp) :
-  Result.t Target.type (Forall (fun b => ~ In (fst b) (map fst (n_in temp))) (n_out temp)) :=
-  Result.list_map (fun b => match In_dec PeanoNat.Nat.eq_dec _ _ with
-    | left _ => Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst b) Result.DeclInput Result.DeclOutput)]
-    | right h => Result.Ok h
-  end) _.
-
-
-Definition n_inputs_equations (l: Result.location) (temp: common_temp) body:
-  Result.t Target.type (incl (List.map (fun '((n, ty) as b) => (n, existT Target.exp ty (Target.EInput b))) (n_in temp)) body).
-Proof.
-  refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
-  intros [n [ty e]].
-  exact (match In_dec (prod_dec PeanoNat.Nat.eq_dec (sigT_dec Target.type_dec (@Target.exp_dec))) _ _ with
-    | left h => Result.Ok h
-    | right _ => Result.Err [(l, Result.InternalError "Missing extra input equation")]
-    end).
+(* TODO: merge with check_Henv *)
+Definition vars_unique (l: Result.location) (temp: common_temp) :
+  Result.t Target.type (NoDup ((map fst (n_in temp ++ n_out temp ++ n_locals temp)))).
+Proof using.
+  induction (n_in temp) as [ | hd tl IH ].
+  2:{
+    refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclInput)]).
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_out temp))) as [ _ | nout ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclOutput)]).
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_locals temp))) as [ _ | nloc ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclLocal)]).
+    refine (Result.Ok _).
+    rewrite !map_app, !in_app_iff; tauto.
+  }
+  induction (n_out temp) as [ | hd tl IH ].
+  2:{
+    refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclOutput Result.DeclOutput)]).
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_locals temp))) as [ _ | nloc ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclOutput Result.DeclLocal)]).
+    refine (Result.Ok _).
+    rewrite !map_app, !in_app_iff; tauto.
+  }
+  induction (n_locals temp) as [ | hd tl IH ].
+  2:{
+    refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
+    destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclLocal Result.DeclLocal)]).
+    refine (Result.Ok _).
+    rewrite !map_app, !in_app_iff; tauto.
+  }
+  exact (Result.Ok (NoDup_nil _)).
 Defined.
 
-
-Definition n_no_einputs_in_other (l: Result.location) (temp: common_temp) (body: list Target.equation):
-  Result.t Target.type (Forall (fun '(name, existT _ _ exp) => ~ In name (map fst (n_in temp)) -> Target.has_einput exp = false) body).
-Proof.
-  refine (Result.list_map _ _).
-  intros [n [ty e]].
-  refine (match ListDec.In_dec PeanoNat.Nat.eq_dec _ _ with left h => Result.Ok (fun f => False_ind _ (f h)) | right h => _ end).
-  destruct (Target.has_einput e); [ refine (Result.Err [(l, Result.InternalError "Non-input equation contains an EInput")]) | left; reflexivity ].
-Defined.
 
 Lemma forall_type_dec : forall (P : Source.type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
 Proof using.
@@ -509,12 +516,8 @@ Definition check_node_prop (entry: Source.node): Result.t Target.type Target.nod
     env := fold_left (fun acc '(n, t) => Dict.add n t acc) (n_in ++ n_out ++ n_loc) (Dict.empty _);
     Henv := Henv;
   |} in
-  do '(exist _ n_body assigned_vars_are_vars) <- check_body temp entry;
-  do '(conj check_assigned (conj n_out_is_not_an_input (conj n_inputs_equations n_no_einputs_in_other))) <-
-    Result.combine_prop (check_assigned_out (Source.n_loc entry) temp n_body) (
-    Result.combine_prop (n_out_is_not_an_input (Source.n_loc entry) temp) (
-    Result.combine_prop (n_inputs_equations (Source.n_loc entry) temp n_body) (
-                        (n_no_einputs_in_other (Source.n_loc entry) temp n_body))));
+  do '(exist _ n_body vars_all_assigned, vars_unique) <-
+    Result.combine (check_body temp entry) (vars_unique (Source.n_loc entry) temp);
   Result.Ok {|
       Target.n_loc := Source.n_loc entry;
       Target.n_name := Source.n_name entry;
@@ -522,11 +525,8 @@ Definition check_node_prop (entry: Source.node): Result.t Target.type Target.nod
       Target.n_out := n_out;
       Target.n_locals := n_loc;
       Target.n_body := n_body;
-      Target.n_assigned_vars_are_vars := assigned_vars_are_vars;
-      Target.n_assigned_out := check_assigned;
-      Target.n_out_is_not_an_input := n_out_is_not_an_input;
-      Target.n_inputs_equations := n_inputs_equations;
-      Target.n_no_einputs_in_other := n_no_einputs_in_other;
+      Target.n_vars_all_assigned := vars_all_assigned;
+      Target.n_vars_unique := vars_unique;
       Target.n_seed := seed;
       Target.n_seed_always_fresh := Hseed;
     |}.

@@ -274,7 +274,6 @@ Defined.
 
 Inductive exp : type -> Set :=
   | EConst: forall {ty}, const ty -> exp ty
-  | EInput: forall (b : binder), exp (binder_ty b)
   | EVar: forall (b : binder), exp (binder_ty b)
   | EUnop: forall {tin tout}, unop tin tout -> exp tin -> exp tout
   | EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> exp ty1 -> exp ty2 -> exp tout
@@ -283,75 +282,57 @@ Inductive exp : type -> Set :=
 
 Lemma exp_inv {ty} (x: exp ty) :
   {c : const ty | x = EConst c} +
-  {b | exists (eq : ty = _), x = eq_rect _ exp (EInput b) _ (eq_sym eq)} +
   {b | exists (eq : ty = _), x = eq_rect _ exp (EVar b) _ (eq_sym eq)} +
   {tin : type & {op : unop tin ty & {e : exp tin | x = EUnop op e}}} +
   {ty1 : type & {ty2 : type & {op : binop ty1 ty2 ty & {e1 : exp ty1 & {e2 : exp ty2 | x = EBinop op e1 e2}}}}} +
   {eb : exp TBool & {et : exp ty & {ef : exp ty | x = EIfte eb et ef}}}.
 Proof using.
   destruct x.
-  1-5: left.
   1-4: left.
   1-3: left.
   1-2: left.
   1-1: left.
-  2-6: right.
+  2-5: right.
   all: try solve [repeat eexists; exact eq_refl].
-  1,2: exists b, eq_refl; exact eq_refl.
+  1: exists b, eq_refl; exact eq_refl.
 Defined.
 Lemma exp_dec {ty} (e1 e2: exp ty) : {e1 = e2} + {e1 <> e2}.
 Proof.
   revert e2.
-  induction e1 as [ ty c | b | b | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1: destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
-    all: right; try destruct H as [eq1 ->]; subst; discriminate.
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    3: right; destruct H as [eq1 ->]; destruct b, b'; cbn in eq1; subst; discriminate.
+  induction e1 as [ ty c | b | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
+  - intros e2; destruct (exp_inv e2) as [ [ [ [
+      (c' & ->) | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    2-5: right; try destruct H as [eq1 ->]; subst; discriminate.
+    destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
+  - intros e2; destruct (exp_inv e2) as [ [ [ [
+      (c' & ->) | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
     1,3-5: right; subst; discriminate.
     destruct b as [n1 ty1], b' as [n2 ty2].
     destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [left|right]; cbn in H; destruct H as [<- ->]; [reflexivity|intros [=f]; exact (ne f)].
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    2: right; destruct H as [eq1 ->]; destruct b, b'; cbn in eq1; subst; discriminate.
-    1,3-5: right; subst; discriminate.
-    destruct b as [n1 ty1], b' as [n2 ty2].
-    destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [left|right]; cbn in H; destruct H as [<- ->]; [reflexivity|intros [=f]; exact (ne f)].
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-3,5-6: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [
+      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1-2,4-5: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (type_dec tin tin') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
     destruct (unop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type f)))].
     destruct (IH e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-4,6: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [
+      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1-3,5: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (type_dec ty1 ty1') as [<-|ne]; [|right; intros [=f _ _ _]; exact (ne f)].
     destruct (type_dec ty2 ty2') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
     destruct (binop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type (sig2T_eq_type f))))].
     destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
-  - intros e2; destruct (exp_inv e2) as [ [ [ [ [
-      (c' & ->) | (b' & H) ] | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
-    1-5: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (exp_inv e2) as [ [ [ [
+      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
+    1-4: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (IHb eb2) as [<-|ne]; [|right; intros [=f]; exact (ne f)].
     destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
 Defined.
-
-Fixpoint has_einput {ty} (e: exp ty): bool :=
-  match e with
-    | EInput _ => true
-    | EConst _ | EVar _ => false
-    | EUnop _ e => has_einput e
-    | EBinop _ e1 e2 => has_einput e1 || has_einput e2
-    | EIfte e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
-  end.
 
 Definition equation : Type := ident * { ty : type & exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
@@ -378,11 +359,8 @@ Record node := mk_node {
   n_vars: list binder := n_in ++ n_out ++ n_locals;
   n_assigned_vars: list binder := map equation_dest n_body;
 
-  n_assigned_vars_are_vars: incl n_assigned_vars n_vars;
-  n_assigned_out: incl n_out n_assigned_vars;
-  n_out_is_not_an_input: Forall (fun b => ~ In (fst b) (map fst n_in)) n_out;
-  n_inputs_equations: incl (List.map (fun '((n, ty) as b) => (n, existT exp ty (EInput b))) n_in) n_body;
-  n_no_einputs_in_other: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_body;
+  n_vars_all_assigned: Permutation n_assigned_vars (n_out ++ n_locals);
+  n_vars_unique: NoDup (map fst n_vars);
   
   n_seed: ident;
   n_seed_always_fresh: forall n, ~ In (iter n next_ident n_seed) (map fst n_vars);
@@ -398,7 +376,6 @@ Definition node_eq (n1 n2: node) :=
 (** ** Semantics *)
 Inductive value : type -> Set :=
   | VConst : forall {ty}, const ty -> value ty
-  | VInput : forall b : binder, value (binder_ty b)
   | VUnop  : forall {ty tout}, unop ty tout -> value ty -> value tout
   | VBinop : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
   | VIfte  : forall {ty}, value TBool -> value ty -> value ty -> value ty
@@ -406,52 +383,44 @@ Inductive value : type -> Set :=
 
 Lemma value_inv {ty} (x: value ty) :
   {c : const ty | x = VConst c} +
-  {b | exists (eq : ty = _), x = eq_rect _ value (VInput b) _ (eq_sym eq)} +
   {tin : type & {op : unop tin ty & {e : value tin | x = VUnop op e}}} +
   {ty1 : type & {ty2 : type & {op : binop ty1 ty2 ty & {e1 : value ty1 & {e2 : value ty2 | x = VBinop op e1 e2}}}}} +
   {eb : value TBool & {et : value ty & {ef : value ty | x = VIfte eb et ef}}}.
 Proof using.
   destruct x.
-  1-4: left.
   1-3: left.
   1-2: left.
   1-1: left.
-  2-5: right.
-  all: try solve [repeat eexists; exact eq_refl].
-  exists b, eq_refl; exact eq_refl.
+  2-4: right.
+  all: repeat eexists; exact eq_refl.
 Defined.
 Lemma value_dec {ty} (e1 e2: value ty) : {e1 = e2} + {e1 <> e2}.
 Proof.
   revert e2.
-  induction e1 as [ ty c | b | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
-  - intros e2; destruct (value_inv e2) as [ [ [ [
-      (c' & ->) | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+  induction e1 as [ ty c | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
+  - intros e2; destruct (value_inv e2) as [ [ [
+      (c' & ->) | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
     1: destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
     all: right; try destruct H as [eq1 ->]; subst; discriminate.
-  - intros e2; destruct (value_inv e2) as [ [ [ [
-      (c' & ->) | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1,3-5: right; subst; discriminate.
-    destruct b as [n1 ty1], b' as [n2 ty2].
-    destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [left|right]; cbn in H; destruct H as [<- ->]; [reflexivity|intros [=f]; exact (ne f)].
-  - intros e2; destruct (value_inv e2) as [ [ [ [
-      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-2,4-5: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (value_inv e2) as [ [ [
+      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1,3-4: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (type_dec tin tin') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
     destruct (unop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type f)))].
     destruct (IH e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [
-      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-3,5: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (value_inv e2) as [ [ [
+      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
+    1-2,4: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (type_dec ty1 ty1') as [<-|ne]; [|right; intros [=f _ _ _]; exact (ne f)].
     destruct (type_dec ty2 ty2') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
     destruct (binop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type (sig2T_eq_type f))))].
     destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [
-      (c' & ->) | (b' & H) ] | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
-    1-4: right; try destruct H as [eq1 ->]; subst; discriminate.
+  - intros e2; destruct (value_inv e2) as [ [ [
+      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
+    1-3: right; try destruct H as [eq1 ->]; subst; discriminate.
     destruct (IHb eb2) as [<-|ne]; [|right; intros [=f]; exact (ne f)].
     destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
     destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
@@ -485,9 +454,6 @@ Qed.
 Inductive sem_exp : history -> forall {ty}, exp ty -> value ty -> Prop :=
   | SeConst (h: history) {ty} (c: const ty):
       sem_exp h (EConst c) (VConst c)
-
-  | SeInput (h : history) (b: binder):
-      sem_exp h (EInput b) (VInput b)
 
   | SeVar (h : history) (b: binder) (v: Stream.t (value (binder_ty b))):
       Dict.maps_to (fst b) (existT _ _ v) h ->
@@ -527,7 +493,6 @@ Qed.
 Fixpoint eval_exp (h: history) {ty} (e: exp ty): option (value ty) :=
   match e with
     | EConst c => Some (VConst c)
-    | EInput b => Some (VInput b)
     | EVar (name, typ) => match Dict.find name h with None => None | Some (existT _ ty' s) => extract_stream _ s end
     | EUnop op e => match eval_exp h e with
       | Some v => Some (VUnop op v)
@@ -550,7 +515,6 @@ Definition is_evaluable (h: history) {ty} (e: exp ty): Prop :=
 Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
     | EConst _ => acc
-    | EInput _ => acc
     | EVar (name, ty) => (name, ty) :: acc
     | EUnop _ e => var_of_exp_aux e acc
     | EBinop _ e1 e2 =>
@@ -565,7 +529,6 @@ Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
 Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
     | EConst _ => acc
-    | EInput _ => acc
     | EVar (name, ty) => (name, ty) :: acc
     | EUnop Uop_pre e => acc
     | EUnop _ e => deps_of_exp_aux e acc
@@ -584,8 +547,7 @@ Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
   var_of_exp_aux e l = var_of_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
-  - reflexivity.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
   - reflexivity.
   - reflexivity.
   - apply IH.
@@ -708,10 +670,8 @@ Lemma exp_with_evaluable_vars_is_evaluable (h: history) {ty} (e: exp ty):
   is_evaluable h e.
 Proof.
   intros H.
-  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ].
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ].
   - exists (VConst c).
-    reflexivity.
-  - exists (VInput b).
     reflexivity.
   - apply Forall_inv, in_history_iff in H.
     destruct H as [ s Hs ].
@@ -752,8 +712,7 @@ Lemma exp_evaluable_have_evaluable_vars (h: history) {ty} (e: exp ty) (v: value 
 Proof.
   intros H.
   revert v H.
-  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
-  - constructor.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
   - constructor.
   - constructor; [ | constructor ].
     apply in_history_iff.
@@ -799,12 +758,9 @@ Proof.
   split.
   - intros H.
     revert v H.
-    induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
+    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
     + inversion H.
       apply SeConst.
-    + inversion H.
-      subst.
-      apply SeInput.
     + cbn in H.
       destruct (Dict.find i h) as [ [ ty' s ] | ] eqn: Heq; [ | discriminate H ].
       unfold extract_stream in H.
@@ -836,13 +792,9 @@ Proof.
       apply SeIfte; assumption.
   - intros H.
     revert v H.
-    induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
+    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
     + inversion H.
       apply sig2T_eq_type in H3, H4.
-      subst.
-      reflexivity.
-    + inversion H.
-      apply sig2T_eq_type in H5.
       subst.
       reflexivity.
     + inversion H; subst.
@@ -878,8 +830,7 @@ Lemma deps_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
   deps_of_exp_aux e l = deps_of_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ ty c | b | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
-  - reflexivity.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
   - reflexivity.
   - reflexivity.
   - destruct op.
@@ -920,9 +871,9 @@ Lemma sub_deps_of_exp_aux_gen {ty} (e: exp ty) (l1 l2: list (ident * type)):
   Sublist l1 l2 -> Sublist l1 (deps_of_exp_aux e l2).
 Proof.
   revert l1 l2.
-  induction e as [ | | b | tin tout u e Ih | ty1 ty2 tout b e1 Ih1 e2 Ih2 | t e1 Ih1 e2 Ih2 e3 Ih3 ].
+  induction e as [ | b | tin tout u e Ih | ty1 ty2 tout b e1 Ih1 e2 Ih2 | t e1 Ih1 e2 Ih2 e3 Ih3 ].
   all: intros l1 l2 s12.
-  1, 2: intros; simpl; assumption.
+  1: intros; simpl; assumption.
   - destruct b.
     constructor 2.
     assumption.
@@ -958,10 +909,8 @@ Lemma deps_var_aux_sublist {ty} (e: exp ty) (lexp: list (ident * type)) (ldeps: 
 Proof.
   revert lexp.
   revert ldeps.
-  induction e as [ | | [] | tin tout u e He | ty1 ty2 tout b e1 H1 e2 H2 | t e1 H1 e2 H2 e3 H3 ].
+  induction e as [ | [] | tin tout u e He | ty1 ty2 tout b e1 H1 e2 H2 | t e1 H1 e2 H2 e3 H3 ].
   all: intros ldeps lexp sub.
-  - simpl.
-    assumption.
   - simpl.
     assumption.
   - simpl.

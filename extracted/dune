@@ -3,12 +3,11 @@
  (extracted_modules
   Ascii
   Bool
-  List ListDec ListDef
+  List ListDef
   Mergesort
   Nat
   Orders
   String
-  ListDec
   Base
   Datatypes
   Dict

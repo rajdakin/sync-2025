@@ -22,8 +22,7 @@ let parse_file filename =
         n_in = args;
         n_out = ret;
         n_locals = locals;
-        n_body =
-          Stdlib.List.map (fun ((id, _) as arg) -> loc, (id, EInput (loc, fst arg))) args @ eqs;
+        n_body = eqs;
       }
   and fail checkpoint =
     close_in inx;
@@ -59,17 +58,8 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.locati
   | BadType (expected, got) ->
       fprintf fmt "expected expression with type in %a, got %a"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_type) expected pp_type got
-  | IncompatibleTypeAssignment (i, t1, t2) ->
-      fprintf fmt "assigned expression with type %a to variable %d with type %a"
-        pp_type t2 i pp_type t1
-  | UndeclaredInput (n, None) ->
-      fprintf fmt "use of undeclared input %s" n
-  | UndeclaredInput (n, Some i) ->
-      fprintf fmt "use of variable %s(%d) as input" n i
   | UndeclaredVariable n ->
       fprintf fmt "use of undeclared variable %s" n
-  | NeverAssigned (n, i, t) ->
-      fprintf fmt "variable %s(%d) with type %a is never assigned to" n i pp_type t
   | MultipleDeclaration (n, i, l1, l2) when l1 = l2 ->
       fprintf fmt "variable %s(%d) is declared multiple times as %s" n i
         (match l1 with DeclInput -> "inputs" | DeclOutput -> "outputs" | DeclLocal -> "locals")
@@ -77,6 +67,14 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.locati
       fprintf fmt "variable %s(%d) is declared multiple times as %s and %s" n i
         (match l1 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
         (match l2 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
+  | MissingAssignment (n, i, t) ->
+      fprintf fmt "variable %s(%d) with type %a is never assigned to" n i pp_type t
+  | IncompatibleTypeAssignment (n, i, t1, t2) ->
+      fprintf fmt "assigned expression with type %a to variable %s(%d) with type %a"
+        pp_type t2 n i pp_type t1
+  | MultipleAssignment (n, i, t) ->
+      fprintf fmt "multiple assignments to variable %s(%d) with type %a"
+        n i pp_type t
   | InternalError e -> fprintf fmt "internal error: %s" e
 
 let () =

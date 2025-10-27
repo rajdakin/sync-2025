@@ -98,7 +98,6 @@ let needs_paren_ternary _parent_op = true
 let rec pp_expr parent_op fmt exp =
   match exp with
   | EConst (_, c) -> fprintf fmt "%a" pp_const c
-  | EInput _ -> ()
   | EVar v -> fprintf fmt "%a" pp_var v
   | EUnop (_, _, op, e) ->
       if needs_paren_unary op parent_op then
@@ -141,15 +140,13 @@ let rec pp_expr parent_op fmt exp =
         fprintf fmt "@[<hv>%a ?@ %a :@ %a@]" (pp_expr (Some TernaryL)) cond
           (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
 
-let is_empty_sassign stmt =
-  match stmt with SAssign (_, EInput _) -> true | _ -> false
+let is_empty_sassign stmt = ignore stmt; false
 
 let get_var_typ var env =
   snd (List.find (fun (name, _) -> name = var) (m_vars env))
 
 let rec pp_stmt env fmt stmt =
   match stmt with
-  | SAssign (_, EInput _) -> ()
   | SAssign ((x, _), e) ->
       fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ x env) pp_ident x
         (pp_expr None) e

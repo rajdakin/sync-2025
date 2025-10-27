@@ -72,45 +72,37 @@ Proof.
   now apply perm_trans with (sort body2).
 Defined.
 
-Definition check_dag_ordered (loc: Result.location) (guess: Target.dag): Result.t Lustre.type (Ordered.t guess).
+Definition check_dag_ordered (loc: Result.location) (guess: Target.dag) (n_in: list (ident * Target.type)):
+  Result.t Lustre.type (Ordered.t guess).
 Proof.
-  induction guess as [| x xs IHguess ].
+  induction guess as [| [ [ i ty ] l ] xs IHguess ].
   { apply Result.Ok, Ordered.nil. }
 
-  inversion IHguess as [| err ].
-  2: { apply Result.Err, err. }
+  refine (Result.bind (Result.combine_prop (Result.combine_prop _ _) IHguess)
+            (fun '(conj (conj H2 H3) H1) => Result.Ok (Ordered.append _ _ _ _ H1 H2 H3))); clear IHguess.
 
-  destruct x as [ [ i ty ] l].
-  destruct (in_dec PeanoNat.Nat.eq_dec i (map (fun '(y, _, _) => y) xs)).
-  { exact (Result.Err [(loc, Result.InternalError "Identifier is in list")]). }
+  1: exact (match in_dec PeanoNat.Nat.eq_dec _ _ with
+      | left _ => Result.Err [(loc, Result.InternalError "Identifier is in list")]
+      | right h => Result.Ok h end).
 
   induction l as [| [ y ty' ] ? IHl ].
-  { apply Result.Ok, Ordered.append; [ assumption | assumption | constructor ]. }
-
-  inversion IHl as [ IHl' | err ].
-  2: { apply Result.Err, err. }
+  1: left; constructor.
+  refine (Result.bind (Result.combine_prop _ IHl) (fun '(conj H1 H2) => Result.Ok (Forall_cons _ H1 H2))); clear IHl.
 
   destruct (in_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (y, ty') (map fst xs)).
   2: { exact (Result.Err [(loc, Result.InternalError "Identifier not bound")]). }
 
-  apply Result.Ok, Ordered.append.
-  { assumption. }
-  { assumption. }
-
-  constructor.
-  { now apply Sorted.in_map_fst. }
-
-  inversion IHl'.
-  assumption.
+  apply Result.Ok.
+  now apply Sorted.in_map_fst.
 Defined.
 
 
 Import Result.notations.
 
 Definition check_order (source guess: Source.node): Result.t Lustre.type Target.node_ordered :=
-  let dag := Target.equations_to_dag (Source.n_body guess) in
+  let dag := Target.equations_to_dag (Source.n_body guess) (Source.n_in guess) in
   do _ <- check_eq_node source guess;
-  do ordered <- check_dag_ordered (Source.n_loc source) dag;
+  do ordered <- check_dag_ordered (Source.n_loc source) dag (Source.n_in guess);
 
   Result.Ok {|
     Target.node_ordered_is_node := guess;

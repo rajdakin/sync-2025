@@ -65,20 +65,10 @@ Inductive binop: Type :=
 
 Inductive exp: Type :=
   | EConst: Result.location -> const -> exp
-  | EInput: Result.location -> binder -> exp
   | EVar: Result.location -> binder -> exp
   | EUnop: Result.location -> unop -> exp -> exp
   | EBinop: Result.location -> binop -> exp -> exp -> exp
   | EIfte: Result.location -> exp -> exp -> exp -> exp.
-
-Fixpoint has_einput (e: exp): bool :=
-  match e with
-    | EInput _ _ => true
-    | EConst _ _ | EVar _ _ => false
-    | EUnop _ _ e => has_einput e
-    | EBinop _ _ e1 e2 => has_einput e1 || has_einput e2
-    | EIfte _ e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
-  end.
 
 Definition equation: Set := string * exp.
 
@@ -294,7 +284,6 @@ Defined.
 Fixpoint exp_eqb (e1 e2: exp): bool :=
   match e1, e2 with
     | EConst _ c1, EConst _ c2 => const_eqb c1 c2
-    | EInput _ b1, EInput _ b2 => binder_eqb b1 b2
     | EVar _ b1, EVar _ b2 => binder_eqb b1 b2
     | EUnop _ op1 e1, EUnop _ op2 e2 =>
       (unop_eqb op1 op2) && (exp_eqb e1 e2)
@@ -307,7 +296,6 @@ Fixpoint exp_eqb (e1 e2: exp): bool :=
 
 Inductive exp_eq : exp -> exp -> Prop :=
   | EeqConst : forall {l1 l2 c}, exp_eq (EConst l1 c) (EConst l2 c)
-  | EeqInput : forall {l1 l2 b}, exp_eq (EInput l1 b) (EInput l2 b)
   | EeqVar : forall {l1 l2 b}, exp_eq (EVar l1 b) (EVar l2 b)
   | EeqUnop : forall {l1 l2 op e1 e2}, exp_eq e1 e2 -> exp_eq (EUnop l1 op e1) (EUnop l2 op e2)
   | EeqBinop : forall {l1 l2 op e11 e12 e21 e22}, exp_eq e11 e21 -> exp_eq e12 e22 -> exp_eq (EBinop l1 op e11 e12) (EBinop l2 op e21 e22)
@@ -328,13 +316,6 @@ Proof.
   - destruct (const_dec c c0) as [c_c0 |].
     + left.
       rewrite c_c0.
-      constructor.
-    + right.
-      inversion 1.
-      contradiction.
-  - destruct (binder_dec b b0) as [b_b0 |].
-    + left.
-      rewrite b_b0.
       constructor.
     + right.
       inversion 1.
@@ -411,7 +392,6 @@ Proof.
   induction e.
   - apply const_eqb_refl.
   - apply binder_eqb_refl.
-  - apply binder_eqb_refl.
   - apply andb_true_intro.
     split; [ | assumption ].
     apply unop_eqb_refl.
@@ -431,12 +411,9 @@ Proof.
   split.
   - intro H.
     revert e2 H.
-    induction e1 as [ l1 c1 | l1 b1 | l1 b1 | l1 op1 e1 IH | l1 op1 e11 IH1 e12 IH2 | l1 e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
+    induction e1 as [ l1 c1 | l1 b1 | l1 op1 e1 IH | l1 op1 e11 IH1 e12 IH2 | l1 e11 IH1 e12 IH2 e13 IH3 ]; intros e2 H.
     all: destruct e2; try inversion H.
     + apply const_eqb_eq in H1.
-      subst.
-      constructor.
-    + apply binder_eqb_eq in H1.
       subst.
       constructor.
     + apply binder_eqb_eq in H1.
@@ -463,7 +440,7 @@ Proof.
   - intros H.
     induction H.
     1: exact (const_eqb_refl _).
-    1,2: exact (binder_eqb_refl _).
+    1: exact (binder_eqb_refl _).
     1: cbn; rewrite IHexp_eq, Bool.andb_true_r; exact (unop_eqb_refl _).
     1: cbn; rewrite IHexp_eq1, IHexp_eq2, !Bool.andb_true_r; exact (binop_eqb_refl _).
     cbn; rewrite IHexp_eq1, IHexp_eq2; exact IHexp_eq3.

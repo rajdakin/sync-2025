@@ -9,7 +9,6 @@ Module LustreTiming := LustreTiming.
 Fixpoint expr_to_raw {ty} (e: Lustre.exp ty): LustreTiming.raw_exp ty :=
   match e with
     | Lustre.EConst c => LustreTiming.Raw_EConst c
-    | Lustre.EInput b => LustreTiming.Raw_EInput b
     | Lustre.EVar v => LustreTiming.Raw_EVar v
     | Lustre.EIfte e1 e2 e3 => LustreTiming.Raw_EIfte (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
     | Lustre.EUnop u e => match u in Lustre.unop tin tout return LustreTiming.raw_exp tin -> LustreTiming.raw_exp tout with
@@ -91,7 +90,7 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (ident_origin: ident): 
 
 Definition translate_node (node: Lustre.node) (ident_origin: ident) : LustreTiming.node.
 Proof.
-  destruct node as [n_loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_assigned_vars_are_vars n_assigned_out n_out_is_not_an_input n_inputs_equations n_no_einputs_in_other ].
+  destruct node as [n_loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_vars_all_assigned n_vars_unique n_seed n_seed_always_fresh ].
 
   destruct (translate_equations n_body ident_origin) as [
     [[[[[init_eqs
@@ -115,7 +114,8 @@ Proof.
 
   all: subst n_vars n_assigned_vars.
 
-  - clear -translation n_assigned_vars_are_vars.
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_assigned_vars_are_vars.
     rewrite map_app.
     induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
     + unfold translate_equations in translation.
@@ -228,8 +228,9 @@ Proof.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
         injection eqe as <- <- <- <- <- <- <-.
-        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
-  - clear -translation n_assigned_vars_are_vars.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))). *)
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_assigned_vars_are_vars.
     induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
     + unfold translate_equations in translation.
       injection translation as <- <- <- <- <- <- <-.
@@ -305,8 +306,9 @@ Proof.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
         injection eqe as <- <- <- <- <- <- <-.
-        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
-  - clear -translation n_assigned_vars_are_vars.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))). *)
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_assigned_vars_are_vars.
     rewrite map_app.
     induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
     + unfold translate_equations in translation.
@@ -419,8 +421,9 @@ Proof.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
         injection eqe as <- <- <- <- <- <- <-.
-        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))).
-  - clear -translation n_assigned_out.
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold IHn_body))). *)
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_assigned_out.
     induction n_out in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_out |- *.
     1: apply incl_nil_l.
     apply incl_cons_inv in n_assigned_out.
@@ -491,8 +494,9 @@ Proof.
       destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
       destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
       injection translation as <- <- <- <- <- <- <-.
-      refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))).
-  - clear -translation n_assigned_out.
+      refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))). *)
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_assigned_out.
     rewrite map_app.
     induction n_out in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_out |- *.
     1: apply incl_nil_l.
@@ -562,10 +566,12 @@ Proof.
       destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
       destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
       injection translation as <- <- <- <- <- <- <-.
-      refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))).
+      refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))). *)
 
-  - assumption.
-  - clear -translation n_inputs_equations.
+  - apply ABORT_FIXME; exact tt.
+    (* assumption. *)
+  - apply ABORT_FIXME; exact tt.
+    (* clear -translation n_inputs_equations.
     induction n_in in n_body, n_inputs_equations, ident_origin, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, translation |- *.
     1: apply incl_nil_l.
     rewrite map_cons in n_inputs_equations.
@@ -641,7 +647,7 @@ Proof.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e2) ident_e1 binders_e1 eqs_e1 init_e1 step_e1) as [[[[[[? ?] ident_e2] binders_e2] eqs_e2] init_e2] step_e2] eqn: e2_unfold.
         destruct (@LustreTiming.raw_to_comb_aux t (@expr_to_raw t e3) ident_e2 binders_e2 eqs_e2 init_e2 step_e2) as [[[[[[]]]]]] eqn: e3_unfold.
         injection translation as <- <- <- <- <- <- <-.
-        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))).
+        refine (IHe3 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e3_unfold (IHe2 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e2_unfold (IHe1 _ _ _ _ _ _ _ _ _ _ _ _ _ _ e1_unfold in_post_init))). *)
   (* EInput, will be changed later *)
   - apply ABORT_FIXME; exact tt.
   - apply ABORT_FIXME; exact tt.
