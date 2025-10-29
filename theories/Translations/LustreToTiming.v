@@ -1,6 +1,9 @@
 From Reactive Require Import Base.
 From Reactive.Languages Require Lustre LustreTiming.
 From Reactive.Datatypes Require Import Inclusion.
+From Reactive.Datatypes Require Import PermutationProps.
+
+From Stdlib Require Import Permutation.
 
 Module Lustre := Lustre.
 Module LustreTiming := LustreTiming.
@@ -88,14 +91,31 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (ident_origin: ident): 
     end.
 
 
-Definition translate_node (node: Lustre.node) (ident_origin: ident) : LustreTiming.node.
+Definition translate_node (node: Lustre.node) : LustreTiming.node.
 Proof.
-  destruct node as [n_loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_vars_all_assigned n_vars_unique n_seed n_seed_always_fresh ].
+  destruct node as [
+    n_loc
+    n_name
 
-  destruct (translate_equations n_body ident_origin) as [
+    n_in
+    n_out
+    n_locals
+    n_body
+    
+    n_vars
+    n_assigned_vars
+    
+    n_vars_all_assigned
+    n_vars_unique
+    
+    n_seed
+    n_seed_always_fresh
+  ].
+
+  destruct (translate_equations n_body n_seed) as [
     [[[[[init_eqs
     step_eqs]
-    new_ident_origin]
+    new_seed]
     pre_binders]
     pre_eqs]
     init_post_eqs]
@@ -103,26 +123,137 @@ Proof.
   ] eqn: translation.
 
   refine {|
+    LustreTiming.n_loc := n_loc;
     LustreTiming.n_name := n_name;
+
     LustreTiming.n_in := n_in;
     LustreTiming.n_out := n_out;
     LustreTiming.n_locals := pre_binders ++ n_locals;
     LustreTiming.n_pre := pre_eqs;
     LustreTiming.n_init := init_eqs ++ init_post_eqs;
     LustreTiming.n_step := step_eqs ++ step_post_eqs;
+
+    LustreTiming.n_seed := new_seed;
   |}.
 
   all: subst n_vars n_assigned_vars.
 
-  - apply ABORT_FIXME; exact tt.
-    (* clear -translation n_assigned_vars_are_vars.
-    rewrite map_app.
-    induction n_body in translation, init_eqs, step_eqs, new_ident_origin, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, ident_origin, n_assigned_vars_are_vars |- *.
+  - clear -translation n_vars_all_assigned n_vars_unique.
+
+    apply NoDup_map_inv in n_vars_unique.
+
+    induction n_body as [ | eq n_body IHn] in translation, n_vars_unique, init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs, n_seed, n_vars_all_assigned, n_out, n_locals |- *.
     + unfold translate_equations in translation.
       injection translation as <- <- <- <- <- <- <-.
       simpl.
-      intros ? [].
-    + assert (H := n_assigned_vars_are_vars).
+      destruct n_out, n_locals; simpl in n_vars_all_assigned.
+      1: apply perm_nil.
+      all: apply Permutation_nil_cons in n_vars_all_assigned.
+      all: contradiction.
+    + destruct eq as [eq_ident [ty eq_expr]].
+      cbn in translation.
+      destruct (translate_equations n_body n_seed) as [[[[[[init_eqs0 step_eqs0] new_seed_0] pre_binders0] pre_eqs0] init_post_eqs0] step_post_eqs0] eqn: eq_trans_eq.
+      destruct (@translate_expr_aux ty eq_expr new_seed_0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei es] new_seed_bis] binders] equations_pre] init_equations_post] step_equations_post] eqn: eqe.
+      injection translation as <- <- <- <- <- <- <-.
+
+      rewrite map_cons in n_vars_all_assigned.
+      unfold Lustre.equation_dest at 1, fst, snd, projT1 in n_vars_all_assigned.
+
+      rewrite map_app.
+      rewrite map_cons.
+      unfold LustreTiming.equation_dest at 2, fst, snd, projT1.
+
+      specialize (IHn [] (map Lustre.equation_dest n_body)).
+      simpl in IHn.
+      specialize (IHn (Permutation_refl (map Lustre.equation_dest n_body))).
+
+      assert (nodup_IH := n_vars_unique).
+      rewrite (Permutation_sym n_vars_all_assigned) in nodup_IH.
+
+      assert (nodup_2 := nodup_IH).
+      apply NoDup_app_remove_l in nodup_2.
+      apply (permutation_nodup_remove_cons Lustre.binder_dec _ _ _ n_vars_all_assigned) in nodup_2.
+
+      apply NoDup_remove_1 in nodup_IH.
+      specialize (IHn nodup_IH _ _ _ _ _ _ _ _ eq_trans_eq).
+      clear nodup_IH.
+
+      rewrite map_app in IHn.
+      rewrite nodup_2 in IHn.
+
+      assert (eq_in_out_locals := n_vars_all_assigned).
+
+      apply (Permutation_in (eq_ident, ty)) in eq_in_out_locals.
+      2: left; reflexivity.
+
+      assert (nodup_out_locals := NoDup_app_remove_l _ _ n_vars_unique).
+
+      assert (
+        permut_add_out := add_removed Lustre.binder_dec _ _ eq_in_out_locals nodup_out_locals
+      ).
+      clear eq_in_out_locals nodup_out_locals.
+
+      rewrite (Permutation_app_comm binders n_locals).
+      simpl.
+      rewrite app_assoc.
+      rewrite permut_add_out.
+      simpl.
+      rewrite <- Permutation_middle.
+
+      apply perm_skip.
+      
+      rewrite (Permutation_app_comm _ binders).
+
+      clear -eqe IHn.
+
+      revert eqe.
+
+      induction eq_expr.
+      all: intro eqe.
+      * unfold translate_expr_aux in eqe.
+        simpl in eqe.
+        injection eqe as <- <- <- <- <- <- <-.
+        assumption.
+      * unfold translate_expr_aux in eqe.
+        simpl in eqe.
+        injection eqe as <- <- <- <- <- <- <-.
+        assumption.
+      * destruct u.
+        -- unfold translate_expr_aux in eqe.
+           simpl in eqe.
+           destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt eq_expr) new_seed_0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei1 es1] new_seed_1] pre_binders1] pre_eqs1] init_post_eqs1] step_post_eqs1] eqn: unfold1.
+           injection eqe as <- <- <- <- <- <- <-.
+           specialize (IHeq_expr _ _ IHn unfold1).
+           assumption.
+        -- unfold translate_expr_aux in eqe.
+           simpl in eqe.
+           destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TInt (@expr_to_raw Lustre.TInt eq_expr) new_seed_0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei1 es1] new_seed_1] pre_binders1] pre_eqs1] init_post_eqs1] step_post_eqs1] eqn: unfold1.
+           injection eqe as <- <- <- <- <- <- <-.
+           specialize (IHeq_expr _ _ IHn unfold1).
+           assumption.
+        -- unfold translate_expr_aux in eqe.
+           simpl in eqe.
+           destruct (@LustreTiming.raw_to_comb_aux Lustre.TInt (@expr_to_raw Lustre.TInt eq_expr) new_seed_0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei1 es1] new_seed_1] pre_binders1] pre_eqs1] init_post_eqs1] step_post_eqs1] eqn: unfold1.
+           injection eqe as <- <- <- <- <- <- <-.
+
+           simpl.
+           unfold LustreTiming.equation_dest at 1 4, fst, snd, projT1.
+           apply perm_skip.
+           do 2 rewrite <- Permutation_middle.
+           apply perm_skip.
+           admit.
+      * destruct b.
+        -- unfold translate_expr_aux in eqe.
+           simpl in eqe.
+           destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool eq_expr1) new_seed_0 pre_binders0 pre_eqs0 init_post_eqs0 step_post_eqs0) as [[[[[[ei1 es1] new_seed_1] pre_binders1] pre_eqs1] init_post_eqs1] step_post_eqs1] eqn: unfold1.
+           destruct (@LustreTiming.raw_to_comb_aux LustreTiming.TBool (@expr_to_raw Lustre.TBool eq_expr2) new_seed_1 pre_binders1 pre_eqs1 init_post_eqs1 step_post_eqs1) as [[[[[[ei2 es2] new_seed_2] pre_binders2] pre_eqs2] init_post_eqs2] step_post_eqs2] eqn: unfold2.
+           injection eqe as <- <- <- <- <- <- <-.
+           specialize (IHeq_expr1 _ _ IHn unfold1).
+           
+
+      Search Permutation app.
+    (*
+    assert (H := n_vars_all_assigned).
       rewrite map_cons in H.
       apply incl_cons_inv in H.
       destruct H as [ina incl_nbody].
