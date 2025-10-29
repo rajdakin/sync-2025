@@ -2,6 +2,8 @@ From Reactive Require Import Base.
 From Reactive.Datatypes Require Ordered.
 From Reactive.Languages Require Lustre.
 
+From Stdlib Require Import Permutation.
+
 Module Lustre := Lustre.
 
 Definition type := Lustre.type.
@@ -40,7 +42,6 @@ Inductive binop: type -> type -> type -> Set :=
 
 Inductive raw_exp : type -> Set :=
   | Raw_EConst: forall {ty}, const ty -> raw_exp ty
-  | Raw_EInput: forall (b: binder), raw_exp (binder_ty b)
   | Raw_EVar: forall (b: binder), raw_exp (binder_ty b)
   | Raw_EUnop: forall {tin tout}, unop tin tout -> raw_exp tin -> raw_exp tout
   | Raw_EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> raw_exp ty1 -> raw_exp ty2 -> raw_exp tout
@@ -51,7 +52,6 @@ Inductive raw_exp : type -> Set :=
 
 Inductive comb_exp : type -> Set :=
   | EConst: forall {ty}, const ty -> comb_exp ty
-  | EInput: forall (b: binder), comb_exp (binder_ty b)
   | EVar: forall (b: binder), comb_exp (binder_ty b)
   | EUnop: forall {tin tout}, unop tin tout -> comb_exp tin -> comb_exp tout
   | EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> comb_exp ty1 -> comb_exp ty2 -> comb_exp tout
@@ -61,16 +61,8 @@ Inductive comb_exp : type -> Set :=
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
 
-Fixpoint has_einput {ty} (e: comb_exp ty): bool :=
-  match e with
-    | EInput _ => true
-    | EConst _ | EVar _ => false
-    | EUnop _ e => has_einput e
-    | EBinop _ e1 e2 => has_einput e1 || has_einput e2
-    | EIfte e1 e2 e3 => has_einput e1 || has_einput e2 || has_einput e3
-  end.
-
 Record node := mk_node {
+  n_loc: Result.location;
   n_name: string;
 
   n_in: list binder;
@@ -85,22 +77,13 @@ Record node := mk_node {
   n_assigned_vars_pre: list binder := map equation_dest n_pre;
   n_assigned_vars_step: list binder := map equation_dest n_step;
 
-  n_assigned_vars_init_are_vars: incl n_assigned_vars_init n_vars;
-  n_assigned_vars_pre_are_vars: incl n_assigned_vars_pre n_vars;
-  n_assigned_vars_step_are_vars: incl n_assigned_vars_step n_vars;
+  n_init_vars_all_assigned: Permutation (n_assigned_vars_pre ++ n_assigned_vars_init) (n_out ++ n_locals);
+  n_step_vars_all_assigned: Permutation (n_assigned_vars_pre ++ n_assigned_vars_step) (n_out ++ n_locals);
 
-  n_assigned_out_init: incl n_out n_assigned_vars_init;
-  n_assigned_out_step: incl n_out n_assigned_vars_step;
+  n_vars_unique: NoDup (map fst n_vars);
 
-  n_out_is_not_an_input: Forall (fun b => ~ In (fst b) (map fst n_in)) n_out;
-
-  n_inputs_equations_init: incl (List.map (fun '((n, ty) as b) => (n, existT comb_exp ty (EInput b))) n_in) n_init;
-  n_inputs_equations_step: incl (List.map (fun '((n, ty) as b) => (n, existT comb_exp ty (EInput b))) n_in) n_step;
-
-  n_no_einputs_in_other_init: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_init;
-  n_no_einputs_in_other_step: Forall (fun '(name, existT _ ty exp) => ~ In name (map fst n_in) -> has_einput exp = false) n_step;
-
-  n_no_einputs_in_pre: Forall (fun '(name, existT _ ty exp) => has_einput exp = false) n_pre;
+  n_seed: ident;
+  n_seed_always_fresh:  forall n, ~ In (iter n next_ident n_seed) (map fst n_vars);
 }.
 
 
@@ -126,7 +109,6 @@ Fixpoint raw_to_comb_aux {ty} (exp: raw_exp ty) (ident_origin: ident) (pre_binde
   ) :=
   match exp with
     | Raw_EConst c => (EConst c, EConst c, ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations)
-    | Raw_EInput e => (EInput e, EInput e, ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations)
     | Raw_EVar v => (EVar v, EVar v, ident_origin, pre_binders, pre_equations, init_post_equations, step_post_equations)
     | Raw_EUnop u e => let '(ei, es, orig, binders, equations_pre, init_equations_post, step_equations_post) := raw_to_comb_aux e ident_origin pre_binders pre_equations init_post_equations step_post_equations in
       (EUnop u ei, EUnop u es, orig, binders, equations_pre, init_equations_post, step_equations_post)
