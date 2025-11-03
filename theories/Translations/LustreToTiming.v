@@ -238,10 +238,13 @@ Proof.
 
            simpl.
            unfold LustreTiming.equation_dest at 1 4, fst, snd, projT1.
-           apply perm_skip.
-           do 2 rewrite <- Permutation_middle.
-           apply perm_skip.
-           admit.
+           simpl in IHeq_expr.
+           unfold LustreTiming.equation_dest at 4 7, fst, snd, projT1 in IHeq_expr.
+           eapply IHeq_expr.
+           1: assumption.
+           unfold translate_expr_aux.
+           rewrite unfold1.
+           split.
       * destruct b.
         -- unfold translate_expr_aux in eqe.
            simpl in eqe.
