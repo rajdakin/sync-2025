@@ -95,4 +95,6 @@ Definition incl_dec {A : Type} (dec : forall x y : A, {x = y} + {x <> y}) : fora
 Definition dec_not {P : Prop} : {P} + {~P} -> {~P} + {~ ~P} :=
   fun dec => match dec with left h => right (fun nP => nP h) | right h => left h end.
 
+Definition freshness {A} (seed: ident) (vars: list (ident * A)) := forall n, ~In (iter n next_ident seed) (map fst vars).
+
 Axiom ABORT_FIXME : forall A : Type, unit -> A.

@@ -1,5 +1,5 @@
 From Reactive Require Import Base.
-From Reactive.Datatypes Require Ordered.
+From Reactive.Datatypes Require Import Freshness.
 From Reactive.Languages Require Lustre.
 
 From Stdlib Require Import Permutation.
@@ -87,8 +87,6 @@ Record node := mk_node {
   n_seed_always_fresh: forall n, ~In (iter n next_ident n_seed) (map fst n_vars);
 }.
 
-Definition freshness (seed: ident) (vars: list binder) := forall n, ~In (iter n next_ident seed) (map fst vars).
-
 
 (* Translation from raw expressions to combinatorial expressions, extracting pre and arrow *)
 
@@ -141,36 +139,6 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
   end.
 
 (** Properties *)
-Lemma freshness_fusion {seed: ident} {vars1 vars2: list binder}:
-  freshness seed vars1 -> freshness seed vars2 -> freshness seed (vars1 ++ vars2).
-Proof.
-  intros fresh1 fresh2 n.
-  specialize (fresh1 n).
-  specialize (fresh2 n).
-  rewrite map_app.
-  intro isin.
-  apply in_app_or in isin.
-  tauto.
-Qed.
-
-Lemma freshness_later {seed1 seed2: ident} {n: nat} {vars: list binder}:
-  seed2 = iter n next_ident seed1 -> freshness seed1 vars -> freshness seed2 vars.
-Proof.
-  intros fresh1 isiter.
-  intro m.
-  specialize (isiter (m + n)).
-  rewrite Nat.iter_add in isiter.
-  rewrite <- fresh1 in isiter.
-  assumption.
-Qed.
-
-Lemma freshness_later_e {seed1 seed2: ident} {vars: list binder}:
-  (exists n, seed2 = iter n next_ident seed1) -> freshness seed1 vars -> freshness seed2 vars.
-Proof.
-  intros [n isiter].
-  apply (freshness_later isiter).
-Qed.
-
 Lemma raw_to_comb_nextseed {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
   raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> exists n, seed' = iter n next_ident seed.

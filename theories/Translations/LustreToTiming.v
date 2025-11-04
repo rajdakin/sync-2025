@@ -1,7 +1,6 @@
 From Reactive Require Import Base.
 From Reactive.Languages Require Lustre LustreTiming.
-From Reactive.Datatypes Require Import Inclusion.
-From Reactive.Datatypes Require Import PermutationProps.
+From Reactive.Datatypes Require Import Freshness PermutationProps.
 
 From Stdlib Require Import Permutation.
 From Stdlib.Arith Require Import PeanoNat.
@@ -66,7 +65,7 @@ Qed.
 
 Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> LustreTiming.freshness seed' pre_binders.
+  -> freshness seed' pre_binders.
 Proof.
   apply LustreTiming.freshness_raw_to_comb.
 Qed.
@@ -158,7 +157,7 @@ Qed.
 
 Lemma freshness_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> LustreTiming.freshness seed' pre_binders.
+  -> freshness seed' pre_binders.
 Proof.
   intro translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -173,8 +172,8 @@ Proof.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     assert (freshness_expr := freshness_translate_expr unfoldexpr).
     assert (nextseed_expr := translate_expr_nextseed unfoldexpr).
-    apply (LustreTiming.freshness_later_e nextseed_expr) in IH.
-    apply (LustreTiming.freshness_fusion freshness_expr IH).
+    apply (freshness_later_e nextseed_expr) in IH.
+    apply (freshness_fusion freshness_expr IH).
 Qed.
 
 Lemma isnext_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
