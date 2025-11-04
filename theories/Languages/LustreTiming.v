@@ -303,3 +303,409 @@ Proof.
     apply (freshness_later_e nextseed) in IHexp1.
     apply (freshness_fusion IHexp1 IHexp2).
 Qed.
+
+Lemma isnext_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
+Proof.
+  intros eqe.
+  induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
+  - injection eqe as <- <- <- <- <- <- <-.
+    intros.
+    contradiction.
+  - injection eqe as <- <- <- <- <- <- <-.
+    intros.
+    contradiction.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    apply (IHexp _ _ _ _ _ _ _ _ unfold1).
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    intros x isin.
+    rewrite map_app in isin.
+    apply in_app_or in isin.
+    specialize (IHexp1 x).
+    specialize (IHexp2 x).
+    destruct isin as [isin | isin].
+    1: tauto.
+    specialize (IHexp2 isin).
+    assert (nextseed := raw_to_comb_nextseed unfold1).
+    destruct nextseed as [nseed nextseed].
+    rewrite nextseed in IHexp2.
+    destruct IHexp2 as [n2 IHexp2].
+    rewrite <- Nat.iter_add in IHexp2.
+    exists (n2 + nseed).
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    destruct (raw_to_comb exp3 seed2) as [[[[[[ei3 es3] seed3] binders3] pre_eqs3] init_post3] step_post3] eqn: unfold3.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
+
+    assert (nextseed1 := raw_to_comb_nextseed unfold1).
+    assert (nextseed2 := raw_to_comb_nextseed unfold2).
+
+    intros x isin.
+    specialize (IHexp1 x).
+    specialize (IHexp2 x).
+    specialize (IHexp3 x).
+    destruct nextseed1 as [nseed1 nextseed1].
+    destruct nextseed2 as [nseed2 nextseed2].
+    rewrite nextseed1 in IHexp2.
+    rewrite nextseed2 in IHexp3.
+    rewrite nextseed1 in IHexp3.
+    rewrite !map_app in isin.
+    rewrite !in_app_iff in isin.
+    destruct isin as [isin | [isin | isin]].
+    + tauto.
+    + specialize (IHexp2 isin).
+      destruct IHexp2 as [n IH].
+      rewrite <- Nat.iter_add in IH.
+      exists (n + nseed1).
+      assumption.
+    + specialize (IHexp3 isin).
+      destruct IHexp3 as [n IH].
+      do 2 rewrite <- Nat.iter_add in IH.
+      exists (n + nseed2 + nseed1).
+      assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
+    intros x isin.
+    specialize (IHexp x).
+    assert (nextseed := raw_to_comb_nextseed unfold1).
+    destruct nextseed as [nseed nextseed].
+    rewrite !map_cons in isin.
+    unfold fst at 1 2 in isin.
+    destruct isin as [isseed | [isnext | isin]]; subst.
+    + exists nseed.
+      reflexivity.
+    + exists (S nseed).
+      reflexivity.
+    + tauto.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    intros x isin.
+    rewrite map_app in isin.
+    apply in_app_or in isin.
+    specialize (IHexp1 x).
+    specialize (IHexp2 x).
+    destruct isin as [isin | isin].
+    1: tauto.
+    specialize (IHexp2 isin).
+    assert (nextseed := raw_to_comb_nextseed unfold1).
+    destruct nextseed as [nseed nextseed].
+    rewrite nextseed in IHexp2.
+    destruct IHexp2 as [n2 IHexp2].
+    rewrite <- Nat.iter_add in IHexp2.
+    exists (n2 + nseed).
+    assumption.
+Qed.
+
+Lemma nodup_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> NoDup (map fst pre_binders).
+Proof.
+  intros eqe.
+  induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply NoDup_nil.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply NoDup_nil.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    apply (IHexp _ _ _ _ _ _ _ _ unfold1).
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    assert (freshness1 := freshness_raw_to_comb unfold1).
+    rewrite map_app.
+    apply NoDup_app.
+    1, 2: assumption.
+    intros x isin1 isin2.
+    assert (isnext := isnext_raw_to_comb unfold2 x isin2).
+    destruct isnext as [n isnext].
+    apply (freshness1 n).
+    rewrite <- isnext.
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    destruct (raw_to_comb exp3 seed2) as [[[[[[ei3 es3] seed3] binders3] pre_eqs3] init_post3] step_post3] eqn: unfold3.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
+    assert (freshness1 := freshness_raw_to_comb unfold1).
+    assert (freshness2 := freshness_raw_to_comb unfold2).
+    assert (nextseed := raw_to_comb_nextseed unfold2).
+    destruct nextseed as [nseed nextseed].
+    rewrite !map_app.
+    apply NoDup_app.
+    + assumption.
+    + apply NoDup_app.
+      1,2: assumption.
+      intros x isin2 isin3.
+      assert (isnext := isnext_raw_to_comb unfold3 x isin3).
+      destruct isnext as [n isnext].
+      apply (freshness2 n).
+      rewrite <- isnext.
+      assumption.
+    + intros x isin1 isin23.
+      apply in_app_or in isin23.
+      destruct isin23 as [isin2 | isin3].
+      * assert (isnext := isnext_raw_to_comb unfold2 x isin2).
+        destruct isnext as [n isnext].
+        apply (freshness1 n).
+        rewrite <- isnext.
+        assumption.
+      * assert (isnext := isnext_raw_to_comb unfold3 x isin3).
+        destruct isnext as [n isnext].
+        rewrite nextseed in isnext.
+        rewrite <- Nat.iter_add in isnext.
+        apply (freshness1 (n + nseed)).
+        rewrite <- isnext.
+        assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
+    assert (freshness := freshness_raw_to_comb unfold1).
+    rewrite !map_cons.
+    unfold fst at 1 2.
+    apply NoDup_cons.
+    + intro isin.
+      destruct isin as [f|isin].
+      * inversion f as [ff].
+        symmetry in ff.
+        apply (ident_diff _ 0) in ff.
+        assumption.
+      * apply (freshness 0).
+        assumption.
+    + apply NoDup_cons.
+      2: assumption.
+      intro isin.
+      apply (freshness 1).
+      assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    assert (freshness1 := freshness_raw_to_comb unfold1).
+    rewrite map_app.
+    apply NoDup_app.
+    1, 2: assumption.
+    intros x isin1 isin2.
+    assert (isnext := isnext_raw_to_comb unfold2 x isin2).
+    destruct isnext as [n isnext].
+    apply (freshness1 n).
+    rewrite <- isnext.
+    assumption.
+Qed.
+
+Lemma raw_to_comb_assigned_init {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> Permutation (map equation_dest (pre_eqs ++ init_post)) pre_binders.
+Proof.
+  intro eqe.
+  induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply perm_nil.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply perm_nil.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    apply (IHexp _ _ _ _ _ _ _ _ unfold1).
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite <- app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest init_post2)).
+    apply Permutation_app.
+    all: assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    destruct (raw_to_comb exp3 seed2) as [[[[[[ei3 es3] seed3] binders3] pre_eqs3] init_post3] step_post3] eqn: unfold3.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite map_app in IHexp3.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs2)).
+    rewrite <- !app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite !app_assoc.
+    rewrite <- app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest init_post3)).
+    rewrite IHexp3.
+    rewrite (Permutation_app_comm _ (map equation_dest init_post2)).
+    rewrite !app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest init_post2)).
+    rewrite IHexp2.
+    rewrite (Permutation_app_comm _ (map equation_dest init_post1)).
+    rewrite (Permutation_app_comm binders2).
+    rewrite !app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest init_post1)).
+    rewrite IHexp1.
+    apply Permutation_refl.
+  - simpl in eqe.
+    destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
+    rewrite !map_app.
+    rewrite map_app in IHexp.
+    rewrite !map_cons.
+    unfold equation_dest at 1 3, fst, snd, projT1.
+    rewrite <- !Permutation_middle.
+    simpl.
+    rewrite perm_swap.
+    do 2 apply perm_skip.
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite <- app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest init_post2)).
+    apply Permutation_app.
+    all: assumption.
+Qed.
+
+Lemma raw_to_comb_assigned_step {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> Permutation (map equation_dest (pre_eqs ++ step_post)) pre_binders.
+Proof.
+  intro eqe.
+  induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply perm_nil.
+  - injection eqe as <- <- <- <- <- <- <-.
+    apply perm_nil.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    apply (IHexp _ _ _ _ _ _ _ _ unfold1).
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite <- app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest step_post2)).
+    apply Permutation_app.
+    all: assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    destruct (raw_to_comb exp3 seed2) as [[[[[[ei3 es3] seed3] binders3] pre_eqs3] init_post3] step_post3] eqn: unfold3.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite map_app in IHexp3.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs2)).
+    rewrite <- !app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite !app_assoc.
+    rewrite <- app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest step_post3)).
+    rewrite IHexp3.
+    rewrite (Permutation_app_comm _ (map equation_dest step_post2)).
+    rewrite !app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest step_post2)).
+    rewrite IHexp2.
+    rewrite (Permutation_app_comm _ (map equation_dest step_post1)).
+    rewrite (Permutation_app_comm binders2).
+    rewrite !app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest step_post1)).
+    rewrite IHexp1.
+    apply Permutation_refl.
+  - simpl in eqe.
+    destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
+    rewrite !map_app.
+    rewrite map_app in IHexp.
+    rewrite !map_cons.
+    unfold equation_dest at 1 3, fst, snd, projT1.
+    rewrite <- !Permutation_middle.
+    simpl.
+    rewrite perm_swap.
+    do 2 apply perm_skip.
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
+    rewrite !map_app.
+    rewrite map_app in IHexp1.
+    rewrite map_app in IHexp2.
+    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
+    rewrite <- app_assoc.
+    rewrite Permutation_app_comm.
+    rewrite <- !app_assoc.
+    rewrite app_assoc.
+    rewrite (Permutation_app_comm (map equation_dest step_post2)).
+    apply Permutation_app.
+    all: assumption.
+Qed.
