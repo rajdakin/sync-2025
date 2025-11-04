@@ -177,3 +177,214 @@ Proof.
     assumption.
 Qed.
 
+Lemma NoDup_app_list_remove_r {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
+  NoDup (l1 ++ l2) -> NoDup (l1 ++ (List.remove eq_dec a l2)).
+Proof.
+  intro nodup.
+  induction l1 as [| b l1 IH].
+  - apply NoDup_remove.
+    assumption.
+  - simpl.
+    inversion nodup; subst.
+    constructor.
+    2: tauto.
+    rewrite in_app_iff.
+    intros [inl1 | inl2].
+    + apply H1.
+      apply in_or_app.
+      tauto.
+    + apply in_remove in inl2.
+      destruct inl2 as [inl2 _].
+      apply H1.
+      apply in_or_app.
+      tauto.
+Qed.
+
+Lemma NoDup_app_list_remove_l {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
+  NoDup (l1 ++ l2) -> NoDup ((List.remove eq_dec a l1) ++ l2).
+Proof.
+  intro nodup.
+  induction l1 as [| b l1 IH].
+  1: assumption.
+  simpl.
+  inversion nodup; subst.
+  specialize (IH H2).
+  destruct (eq_dec a b); subst.
+  - assumption.
+  - simpl.
+    constructor.
+    2: assumption.
+    rewrite in_app_iff.
+    intros [inl1 | inl2].
+    + apply in_remove in inl1.
+      destruct inl1 as [inl1 _].
+      apply H1.
+      apply in_or_app.
+      tauto.
+    + apply H1.
+      apply in_or_app.
+      tauto.
+Qed.
+
+Lemma remove_notin {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l: list A):
+  ~In x l -> ~In x (List.remove eq_dec a l).
+Proof.
+  intros notinl inremove.
+  apply in_remove in inremove.
+  apply notinl.
+  tauto.
+Qed.
+
+Lemma remove_notinl {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l1 l2: list A):
+  ~In x (l1 ++ l2) -> ~In x ((List.remove eq_dec a l1) ++ l2).
+Proof.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [inremove|?].
+  2: tauto.
+  apply in_remove in inremove.
+  tauto.
+Qed.
+
+Lemma remove_notinr {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l1 l2: list A):
+  ~In x (l1 ++ l2) -> ~In x (l1 ++ (List.remove eq_dec a l2)).
+Proof.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [?|inremove].
+  1: tauto.
+  apply in_remove in inremove.
+  tauto.
+Qed.
+
+Lemma remove_map_notinl {A B} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (map_fn: A -> B) (x: B) (l1 l2: list A):
+  ~In x (map map_fn (l1 ++ l2)) -> ~In x (map map_fn ((List.remove eq_dec a l1) ++ l2)).
+Proof.
+  do 2 rewrite map_app.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [inremove|?].
+  2: tauto.
+  rewrite in_map_iff in inremove.
+  destruct inremove as [y [existing inremove]].
+  apply in_remove in inremove.
+  subst.
+  left.
+  apply in_map.
+  tauto.
+Qed.
+
+Lemma remove_map_notinr {A B} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (map_fn: A -> B) (x: B) (l1 l2: list A):
+  ~In x (map map_fn (l1 ++ l2)) -> ~In x (map map_fn (l1 ++ (List.remove eq_dec a l2))).
+Proof.
+  do 2 rewrite map_app.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [?|inremove].
+  1: tauto.
+  rewrite in_map_iff in inremove.
+  destruct inremove as [y [existing inremove]].
+  apply in_remove in inremove.
+  subst.
+  right.
+  apply in_map.
+  tauto.
+Qed.
+
+Lemma permutation_remove_app {A} {eq_dec: forall x y: A, {x = y} + {x <> y}} (a: A) (l1 l2: list A):
+  Permutation (List.remove eq_dec a (l1 ++ l2)) ((List.remove eq_dec a l1) ++ (List.remove eq_dec a l2)).
+Proof.
+  rewrite remove_app.
+  apply Permutation_refl.
+Qed.
+
+Lemma NoDup_app_inv {A} (l1 l2: list A):
+  NoDup (l1 ++ l2) -> NoDup (l2 ++ l1).
+Proof.
+  intro nod.
+  induction l1.
+  - rewrite app_nil_r.
+    assumption.
+  - inversion nod; subst.
+    apply NoDup_remove_inv.
+    split.
+    1: tauto.
+    intro f.
+    apply H1.
+    apply in_app_iff.
+    apply in_app_iff in f.
+    destruct f; tauto.
+Qed.
+
+Lemma nodup_app_in_l {A} (x: A) (l r: list A):
+  NoDup (l ++ r) -> In x l -> ~In x r.
+Proof.
+  intros nodup isin.
+  induction l as [| a l IH].
+  1: inversion isin.
+  simpl in isin.
+  simpl in nodup.
+  apply NoDup_cons_iff in nodup.
+  destruct nodup as [notin nodup].
+  specialize (IH nodup).
+  destruct isin as [eq | isin].
+  - subst.
+    intro inxr.
+    apply notin.
+    apply in_or_app.
+    right.
+    assumption.
+  - tauto.
+Qed.
+
+Lemma nodup_app_in_r {A} (x: A) (l r: list A):
+  NoDup (l ++ r) -> In x r -> ~In x l.
+Proof.
+  intros nodup isin.
+  induction l as [| a l IH].
+  1: tauto.
+  intro isinl.
+  simpl in nodup.
+  apply NoDup_cons_iff in nodup.
+  destruct nodup as [notin nodup].
+  specialize (IH nodup).
+  destruct isinl as [eq | isinl].
+  - subst.
+    apply notin.
+    apply in_or_app.
+    right.
+    assumption.
+  - contradiction.
+Qed.
+
+Lemma nodup_app_in_mid {A} (x: A) (l r m: list A):
+  NoDup (l ++ m ++ r) -> In x (l ++ r) -> ~In x m.
+Proof.
+  intros nodup isin.
+  induction l as [| a l IH].
+  - apply (nodup_app_in_r _ _ r).
+    all: assumption.
+  - simpl in isin.
+    simpl in nodup.
+    apply NoDup_cons_iff in nodup.
+    destruct nodup as [notin nodup].
+    specialize (IH nodup).
+    destruct isin as [eq | isin].
+    2: tauto.
+    subst.
+    intro.
+    apply notin.
+    apply in_or_app.
+    right.
+    apply in_or_app.
+    left.
+    assumption.
+Qed.

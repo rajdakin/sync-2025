@@ -39,3 +39,13 @@ Proof.
   destruct inapp as [ina2 | ina3].
   all: tauto.
 Qed.
+
+Lemma In_app_inv {A} (x: A) (l1 l2: list A):
+  In x (l1 ++ l2) -> In x (l2 ++ l1).
+Proof.
+  intro isin.
+  apply in_or_app.
+  apply in_app_or in isin.
+  destruct isin.
+  all: tauto.
+Qed.
