@@ -83,14 +83,15 @@ Record node := mk_node {
   n_vars_unique: NoDup (map fst n_vars);
 
   n_seed: ident;
-  n_seed_always_fresh:  forall n, ~ In (iter n next_ident n_seed) (map fst n_vars);
+  n_seed_always_fresh: forall n, ~In (iter n next_ident n_seed) (map fst n_vars);
 }.
 
+Definition freshness (seed: ident) (vars: list binder) := forall n, ~In (iter n next_ident seed) (map fst vars).
 
 
 (* Translation from raw expressions to combinatorial expressions, extracting pre and arrow *)
 
-Fixpoint raw_to_comb_aux {ty} (exp: raw_exp ty) (ident_origin: ident) (pre_binders: list binder) (pre_equations init_post_equations step_post_equations: list equation): (
+Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident) (pre_binders: list binder) (pre_equations init_post_equations step_post_equations: list equation): (
     comb_exp ty (* init *)
     * comb_exp ty (* step *)
     * ident (* New identifier origin *)
@@ -158,3 +159,74 @@ Definition raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident): (
   raw_to_comb_aux exp ident_origin [] [] [] [].
 
 (** Properties *)
+
+Lemma freshness_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed0 seed1: ident} {binders pre_binders0 pre_binders1: list binder} {pre_eqs0 pre_eqs1 init_post0 init_post1 step_post0 step_post1: list equation}:
+  raw_to_comb exp seed0 pre_binders0 pre_eqs0 init_post0 step_post0 = (ei, es, seed1, pre_binders1, pre_eqs1, init_post1, step_post1)
+  -> freshness seed0 (pre_binders0 ++ binders)
+  -> freshness seed1 (pre_binders1 ++ binders).
+Proof.
+  intros eqe isfresh.
+  induction exp in ei, es, seed0, seed1, pre_binders0, pre_binders1, pre_eqs0, pre_eqs1, init_post0, init_post1, step_post0, step_post1, eqe, isfresh.
+  - injection eqe as <- <- <- <- <- <- <-.
+    assumption.
+  - injection eqe as <- <- <- <- <- <- <-.
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed0 pre_binders0 pre_eqs0 init_post0 step_post0) as [[[[[[ei_1 es_1] seed_1] binders_1] pre_eqs_1] init_post_1] step_post_1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    apply (IHexp _ _ _ _ _ _ _ _ _ _ _ _ unfold1 isfresh).
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed0 pre_binders0 pre_eqs0 init_post0 step_post0) as [[[[[[ei_1 es_1] seed_1] binders_1] pre_eqs_1] init_post_1] step_post_1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed_1 binders_1 pre_eqs_1 init_post_1 step_post_1) as [[[[[[ei_2 es_2] seed_2] binders_2] pre_eqs_2] init_post_2] step_post_2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ _ _ _ _ unfold1 isfresh).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ _ _ _ _ unfold2 IHexp1).
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed0 pre_binders0 pre_eqs0 init_post0 step_post0) as [[[[[[ei_1 es_1] seed_1] binders_1] pre_eqs_1] init_post_1] step_post_1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed_1 binders_1 pre_eqs_1 init_post_1 step_post_1) as [[[[[[ei_2 es_2] seed_2] binders_2] pre_eqs_2] init_post_2] step_post_2] eqn: unfold2.
+    destruct (raw_to_comb exp3 seed_2 binders_2 pre_eqs_2 init_post_2 step_post_2) as [[[[[[ei_3 es_3] seed_3] binders_3] pre_eqs_3] init_post_3] step_post_3] eqn: unfold3.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ _ _ _ _ unfold1 isfresh).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ _ _ _ _ unfold2 IHexp1).
+    specialize (IHexp3 _ _ _ _ _ _ _ _ _ _ _ _ unfold3 IHexp2).
+    assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp seed0 pre_binders0 pre_eqs0 init_post0 step_post0) as [[[[[[ei_1 es_1] seed_1] binders_1] pre_eqs_1] init_post_1] step_post_1] eqn: unfold1.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp _ _ _ _ _ _ _ _ _ _ _ _ unfold1 isfresh).
+    intros n isin.
+    rewrite map_app in isin.
+    apply in_app_or in isin.
+    specialize (IHexp (S (S n))).
+    do 2 rewrite map_cons in isin.
+    unfold fst at 1 2 in isin.
+    rewrite map_app in IHexp.
+    rewrite in_app_iff in IHexp.
+
+    rewrite <- !PeanoNat.Nat.iter_succ_r in isin.
+    destruct isin as [[is1 | [is2 | isin]] | isbinders].
+    + symmetry in is1.
+      apply ident_diff in is1.
+      assumption.
+    + symmetry in is2.
+      unfold next_ident at 2 in is2.
+      apply PeanoNat.Nat.succ_inj in is2.
+      apply ident_diff in is2.
+      assumption.
+    + apply IHexp.
+      left.
+      assumption.
+    + apply IHexp.
+      right.
+      assumption.
+  - simpl in eqe.
+    destruct (raw_to_comb exp1 seed0 pre_binders0 pre_eqs0 init_post0 step_post0) as [[[[[[ei_1 es_1] seed_1] binders_1] pre_eqs_1] init_post_1] step_post_1] eqn: unfold1.
+    destruct (raw_to_comb exp2 seed_1 binders_1 pre_eqs_1 init_post_1 step_post_1) as [[[[[[ei_2 es_2] seed_2] binders_2] pre_eqs_2] init_post_2] step_post_2] eqn: unfold2.
+    injection eqe as <- <- <- <- <- <- <-.
+    specialize (IHexp1 _ _ _ _ _ _ _ _ _ _ _ _ unfold1 isfresh).
+    specialize (IHexp2 _ _ _ _ _ _ _ _ _ _ _ _ unfold2 IHexp1).
+    intros n isin.
+    specialize (IHexp2 n).
+    contradiction.
+Qed.
