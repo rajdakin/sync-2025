@@ -1,6 +1,11 @@
-From Reactive Require Export Base.
+Set Default Goal Selector "!".
 
+From Stdlib Require Import List.
 From Stdlib Require Export String.
+
+From Reactive.Props Require Import Identifier.
+
+Import ListNotations.
 
 Record location : Set := {
   loc_start_line: nat;
@@ -22,6 +27,7 @@ Inductive r {type: Set} | : Set :=
   | MissingAssignment (vname: string) (vid: ident) (vtype: type): r
   | IncompatibleTypeAssignment (vname: string) (vid: ident) (vtype: type) (etype: type): r
   | MultipleAssignment (vname: string) (vid: ident) (vtype: type): r
+  | InvalidTiming (vname: string) (vid: ident) (vtype: type): r
   | InternalError (msg: string): r
 .
 Arguments r _ : clear implicits.

@@ -1,5 +1,6 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
+From Stdlib Require Import Nat Lia.
 
 Lemma lt_n_S_stt (n m: nat):
   n < m -> S n < S m.

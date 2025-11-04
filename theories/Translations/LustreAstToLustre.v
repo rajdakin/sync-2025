@@ -1,27 +1,17 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Result.
 From Reactive.Languages Require LustreAst Lustre.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Dec Forall Identifier.
 
-From Stdlib Require ListDec.
-From Stdlib Require Import Bool Sorting Permutation.
+From Stdlib Require ListDec FMaps.
+From Stdlib Require Import Bool List Nat Permutation Sorting String.
+
+Import ListNotations.
 
 Module Source := LustreAst.
 Module Target := Lustre.
-
-Definition convert_type (t : Source.type) : Target.type := match t with
-  | Source.TVoid => Target.TVoid
-  | Source.TBool => Target.TBool
-  | Source.TInt => Target.TInt
-end.
-
-Lemma type_conversion (t1 t2 : Source.type):
-  t1 = t2 <-> convert_type t1 = convert_type t2.
-Proof.
-  destruct t1, t2.
-  all: firstorder.
-  all: discriminate.
-Qed.
 
 From Stdlib Require FMaps.
 
@@ -76,15 +66,15 @@ Record common_temp : Type := {
   orig :> Source.node;
   
   smap: StringMap.t (ident * Result.declaration_location);
-  n_in: list Target.binder;
-  n_out: list Target.binder;
-  n_locals: list Target.binder;
+  n_in: list binder;
+  n_out: list binder;
+  n_locals: list binder;
   
   nvars := n_in ++ n_out ++ n_locals;
   Hnvars:
     Forall2 (fun '(x, tx) '(l, (v, tv)) =>
         StringMap.find v smap = Some (x, l) /\
-        tx = convert_type tv)
+        tx = tv)
       nvars
       (map (pair Result.DeclInput) orig.(Source.n_in) ++
        map (pair Result.DeclOutput) orig.(Source.n_out) ++
@@ -93,7 +83,7 @@ Record common_temp : Type := {
   seed: ident;
   Hseed: forall n, ~ In (iter n next_ident seed) (map fst nvars);
   
-  env: Dict.t Target.type;
+  env: Dict.t type;
   Henv: forall x t, Dict.maps_to x t env <-> In (x, t) (n_in ++ n_out ++ n_locals);
 }.
 
@@ -119,24 +109,24 @@ Definition translate_binop (op: Source.binop): { tin1 & { tin2 & { tout & Target
   | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
   | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
 end.
-Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: Target.type): Result.t Target.type (Target.exp t) := match e, t with
-  | existT _ Target.TVoid e, Target.TVoid => Result.Ok e
-  | existT _ Target.TBool e, Target.TBool => Result.Ok e
-  | existT _ Target.TInt e, Target.TInt => Result.Ok e
+Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: type): Result.t type (Target.exp t) := match e, t with
+  | existT _ TVoid e, TVoid => Result.Ok e
+  | existT _ TBool e, TBool => Result.Ok e
+  | existT _ TInt e, TInt => Result.Ok e
   | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
 end.
 
-Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t type (sigT Target.exp).
 Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
-    + exists Target.TVoid.
-      exact (Target.EConst Target.CVoid).
-    + exists Target.TBool.
-      exact (Target.EConst (Target.CBool b)).
-    + exists Target.TInt.
-      exact (Target.EConst (Target.CInt n)).
+    + exists TVoid.
+      exact (Target.EConst CVoid).
+    + exists TBool.
+      exact (Target.EConst (CBool b)).
+    + exists TInt.
+      exact (Target.EConst (CInt n)).
   - destruct (StringMap.find n (smap temp)) as [ [ i _ ] | ].
     2: right; exact [(l, Result.UndeclaredVariable n)].
     destruct (Dict.find i (env temp)) as [ ty | ].
@@ -162,7 +152,7 @@ Proof.
     exact (Result.Ok (existT _ tout (Target.EBinop top e1'' e2''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
-    refine (Result.bind (typecheck_exp l e1' Target.TBool) _).
+    refine (Result.bind (typecheck_exp l e1' TBool) _).
     intros e1''.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
@@ -174,7 +164,7 @@ Proof.
     exact (Result.Ok (existT _ t (Target.EIfte e1'' e2'' e3''))).
 Defined.
 
-Definition check_body (temp: common_temp) (entry: Source.node): Result.t Target.type
+Definition check_body (temp: common_temp) (entry: Source.node): Result.t type
   { body : list Target.equation | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) }.
 Proof.
   destruct entry as [nloc n nin out loc eqs]; clear n nin out loc.
@@ -191,14 +181,14 @@ Proof.
     intros [ [ ty e' ] [ rem [ eqs IH ] ] ].
     destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ].
     2: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
-    pose (rev_lhs := @nil (ident * Target.type)); change rem with (rev_lhs ++ rem) in IH.
+    pose (rev_lhs := @nil (ident * type)); change rem with (rev_lhs ++ rem) in IH.
     generalize dependent rev_lhs; induction rem as [ | [ i' ty' ] rem IH ]; intros rev_lhs Hperm.
     1: exact (Result.Err [(l, Result.MultipleAssignment n i ty)]).
     destruct (PeanoNat.Nat.eq_dec i i') as [ <- | nnei ].
     2: refine (IH ((i', ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
     2: rewrite (app_assoc _ [_] _ : _ ++ (i', ty') :: _ = _).
     2: exact (Permutation_app_tail _ (Permutation_cons_append _ _)).
-    destruct (Target.type_dec ty ty') as [ <- | nety ].
+    destruct (type_dec ty ty') as [ <- | nety ].
     2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n i ty' ty)]).
     refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((i, existT Target.exp ty e') :: eqs) _))).
     rewrite (app_assoc _ [_] _ : _ ++ map Target.equation_dest ((_, _) :: _) = (_ ++ _) ++ map _ _), rev_append_rev.
@@ -211,18 +201,18 @@ Definition n_assigned_vars (body: list Target.equation) :=
 
 Scheme Equality for list.
 
-Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t Target.type (incl (n_out temp) (n_assigned_vars body)).
+Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t type (incl (n_out temp) (n_assigned_vars body)).
 Proof.
   refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
   intros b.
-  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
+  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
   1: exact (Result.Ok Hin).
   exact (Result.Err [(l, Result.MissingAssignment "<information lost>" (fst b) (snd b))]).
 Defined.
 
 (* TODO: merge with check_Henv *)
 Definition vars_unique (l: Result.location) (temp: common_temp) :
-  Result.t Target.type (NoDup ((map fst (n_in temp ++ n_out temp ++ n_locals temp)))).
+  Result.t type (NoDup ((map fst (n_in temp ++ n_out temp ++ n_locals temp)))).
 Proof using.
   induction (n_in temp) as [ | hd tl IH ].
   2:{
@@ -257,23 +247,8 @@ Proof using.
   exact (Result.Ok (NoDup_nil _)).
 Defined.
 
-
-Lemma forall_type_dec : forall (P : Source.type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
-Proof using.
-  intros P dec.
-  destruct (dec Source.TVoid) as [Pvoid | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  destruct (dec Source.TBool) as [Pbool | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  destruct (dec Source.TInt)  as [Pint  | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  left; intros []; assumption.
-Defined.
-
-Lemma Forall_univ : forall [A] (P : A -> Prop), (forall x, P x) -> forall l, Forall P l.
-Proof using.
-  intros A P HP l; induction l as [|hd tl IH]; constructor; [exact (HP _)|exact IH].
-Qed.
-
 Definition build_map (entry: Source.node) :
-  { sm & { seed & Result.t Target.type { n_in & { n_out & { n_locals |
+  { sm & { seed & Result.t type { n_in & { n_out & { n_locals |
     Forall (fun v => forall ty', In (fst v, ty') n_in -> ty' = snd v) n_in /\
     Forall (fun v => forall ty', In (fst v, ty') n_out -> ty' = snd v) n_out /\
     Forall (fun v => forall ty', In (fst v, ty') n_locals -> ty' = snd v) n_locals /\
@@ -282,7 +257,7 @@ Definition build_map (entry: Source.node) :
     Forall (fun v => ~ In (fst v) (map fst n_locals)) n_out /\
     Forall2 (fun '(x, tx) '(l, (v, tv)) =>
         StringMap.find v sm = Some (x, l) /\
-        tx = convert_type tv)
+        tx = tv)
       (n_in ++ n_out ++ n_locals)
       (map (pair Result.DeclInput) entry.(Source.n_in) ++
        map (pair Result.DeclOutput) entry.(Source.n_out) ++
@@ -298,7 +273,7 @@ Proof using.
     exists (StringMap.add n (seed, Result.DeclInput) sm), (next_ident seed);
       refine (Result.bind IH _);
       intros (IHnin & IHout & IHloc & IHii & IHoo & IHll & IHio & IHil & IHol & IH1 & IH2);
-      left; exists ((seed, convert_type ty) :: IHnin), IHout, IHloc; repeat split; try assumption.
+      left; exists ((seed, ty) :: IHnin), IHout, IHloc; repeat split; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
       assert (Hseed : ~ In seed (map fst IHnin))
@@ -340,7 +315,7 @@ Proof using.
     exists (StringMap.add n (seed, Result.DeclOutput) sm), (next_ident seed);
       refine (Result.bind IH _);
       intros (IHout & IHloc & IHoo & IHll & IHol & IH1 & IH2);
-      left; exists ((seed, convert_type ty) :: IHout), IHloc; repeat split; try assumption.
+      left; exists ((seed, ty) :: IHout), IHloc; repeat split; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
       assert (Hseed : ~ In seed (map fst IHout))
@@ -378,7 +353,7 @@ Proof using.
     exists (StringMap.add n (seed, Result.DeclLocal) sm), (next_ident seed);
       refine (Result.bind IH _);
       intros (IHloc & IHll & IH1 & IH2);
-      left; exists ((seed, convert_type ty) :: IHloc); repeat split; try assumption.
+      left; exists ((seed, ty) :: IHloc); repeat split; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: exact (in_map fst _ _ H).
       assert (Hseed : ~ In seed (map fst IHloc))
@@ -413,7 +388,7 @@ Lemma check_Henv {n_in n_out n_loc} :
     Dict.maps_to n t
       (fold_left (fun acc '(n, t) => Dict.add n t acc)
        (n_in ++ n_out ++ n_loc)
-       (Dict.empty Target.type)) <->
+       (Dict.empty type)) <->
     In (n, t) (n_in ++ n_out ++ n_loc)%list.
 Proof using.
   rename n_in into nin, n_out into nout, n_loc into nloc.
@@ -497,7 +472,7 @@ Defined.
 
 Import Result.notations.
 
-Definition check_node_prop (entry: Source.node): Result.t Target.type Target.node :=
+Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
   let '(existT _ sm (existT _ seed tmp)) := build_map entry in
   do '(existT _ n_in (existT _ n_out (exist _ n_loc
         (conj Hii (conj Hoo (conj Hll (conj Hio (conj Hil (conj Hol (conj Hnvars Hseed)))))))))) <- tmp;

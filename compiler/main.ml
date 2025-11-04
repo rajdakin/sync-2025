@@ -75,6 +75,9 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.locati
   | MultipleAssignment (n, i, t) ->
       fprintf fmt "multiple assignments to variable %s(%d) with type %a"
         n i pp_type t
+  | InvalidTiming (n, i, t) ->
+      fprintf fmt "invalid delay of pre expression with type %a in assignment of variable %s(%d)"
+        pp_type t n i
   | InternalError e -> fprintf fmt "internal error: %s" e
 
 let () =
@@ -86,7 +89,7 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        let pp_type fmt (t: Extracted.Lustre.coq_type) = match t with
+        let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
           | TVoid -> fprintf fmt "void"
           | TBool -> fprintf fmt "bool"
           | TInt -> fprintf fmt "int"
@@ -99,7 +102,7 @@ let () =
   match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
   | Err x ->
-      let pp_type fmt (t: Extracted.Lustre.coq_type) = match t with
+      let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
         | TVoid -> fprintf fmt "void"
         | TBool -> fprintf fmt "bool"
         | TInt -> fprintf fmt "int"

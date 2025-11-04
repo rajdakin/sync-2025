@@ -1,19 +1,10 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
+
+From Stdlib Require Import Nat List String.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Identifier Sigma.
+
 From Reactive.Datatypes Require Dict.
-
-
-Inductive type: Set :=
-  | TVoid
-  | TBool
-  | TInt.
-
-Definition binder := prod ident type.
-
-Inductive const: type -> Set :=
-  | CVoid: const TVoid
-  | CBool: bool -> const TBool
-  | CInt: nat -> const TInt
-.
 
 Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
@@ -57,24 +48,6 @@ Inductive stmt :=
 
 
 (** ** Equalities *)
-
-Definition type_dec (x y: type): { x = y } + { x <> y }.
-Proof using.
-  destruct x, y; try exact (left eq_refl); right; discriminate.
-Defined.
-Definition sig2T_eq_type := @sig2T_eq _ type_dec.
-Arguments sig2T_eq_type {_ _ _ _}.
-
-Definition type_eqb (x y: type): bool :=
-  match x, y with
-    | TVoid, TVoid => true
-    | TBool, TBool => true
-    | TInt, TInt => true
-    | _, _ => false
-  end.
-
-Definition binder_eqb (x y: binder): bool :=
-  andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
 
 Lemma unop_inv {ty tout} (x: unop ty tout) :
   {exists (eq1 : ty = TInt) (eq2 : tout = TInt), x = eq_rect _ (unop _) (eq_rect _ (fun ty => unop ty _) Uop_not _ (eq_sym eq1)) _ (eq_sym eq2)} +
@@ -479,35 +452,6 @@ Fixpoint eval_exp {ty} (e: exp ty) (s: stack): option (value ty) :=
 
 
 (** ** Lemmas *)
-
-Lemma type_eqb_refl (t: type):
-  type_eqb t t = true.
-Proof.
-  destruct t; reflexivity.
-Qed.
-
-Lemma binder_eqb_refl (b: binder):
-  binder_eqb b b = true.
-Proof.
-  destruct b as (i, t).
-  apply andb_true_intro.
-  split.
-  - apply PeanoNat.Nat.eqb_refl.
-  - apply type_eqb_refl.
-Qed.
-
-Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
-Proof.
-  unfold binder_eqb, andb.
-  destruct (fst x =? fst y) eqn:Heq; [| discriminate ].
-
-  rewrite PeanoNat.Nat.eqb_eq in Heq.
-  destruct x, y; simpl in Heq |- *.
-  rewrite Heq.
-
-  intros H.
-  now destruct t, t0.
-Qed.
 
 Lemma unop_eqb_refl {ty tout} (op: unop ty tout):
   unop_eqb op op = true.

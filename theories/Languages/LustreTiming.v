@@ -1,19 +1,15 @@
-From Reactive Require Import Base.
-From Reactive.Datatypes Require Import Freshness.
-From Reactive.Languages Require Lustre.
+Set Default Goal Selector "!".
 
-From Stdlib Require Import Permutation.
+From Reactive.Props Require Import Freshness Identifier.
+From Reactive.Languages Require Lustre.
+From Reactive.Languages Require Import Semantics.
+
+From Stdlib Require Import Nat List Permutation String.
 From Stdlib.Arith Require Import PeanoNat.
 
-Module Lustre := Lustre.
+Import ListNotations.
 
-Definition type := Lustre.type.
-Definition TBool := Lustre.TBool.
-Definition TInt := Lustre.TInt.
-Definition const := Lustre.const.
-Definition binder := Lustre.binder.
-Definition value := Lustre.value.
-Definition binder_ty := Lustre.binder_ty.
+Module Lustre := Lustre.
 
 Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
@@ -59,8 +55,199 @@ Inductive comb_exp : type -> Set :=
   | EIfte: forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
 .
 
+Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
+  | TimedConst: forall (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst c)
+  | TimedVar: forall (n: nat) (b: binder), well_timed n (Raw_EVar b)
+  | TimedUnop: forall (n: nat) {tin tout} (u: unop tin tout) (e: raw_exp tin), well_timed n e -> well_timed n (Raw_EUnop u e)
+  | TimedBinop: forall (n: nat) {ty1 ty2 tout} (b: binop ty1 ty2 tout) (e1: raw_exp ty1) (e2: raw_exp ty2), well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EBinop b e1 e2)
+  | TimedIfte: forall (n: nat) {ty} (c: raw_exp TBool) (e1 e2: raw_exp ty), well_timed n c -> well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EIfte c e1 e2)
+  | TimedPre: forall (n: nat) {ty} (e: raw_exp ty), well_timed n e -> well_timed (S n) (Raw_EPre e)
+  | TimedArrow_O: forall {ty} (e1 e2: raw_exp ty), well_timed 0 e1 -> well_timed 0 (Raw_EArrow e1 e2)
+  | TimedArrow_S: forall (n: nat) {ty} (e1 e2: raw_exp ty), well_timed (S n) e2 -> well_timed (S n) (Raw_EArrow e1 e2)
+.
+
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
+
+Lemma timed_exp {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+  Result.t type (well_timed n exp).
+Proof.
+  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  - constructor 1.
+    constructor.
+  - constructor 1.
+    constructor.
+  - specialize (IH n).
+    destruct IH as [IH | err].
+    2: constructor 2; exact err.
+    constructor 1.
+    constructor.
+    apply IH.
+  - specialize (IH1 n).
+    specialize (IH2 n).
+    destruct IH1 as [IH1 | err1].
+    + destruct IH2 as [IH2 | err2].
+      * constructor 1.
+        constructor.
+        all: assumption.
+      * constructor 2.
+        exact err2.
+    + destruct IH2 as [_ | err2].
+      all: constructor 2.
+      * exact err1.
+      * exact (err1 ++ err2).
+  - specialize (IHc n).
+    specialize (IH1 n).
+    specialize (IH2 n).
+    destruct IHc as [IHc | errc].
+    + destruct IH1 as [IH1 | err1].
+      * destruct IH2 as [IH2 | err2].
+        -- constructor 1.
+           constructor.
+           all: assumption.
+        -- constructor 2.
+           exact err2.
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact err1.
+        exact (err1 ++ err2).
+    + destruct IH1 as [IH1 | err1].
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact errc.
+        exact (errc ++ err2).
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact (errc ++ err1).
+        exact (errc ++ err1 ++ err2).
+  - destruct n.
+    + constructor 2.
+      exact [(loc, (Result.InvalidTiming vname vid ty))].
+    + specialize (IH n).
+      destruct IH as [IH | err].
+      2: constructor 2; exact err.
+      constructor 1.
+      constructor.
+      apply IH.
+  - destruct n.
+    + specialize (IH1 0).
+      destruct IH1 as [IH1 | err].
+      * constructor 1.
+        constructor.
+        assumption.
+      * constructor 2.
+        exact err.
+    + specialize (IH2 (S n)).
+      destruct IH2 as [IH2 | err].
+      * constructor 1.
+        constructor.
+        assumption.
+      * constructor 2.
+        exact err.
+Defined.
+
+Lemma timed_exp_gt {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+  Result.t type (forall n', n <= n' -> well_timed n' exp).
+Proof.
+  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  - constructor 1.
+    intros.
+    constructor.
+  - constructor 1.
+    intros.
+    constructor.
+  - specialize (IH n).
+    destruct IH as [IH | err].
+    2: constructor 2; exact err.
+    constructor 1.
+    intros n' isless.
+    specialize (IH _ isless).
+    constructor.
+    apply IH.
+  - specialize (IH1 n).
+    specialize (IH2 n).
+    destruct IH1 as [IH1 | err1].
+    + destruct IH2 as [IH2 | err2].
+      * constructor 1.
+        intros n' isless.
+        specialize (IH1 _ isless).
+        specialize (IH2 _ isless).
+        constructor.
+        all: assumption.
+      * constructor 2.
+        exact err2.
+    + destruct IH2 as [_ | err2].
+      all: constructor 2.
+      * exact err1.
+      * exact (err1 ++ err2).
+  - specialize (IHc n).
+    specialize (IH1 n).
+    specialize (IH2 n).
+    destruct IHc as [IHc | errc].
+    + destruct IH1 as [IH1 | err1].
+      * destruct IH2 as [IH2 | err2].
+        -- constructor 1.
+           intros n' isless.
+           specialize (IHc _ isless).
+           specialize (IH1 _ isless).
+           specialize (IH2 _ isless).
+           constructor.
+           all: assumption.
+        -- constructor 2.
+           exact err2.
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact err1.
+        exact (err1 ++ err2).
+    + destruct IH1 as [IH1 | err1].
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact errc.
+        exact (errc ++ err2).
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact (errc ++ err1).
+        exact (errc ++ err1 ++ err2).
+  - destruct n.
+    + constructor 2.
+      exact [(loc, (Result.InvalidTiming vname vid ty))].
+    + specialize (IH n).
+      destruct IH as [IH | err].
+      2: constructor 2; exact err.
+      constructor 1.
+      intros n' isless.
+      destruct n' as [|n'].
+      1: inversion isless.
+      apply le_S_n in isless.
+      constructor.
+      apply IH.
+      assumption.
+  - specialize (IH2 n).
+    destruct n as [| n].
+    + assert (timed_1 := timed_exp vname vid loc 0 e1).
+      destruct timed_1 as [timed_1 | err1].
+      * destruct IH2 as [IH2 | err2].
+        2: constructor 2; exact err2.
+        constructor 1.
+        intros n' isless.
+        specialize (IH2 _ isless).
+        destruct n' as [| n'].
+        all: constructor.
+        all: assumption.
+      * destruct IH2 as [IH2 | err2].
+        all: constructor 2.
+        1: exact err1.
+        exact (err1 ++ err2).
+    + destruct IH2 as [IH2 | err2].
+      2: constructor 2; exact err2.
+      constructor 1.
+      intros n' isless.
+      destruct n' as [|n'].
+      1: inversion isless.
+      constructor.
+      apply IH2.
+      assumption.
+Defined.
 
 Record node := mk_node {
   n_loc: Result.location;
@@ -137,6 +324,20 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         (ei1, e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
   end.
+
+Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ => acc
+    | EVar (name, ty) => (name, ty) :: acc
+    | EUnop _ e => var_of_exp_aux e acc
+    | EBinop _ e1 e2 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
+  end.
+
+Definition var_of_exp {ty} (e: comb_exp ty): list (ident * type) :=
+  var_of_exp_aux e [].
 
 (** Properties *)
 Lemma raw_to_comb_nextseed {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
@@ -677,3 +878,17 @@ Proof.
     apply Permutation_app.
     all: assumption.
 Qed.
+
+(* Semantics *)
+Inductive value: type -> Set :=
+  | RVConst  : forall {ty}, const ty -> value ty
+  | RVUnop   : forall {ty tout}, unop ty tout -> value ty -> value tout
+  | RVBinop  : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
+  | RVIfte   : forall {ty}, value TBool -> value ty -> value ty -> value ty
+.
+
+Definition history := Dict.t {ty & Stream.t (value ty)}.
+Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
+  | Some (existT _ ty' _) => ty' = ty
+  | None => False
+end.

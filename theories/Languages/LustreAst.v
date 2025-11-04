@@ -1,14 +1,9 @@
+Set Default Goal Selector "!".
 
-From Reactive Require Import Base.
 From Reactive.Datatypes Require Dict Result Stream.
-
+From Reactive.Languages Require Import Semantics.
 
 From Stdlib Require Import Permutation String.
-
-Inductive type: Type :=
-  | TVoid
-  | TBool
-  | TInt.
 
 Definition binder := string.
 
@@ -94,36 +89,6 @@ Definition name_dec := String.string_dec.
 
 
 (** ** Equality of binders *)
-
-Definition type_eqb (x y: type): bool :=
-  match x, y with
-    | TVoid, TVoid => true
-    | TBool, TBool => true
-    | TInt, TInt => true
-    | _, _ => false
-  end.
-
-Lemma type_eqb_eq (x y: type):
-  type_eqb x y = true <-> x = y.
-Proof.
-  destruct x, y.
-  all: firstorder.
-  all: discriminate.
-Qed.
-
-Lemma type_eqb_refl (t: type):
-  type_eqb t t = true.
-Proof.
-  destruct t; reflexivity.
-Qed.
-
-Lemma type_dec (x y: type): {x = y} + {x <> y}.
-Proof.
-  destruct x, y.
-  all: try (left; reflexivity).
-  all: right; inversion 1.
-Defined.
-
 Definition binder_eqb (x y: binder): bool := (x =? y)%string.
 
 Lemma binder_eqb_eq (x y: binder):

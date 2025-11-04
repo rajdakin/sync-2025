@@ -1,6 +1,8 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
-From Stdlib Require Import Permutation ListDec.
+From Stdlib Require Import List Permutation ListDec.
+
+Import ListNotations.
 
 Lemma nodup_permutation_app_r {A} {l1 l2 l3: list A}:
   Permutation l2 l3 -> NoDup (l1 ++ l2) -> NoDup (l1 ++ l3).
