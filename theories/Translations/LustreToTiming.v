@@ -4,6 +4,7 @@ From Reactive.Datatypes Require Import Inclusion.
 From Reactive.Datatypes Require Import PermutationProps.
 
 From Stdlib Require Import Permutation.
+From Stdlib.Arith Require Import PeanoNat.
 
 Module Lustre := Lustre.
 Module LustreTiming := LustreTiming.
@@ -37,7 +38,7 @@ Fixpoint expr_to_raw {ty} (e: Lustre.exp ty): LustreTiming.raw_exp ty :=
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 
-Definition translate_expr {ty} (e: Lustre.exp ty) (ident_origin: ident) (pre_binders: list LustreTiming.binder) (pre_equations init_post_equations step_post_equations: list LustreTiming.equation): (
+Definition translate_expr {ty} (e: Lustre.exp ty) (seed: ident): (
     LustreTiming.comb_exp ty (* init *)
     * LustreTiming.comb_exp ty (* step *)
     * ident (* New identifier origin *)
@@ -54,22 +55,28 @@ Definition translate_expr {ty} (e: Lustre.exp ty) (ident_origin: ident) (pre_bin
     * (list LustreTiming.equation) (* init_post equations *)
     * (list LustreTiming.equation) (* step_post equations *)
   ) :=
-    LustreTiming.raw_to_comb (expr_to_raw e) ident_origin pre_binders pre_equations init_post_equations step_post_equations.
+    LustreTiming.raw_to_comb (expr_to_raw e) seed.
 
-Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed0 seed1: ident} {binders pre_binders0 pre_binders1: list LustreTiming.binder} {pre_eqs0 pre_eqs1 init_post0 init_post1 step_post0 step_post1: list LustreTiming.equation}:
-  translate_expr e seed0 pre_binders0 pre_eqs0 init_post0 step_post0 = (ei, es, seed1, pre_binders1, pre_eqs1, init_post1, step_post1)
-  -> LustreTiming.freshness seed0 (pre_binders0 ++ binders)
-  -> LustreTiming.freshness seed1 (pre_binders1 ++ binders).
+Lemma translate_expr_nextseed {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+  translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> exists n, seed' = iter n next_ident seed.
+Proof.
+  apply LustreTiming.raw_to_comb_nextseed.
+Qed.
+
+Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+  translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> LustreTiming.freshness seed' pre_binders.
 Proof.
   apply LustreTiming.freshness_raw_to_comb.
 Qed.
 
-Fixpoint translate_equations (eqs: list Lustre.equation) (ident_origin: ident): (
+Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
     list LustreTiming.equation (* init *)
     * list LustreTiming.equation (* step *)
     * ident (* New identifier origin *)
-    * (list LustreTiming.binder) (* Variables created for pre *)
-    * (list LustreTiming.equation) (* pre equations *)
+    * list LustreTiming.binder (* Variables created for pre *)
+    * list LustreTiming.equation (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
       prex = undef (a variable initialised later)
@@ -78,25 +85,69 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (ident_origin: ident): 
       prex = eqx (eqx being updated later with the current values)
     *)
     (* Equations NOT to be merged, but can be ordered separately *)
-    * (list LustreTiming.equation) (* init_post equations *)
-    * (list LustreTiming.equation) (* step_post equations *)
+    * list LustreTiming.equation (* init_post equations *)
+    * list LustreTiming.equation (* step_post equations *)
   ) :=
     match eqs with
-      | [] => ([], [], ident_origin, [], [], [], [])
-      | eq::eqs => let '(init_eq, step_eq, origin_ident, binders_pre, equations_pre, post_init_equations, post_step_equations) := translate_equations eqs ident_origin in
+      | [] => ([], [], seed, [], [], [], [])
+      | eq::eqs => let '(init_eq, step_eq, seed1, pre_binders0, pre_eqs0, init_post0, step_post0) := translate_equations eqs seed in
         let '(ident, existT _ ty e) := eq in
-          let '(ei, es, orig, binders, equations_pre, init_equations_post, step_equations_post) := translate_expr_aux e origin_ident binders_pre equations_pre post_init_equations post_step_equations in
+          let '(ei, es, seed2, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_expr e seed1 in
             (
               (ident, existT _ ty ei)::init_eq,
               (ident, existT _ ty es)::step_eq,
-              orig,
-              binders,
-              equations_pre,
-              init_equations_post,
-              step_equations_post
+              seed2,
+              pre_binders1 ++ pre_binders0,
+              pre_eqs1 ++ pre_eqs0,
+              init_post1 ++ init_post0,
+              step_post1 ++ step_post0
             )
     end.
 
+Lemma translate_equations_nextseed {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+  translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> exists n, seed' = iter n next_ident seed.
+Proof.
+  intro translation.
+  induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
+  - injection translation as <- <- <- <- <- <- <-.
+    exists 0.
+    reflexivity.
+  - simpl in translation.
+    destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
+    destruct eq as [ident [ty expr]].
+    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfoldexpr.
+    injection translation as <- <- <- <- <- <- <-.
+    specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
+    apply translate_expr_nextseed in unfoldexpr.
+    destruct unfoldexpr as [nexpr seedexpr].
+    destruct IH as [nIH IH].
+    rewrite IH in seedexpr.
+    rewrite <- Nat.iter_add in seedexpr.
+    exists (nexpr + nIH).
+    assumption.
+Qed.
+
+Lemma freshness_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+  translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
+  -> LustreTiming.freshness seed' pre_binders.
+Proof.
+  intro translation.
+  induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
+  - injection translation as <- <- <- <- <- <- <-.
+    intro n.
+    tauto.
+  - simpl in translation.
+    destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
+    destruct eq as [ident [ty expr]].
+    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfoldexpr.
+    injection translation as <- <- <- <- <- <- <-.
+    specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
+    assert (freshness_expr := freshness_translate_expr unfoldexpr).
+    assert (nextseed_expr := translate_expr_nextseed unfoldexpr).
+    apply (LustreTiming.freshness_later_e nextseed_expr) in IH.
+    apply (LustreTiming.freshness_fusion freshness_expr IH).
+Qed.
 
 Definition translate_node (node: Lustre.node) : LustreTiming.node.
 Proof.

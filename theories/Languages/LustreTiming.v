@@ -92,7 +92,7 @@ Definition freshness (seed: ident) (vars: list binder) := forall n, ~In (iter n 
 
 (* Translation from raw expressions to combinatorial expressions, extracting pre and arrow *)
 
-Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident): (
+Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
     comb_exp ty (* init *)
     * comb_exp ty (* step *)
     * ident (* New identifier origin *)
@@ -110,18 +110,18 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident): (
     * (list equation) (* step_post equations *)
   ) :=
   match exp with
-    | Raw_EConst c => (EConst c, EConst c, ident_origin, [], [], [], [])
-    | Raw_EVar v => (EVar v, EVar v, ident_origin, [], [], [], [])
-    | Raw_EUnop u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e ident_origin in
+    | Raw_EConst c => (EConst c, EConst c, seed, [], [], [], [])
+    | Raw_EVar v => (EVar v, EVar v, seed, [], [], [], [])
+    | Raw_EUnop u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
       (EUnop u ei, EUnop u es, orig, binders, eqs_pre, init_post, step_post)
-    | Raw_EBinop b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 ident_origin in
+    | Raw_EBinop b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         (EBinop b ei1 e2i, EBinop b es1 e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
-    | Raw_EIfte e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 ident_origin in
+    | Raw_EIfte e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         let '(e3i, e3s, orig3, binders3, eqs_pre3, init_post3, step_post3) := raw_to_comb e3 orig2 in
         (EIfte ei1 e2i e3i, EIfte es1 e2s e3s, orig3, binders1 ++ binders2 ++ binders3, eqs_pre1 ++ eqs_pre2 ++ eqs_pre3, init_post1 ++ init_post2 ++ init_post3, step_post1 ++ step_post2 ++ step_post3)
-    | @Raw_EPre t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e ident_origin in
+    | @Raw_EPre t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
       let ident_eq := next_ident ident_pre in
         let next_orig := next_ident ident_eq in
           let pre_var := (ident_pre, t) in
@@ -135,7 +135,7 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (ident_origin: ident): (
                 (ident_eq, existT _ t ei)::init_post,
                 (ident_eq, existT _ t es)::step_post
               )
-    | Raw_EArrow e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 ident_origin in
+    | Raw_EArrow e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         (ei1, e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
   end.
