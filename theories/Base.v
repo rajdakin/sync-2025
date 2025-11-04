@@ -56,9 +56,9 @@ Definition next_ident: ident -> ident :=
   fun n => (S n).
 
 Lemma ident_diff (seed: ident):
-  forall n, iter (S n) next_ident seed <> seed.
+  forall n, seed <> iter (S n) next_ident seed.
 Proof.
-  assert (s: forall n, iter (S n) next_ident seed > seed).
+  assert (s: forall n, seed < iter (S n) next_ident seed).
   - intro n.
     induction n.
     + unfold next_ident.
