@@ -55,6 +55,25 @@ Definition ident := nat.
 Definition next_ident: ident -> ident :=
   fun n => (S n).
 
+Lemma ident_diff (seed: ident):
+  forall n, iter (S n) next_ident seed <> seed.
+Proof.
+  assert (s: forall n, iter (S n) next_ident seed > seed).
+  - intro n.
+    induction n.
+    + unfold next_ident.
+      simpl.
+      lia.
+    + simpl in IHn.
+      simpl.
+      unfold next_ident at 1 2.
+      unfold next_ident at 1 in IHn.
+      lia.
+  - intro n.
+    specialize (s n).
+    lia.
+Qed.
+
 Definition incl_dec {A : Type} (dec : forall x y : A, {x = y} + {x <> y}) : forall l l' : list A, {incl l l'} + {~ incl l l'} :=
   fun l1 l2 =>
   list_rec (fun l1 => {incl l1 l2} + {~ incl l1 l2})
