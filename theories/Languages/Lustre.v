@@ -1,90 +1,17 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
+
 From Reactive.Datatypes Require Dict Stream.
-From Reactive.Datatypes Require Import Sublist.
 From Reactive.Languages Require LustreAst.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Identifier Sublist.
 
+From Stdlib Require Import Nat List Permutation String.
 
-From Stdlib Require Import Permutation String.
+Import ListNotations.
 
 Module LustreAst := LustreAst.
 
 Definition name_dec := LustreAst.name_dec.
-
-Inductive type : Set :=
-  | TVoid
-  | TBool
-  | TInt
-.
-
-Lemma type_dec (x y: type): {x = y} + {x <> y}.
-Proof.
-  destruct x, y; try solve [left; reflexivity]; right; discriminate.
-Defined.
-Definition sig2T_eq_type := @sig2T_eq _ type_dec.
-Arguments sig2T_eq_type {_ _ _ _}.
-
-Lemma type_dec_same : forall ty, type_dec ty ty = left eq_refl.
-Proof using.
-  intros ty.
-  destruct (type_dec ty ty) as [ e | n ]; [ | contradiction (n eq_refl) ].
-  f_equal.
-  apply Eqdep_dec.UIP_dec.
-  exact type_dec.
-Qed.
-
-Definition binder := prod ident type.
-Definition binder_ty (b : binder) : type := snd b.
-
-Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
-Proof.
-  destruct x as [ i1 ty1 ], y as [ i2 ty2 ].
-
-  pose proof (PeanoNat.Nat.eq_dec i1 i2).
-  destruct H.
-  2: {
-    right.
-    injection as eqi _.
-    contradiction.
-  }
-
-  destruct (type_dec ty1 ty2).
-  2: {
-    right.
-    injection as _ eqt.
-    contradiction.
-  }
-
-  left.
-  f_equal.
-  all: assumption.
-Defined.
-Definition sig2T_eq_binder := @sig2T_eq _ binder_dec.
-Arguments sig2T_eq_binder {_ _ _ _}.
-
-Inductive const : type -> Set :=
-  | CVoid: const TVoid
-  | CBool: bool -> const TBool
-  | CInt: nat -> const TInt
-.
-Lemma const_inv {ty} (x: const ty) :
-  {eq : ty = _ & {b : bool | x = eq_rect _ const (CBool b) _ (eq_sym eq)}} +
-  {eq : ty = _ & {n : nat | x = eq_rect _ const (CInt n) _ (eq_sym eq)}} +
-  {exists (eq : ty = _), x = eq_rect _ const CVoid _ (eq_sym eq)}.
-Proof using.
-  destruct x as [|b|n]; [right|left; left|left; right]; exists eq_refl; [|exists b|exists n]; exact eq_refl.
-Defined.
-
-Lemma const_dec {ty} (x y: const ty) : {x = y} + {x <> y}.
-Proof.
-  destruct x as [ | b | n ].
-  all: destruct (const_inv y) as [[[eq' [b' ->]]|[eq' [n' ->]]]|H].
-  all: try discriminate; try solve [right; destruct H as [f _]; discriminate f].
-  1: left; destruct H as [eq' ->].
-  2: destruct (Bool.bool_dec b b') as [eq|ne]; [left|right].
-  4: destruct (PeanoNat.Nat.eq_dec n n') as [eq|ne]; [left|right].
-  all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn; try intros [=f]; auto.
-  exact (f_equal _ eq).
-Defined.
 
 (** A unary operator
 
@@ -94,7 +21,7 @@ Defined.
 Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
   | Uop_neg: unop TInt TInt
-  | Uop_pre: unop TInt TInt
+  | Uop_pre: unop TInt TInt (* TODO: general pre*)
 .
 
 Lemma unop_inv {ty tout} (x: unop ty tout) :
@@ -145,7 +72,7 @@ Inductive binop: type -> type -> type -> Set :=
   | Bop_gt: binop TInt TInt TBool
 
   (** Timing bop *)
-  | Bop_arrow: binop TInt TInt TInt
+  | Bop_arrow: binop TInt TInt TInt (* TODO: general arrow *)
 .
 
 Lemma binop_inv {ty1 ty2 tout} (x: binop ty1 ty2 tout) :

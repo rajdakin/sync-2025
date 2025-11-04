@@ -1,4 +1,9 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
+
+From Stdlib Require Import List.
+
+Import ListNotations.
+
 
 Lemma incl_trans {A} (l1 l2 l3: list A):
   incl l1 l2 -> incl l2 l3 -> incl l1 l3.

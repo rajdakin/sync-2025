@@ -1,15 +1,19 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Result Sorted.
 From Reactive.Languages Require Lustre LustreOrdered.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Dec Identifier.
 
-From Stdlib Require Import Sorting Permutation.
+From Stdlib Require Import List Sorting Permutation String.
+
+Import ListNotations.
 
 
 Module Source := Lustre.
 Module Target := LustreOrdered.
 
-Parameter node_ordering: Source.node -> Result.t Lustre.type (Source.node).
+Parameter node_ordering: Source.node -> Result.t type (Source.node).
 
 
 Scheme Equality for list.
@@ -36,12 +40,12 @@ Module Import EquationSort := Sort EquationOrder.
 
 
 Definition list_eq_dec_binder :=
-  List.list_eq_dec Source.binder_dec.
+  List.list_eq_dec binder_dec.
 
 Definition list_eq_dec_equation :=
   List.list_eq_dec Source.equation_dec.
 
-Definition check_eq_node (source guess: Source.node): Result.t Source.type (Source.node_eq source guess).
+Definition check_eq_node (source guess: Source.node): Result.t type (Source.node_eq source guess).
 Proof.
   destruct source as [loc1 name1 in1 out1 locals1 body1].
   destruct guess as [loc2 name2 in2 out2 locals2 body2].
@@ -72,8 +76,8 @@ Proof.
   now apply perm_trans with (sort body2).
 Defined.
 
-Definition check_dag_ordered (loc: Result.location) (guess: Target.dag) (n_in: list (ident * Target.type)):
-  Result.t Lustre.type (Ordered.t guess).
+Definition check_dag_ordered (loc: Result.location) (guess: Target.dag) (n_in: list (ident * type)):
+  Result.t type (Ordered.t guess).
 Proof.
   induction guess as [| [ [ i ty ] l ] xs IHguess ].
   { apply Result.Ok, Ordered.nil. }
@@ -89,7 +93,7 @@ Proof.
   1: left; constructor.
   refine (Result.bind (Result.combine_prop _ IHl) (fun '(conj H1 H2) => Result.Ok (Forall_cons _ H1 H2))); clear IHl.
 
-  destruct (in_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (y, ty') (map fst xs)).
+  destruct (in_dec (prod_dec PeanoNat.Nat.eq_dec type_dec) (y, ty') (map fst xs)).
   2: { exact (Result.Err [(loc, Result.InternalError "Identifier not bound")]). }
 
   apply Result.Ok.
@@ -99,7 +103,7 @@ Defined.
 
 Import Result.notations.
 
-Definition check_order (source guess: Source.node): Result.t Lustre.type Target.node_ordered :=
+Definition check_order (source guess: Source.node): Result.t type Target.node_ordered :=
   let dag := Target.equations_to_dag (Source.n_body guess) (Source.n_in guess) in
   do _ <- check_eq_node source guess;
   do ordered <- check_dag_ordered (Source.n_loc source) dag (Source.n_in guess);
@@ -109,5 +113,5 @@ Definition check_order (source guess: Source.node): Result.t Lustre.type Target.
     Target.ordered := ordered;
   |}.
 
-Definition translate_node (source: Source.node): Result.t Lustre.type Target.node_ordered :=
+Definition translate_node (source: Source.node): Result.t type Target.node_ordered :=
   node_ordering source >>= check_order source.

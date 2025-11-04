@@ -1,4 +1,8 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
+
+From Stdlib Require Import List.
+
+Import ListNotations.
 
 Inductive Sublist {A: Type} : list A -> list A -> Prop :=
   | Sublist_nil : forall (l : list A), Sublist [] l

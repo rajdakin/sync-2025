@@ -1,9 +1,13 @@
-From Reactive Require Import Base.
-From Reactive.Languages Require Lustre LustreTiming.
-From Reactive.Datatypes Require Import Freshness PermutationProps.
+Set Default Goal Selector "!".
 
-From Stdlib Require Import Permutation.
+From Reactive.Languages Require Lustre LustreTiming.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Freshness Identifier Permutations.
+
+From Stdlib Require Import List Nat Permutation.
 From Stdlib.Arith Require Import PeanoNat.
+
+Import ListNotations.
 
 Module Lustre := Lustre.
 Module LustreTiming := LustreTiming.
@@ -41,7 +45,7 @@ Definition translate_expr {ty} (e: Lustre.exp ty) (seed: ident): (
     LustreTiming.comb_exp ty (* init *)
     * LustreTiming.comb_exp ty (* step *)
     * ident (* New identifier origin *)
-    * (list LustreTiming.binder) (* Variables created for pre *)
+    * (list binder) (* Variables created for pre *)
     * (list LustreTiming.equation) (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
@@ -56,42 +60,42 @@ Definition translate_expr {ty} (e: Lustre.exp ty) (seed: ident): (
   ) :=
     LustreTiming.raw_to_comb (expr_to_raw e) seed.
 
-Lemma translate_expr_nextseed {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_nextseed {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> exists n, seed' = iter n next_ident seed.
 Proof.
   apply LustreTiming.raw_to_comb_nextseed.
 Qed.
 
-Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> freshness seed' pre_binders.
 Proof.
   apply LustreTiming.freshness_raw_to_comb.
 Qed.
 
-Lemma isnext_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma isnext_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
 Proof.
   apply LustreTiming.isnext_raw_to_comb.
 Qed.
 
-Lemma nodup_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma nodup_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> NoDup (map fst pre_binders).
 Proof.
   apply LustreTiming.nodup_raw_to_comb.
 Qed.
 
-Lemma translate_expr_assigned_init {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_assigned_init {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ init_post)) pre_binders.
 Proof.
   apply LustreTiming.raw_to_comb_assigned_init.
 Qed.
 
-Lemma translate_expr_assigned_step {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list LustreTiming.binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_assigned_step {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ step_post)) pre_binders.
 Proof.
@@ -102,7 +106,7 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
     list LustreTiming.equation (* init *)
     * list LustreTiming.equation (* step *)
     * ident (* New identifier origin *)
-    * list LustreTiming.binder (* Variables created for pre *)
+    * list binder (* Variables created for pre *)
     * list LustreTiming.equation (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
@@ -131,7 +135,7 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
             )
     end.
 
-Lemma translate_equations_nextseed {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_nextseed {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> exists n, seed' = iter n next_ident seed.
 Proof.
@@ -155,7 +159,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma freshness_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma freshness_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> freshness seed' pre_binders.
 Proof.
@@ -176,7 +180,7 @@ Proof.
     apply (freshness_fusion freshness_expr IH).
 Qed.
 
-Lemma isnext_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma isnext_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
 Proof.
@@ -209,7 +213,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma nodup_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma nodup_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> NoDup (map fst pre_binders).
 Proof.
@@ -237,7 +241,7 @@ Proof.
     contradiction.
 Qed.
 
-Lemma translate_equations_assigned_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_assigned_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ init_post)) pre_binders.
 Proof.
@@ -265,7 +269,7 @@ Proof.
     all: assumption.
 Qed.
 
-Lemma translate_equations_assigned_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_assigned_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ step_post)) pre_binders.
 Proof.
@@ -293,7 +297,7 @@ Proof.
     all: assumption.
 Qed.
 
-Lemma translate_equations_conservation_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_conservation_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> map Lustre.equation_dest eqs = map LustreTiming.equation_dest init_eqs.
 Proof.
@@ -313,7 +317,7 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma translate_equations_conservation_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list LustreTiming.binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_conservation_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> map Lustre.equation_dest eqs = map LustreTiming.equation_dest step_eqs.
 Proof.

@@ -8,7 +8,10 @@
   Nat
   Orders
   String
-  Base
+  Identifier
+  Semantics
+  Axioms
+  Dec
   Datatypes
   Dict
   Result
@@ -23,7 +26,7 @@
   LustreOrdering
   LustreOrderedToImp
   FMapList OrderedType OrdersTac)
- (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations))
+ (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations Reactive.Props))
 
 (library
  (name extracted)

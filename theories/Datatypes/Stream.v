@@ -1,4 +1,4 @@
-From Reactive Require Export Base.
+Set Default Goal Selector "!".
 
 
 CoInductive t (A: Type) :=
@@ -22,3 +22,5 @@ Definition hd {A: Type} (s: t A): A :=
   match s with
   | Cons x _ => x
   end.
+
+Definition to_option {A} (x: t A): t (option A) := map (@Some A) x.

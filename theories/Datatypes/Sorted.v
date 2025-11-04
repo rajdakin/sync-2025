@@ -1,7 +1,11 @@
-From Reactive Require Import Base.
-From Reactive.Datatypes Require Comparison.
+Set Default Goal Selector "!".
 
+From Reactive.Props Require Comparison.
+
+From Stdlib Require Import Nat List Lia.
 From Stdlib Require Export Sorting.
+
+Import ListNotations.
 
 
 Definition t {A: Type}: list (nat * A) -> Prop :=

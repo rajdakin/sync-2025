@@ -1,4 +1,5 @@
 open Extracted.Imp
+open Extracted.Semantics
 open Format
 
 let pretty_printer m = printf "Ok: %s\n" (m_name m)
