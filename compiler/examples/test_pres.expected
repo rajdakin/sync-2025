@@ -1,0 +1,4 @@
+int fun_add(int var_2, int var_1) {
+    int var_0 = var_2 + var_1;
+    return var_0;
+}

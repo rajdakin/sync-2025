@@ -1,0 +1,5 @@
+char fun_test_int_cond() {
+    char var_0 = 0;
+    char var_1 = var_0;
+    return var_1;
+}

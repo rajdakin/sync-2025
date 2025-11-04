@@ -1,0 +1,4 @@
+char fun_test() {
+    char var_0 = 1;
+    return var_0;
+}
