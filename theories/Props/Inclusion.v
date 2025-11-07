@@ -45,12 +45,109 @@ Proof.
   all: tauto.
 Qed.
 
-Lemma In_app_inv {A} (x: A) (l1 l2: list A):
-  In x (l1 ++ l2) -> In x (l2 ++ l1).
+Lemma incl_app_swap {A} (l1 l2: list A):
+  incl (l1 ++ l2) (l2 ++ l1).
 Proof.
-  intro isin.
+  intros x isin.
   apply in_or_app.
   apply in_app_or in isin.
-  destruct isin.
-  all: tauto.
+  tauto.
+Qed.
+
+Lemma remove_notin {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l: list A):
+  ~In x l -> ~In x (List.remove eq_dec a l).
+Proof.
+  intros notinl inremove.
+  apply in_remove in inremove.
+  apply notinl.
+  tauto.
+Qed.
+
+Lemma remove_notinl {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l1 l2: list A):
+  ~In x (l1 ++ l2) -> ~In x ((List.remove eq_dec a l1) ++ l2).
+Proof.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [inremove|?].
+  2: tauto.
+  apply in_remove in inremove.
+  tauto.
+Qed.
+
+Lemma remove_notinr {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a x: A) (l1 l2: list A):
+  ~In x (l1 ++ l2) -> ~In x (l1 ++ (List.remove eq_dec a l2)).
+Proof.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [?|inremove].
+  1: tauto.
+  apply in_remove in inremove.
+  tauto.
+Qed.
+
+Lemma remove_map_notinl {A B} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (map_fn: A -> B) (x: B) (l1 l2: list A):
+  ~In x (map map_fn (l1 ++ l2)) -> ~In x (map map_fn ((List.remove eq_dec a l1) ++ l2)).
+Proof.
+  do 2 rewrite map_app.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [inremove|?].
+  2: tauto.
+  rewrite in_map_iff in inremove.
+  destruct inremove as [y [existing inremove]].
+  apply in_remove in inremove.
+  subst.
+  left.
+  apply in_map.
+  tauto.
+Qed.
+
+Lemma remove_map_notinr {A B} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (map_fn: A -> B) (x: B) (l1 l2: list A):
+  ~In x (map map_fn (l1 ++ l2)) -> ~In x (map map_fn (l1 ++ (List.remove eq_dec a l2))).
+Proof.
+  do 2 rewrite map_app.
+  intros notinl inremove.
+  apply notinl.
+  apply in_or_app.
+  rewrite in_app_iff in inremove.
+  destruct inremove as [?|inremove].
+  1: tauto.
+  rewrite in_map_iff in inremove.
+  destruct inremove as [y [existing inremove]].
+  apply in_remove in inremove.
+  subst.
+  right.
+  apply in_map.
+  tauto.
+Qed.
+
+Lemma permutation_remove_app {A} {eq_dec: forall x y: A, {x = y} + {x <> y}} (a: A) (l1 l2: list A):
+  Permutation (List.remove eq_dec a (l1 ++ l2)) ((List.remove eq_dec a l1) ++ (List.remove eq_dec a l2)).
+Proof.
+  rewrite remove_app.
+  apply Permutation_refl.
+Qed.
+
+Lemma NoDup_app_inv {A} (l1 l2: list A):
+  NoDup (l1 ++ l2) -> NoDup (l2 ++ l1).
+Proof.
+  intro nod.
+  induction l1.
+  - rewrite app_nil_r.
+    assumption.
+  - inversion nod; subst.
+    apply NoDup_remove_inv.
+    split.
+    1: tauto.
+    intro f.
+    apply H1.
+    apply in_app_iff.
+    apply in_app_iff in f.
+    destruct f; tauto.
 Qed.

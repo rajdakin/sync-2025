@@ -3,7 +3,7 @@ Set Default Goal Selector "!".
 From Reactive.Datatypes Require Dict Stream.
 From Reactive.Languages Require LustreAst.
 From Reactive.Languages Require Import Semantics.
-From Reactive.Props Require Import Identifier Sublist.
+From Reactive.Props Require Import Freshness Identifier Sublist.
 
 From Stdlib Require Import Nat List Permutation String.
 
@@ -290,7 +290,7 @@ Record node := mk_node {
   n_vars_unique: NoDup (map fst n_vars);
   
   n_seed: ident;
-  n_seed_always_fresh: forall n, ~ In (iter n next_ident n_seed) (map fst n_vars);
+  n_seed_always_fresh: freshness n_seed n_vars;
 }.
 
 Definition node_eq (n1 n2: node) :=
