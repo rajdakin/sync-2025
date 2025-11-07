@@ -301,58 +301,6 @@ Definition node_eq (n1 n2: node) :=
   Permutation (n_body n1) (n_body n2).
 
 (** ** Semantics *)
-Inductive value : type -> Set :=
-  | VConst : forall {ty}, const ty -> value ty
-  | VUnop  : forall {ty tout}, unop ty tout -> value ty -> value tout
-  | VBinop : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
-  | VIfte  : forall {ty}, value TBool -> value ty -> value ty -> value ty
-.
-
-Lemma value_inv {ty} (x: value ty) :
-  {c : const ty | x = VConst c} +
-  {tin : type & {op : unop tin ty & {e : value tin | x = VUnop op e}}} +
-  {ty1 : type & {ty2 : type & {op : binop ty1 ty2 ty & {e1 : value ty1 & {e2 : value ty2 | x = VBinop op e1 e2}}}}} +
-  {eb : value TBool & {et : value ty & {ef : value ty | x = VIfte eb et ef}}}.
-Proof using.
-  destruct x.
-  1-3: left.
-  1-2: left.
-  1-1: left.
-  2-4: right.
-  all: repeat eexists; exact eq_refl.
-Defined.
-Lemma value_dec {ty} (e1 e2: value ty) : {e1 = e2} + {e1 <> e2}.
-Proof.
-  revert e2.
-  induction e1 as [ ty c | tin tout op e1 IH | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
-  - intros e2; destruct (value_inv e2) as [ [ [
-      (c' & ->) | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1: destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
-    all: right; try destruct H as [eq1 ->]; subst; discriminate.
-  - intros e2; destruct (value_inv e2) as [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1,3-4: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (type_dec tin tin') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
-    destruct (unop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type f)))].
-    destruct (IH e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-2,4: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (type_dec ty1 ty1') as [<-|ne]; [|right; intros [=f _ _ _]; exact (ne f)].
-    destruct (type_dec ty2 ty2') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
-    destruct (binop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type (sig2T_eq_type f))))].
-    destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
-    1-3: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (IHb eb2) as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-Defined.
 
 Definition history := Dict.t {ty & Stream.t (value ty)}.
 Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
