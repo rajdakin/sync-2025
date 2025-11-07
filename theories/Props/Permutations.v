@@ -4,59 +4,8 @@ From Stdlib Require Import List Permutation ListDec.
 
 Import ListNotations.
 
-Lemma NoDup_permutation_app_l {A} {l1 l2 l3: list A}:
-  Permutation l1 l3 -> NoDup (l1 ++ l2) -> NoDup (l3 ++ l2).
-Proof.
-  induction l2 as [ | a l2 IH].
-  1: do 2 rewrite app_nil_r.
-  1: apply Permutation_NoDup.
 
-  intros perm nodup.
-  apply NoDup_remove in nodup.
-  destruct nodup as [nodup notin].
-  specialize (IH perm nodup).
-
-  simpl.
-  apply NoDup_remove_inv.
-  split.
-  1: assumption.
-  intro ina.
-  apply in_app_or in ina.
-
-  apply notin.
-  apply in_or_app.
-
-  destruct ina as [ina | ina].
-
-  - left.
-    exact (Permutation_in a (Permutation_sym perm) ina).
-  - right. assumption.
-Qed.
-
-Lemma NoDup_permutation_app_r {A} {l1 l2 l3: list A}:
-  Permutation l2 l3 -> NoDup (l1 ++ l2) -> NoDup (l1 ++ l3).
-Proof.
-  induction l1 as [ | a l1 IH].
-  1: apply Permutation_NoDup.
-  
-  intros perm nodup.
-  simpl in nodup.
-  apply NoDup_cons_iff in nodup.
-  destruct nodup as [notin nodup].
-  specialize (IH perm nodup).
-  simpl.
-  apply NoDup_cons.
-  2: assumption.
-
-  apply (Permutation_app_head l1) in perm.
-
-  intro isin.
-
-  apply (Permutation_in a (Permutation_sym perm)) in isin.
-  contradiction.
-Qed.
-
-Lemma NoDup_remove {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l: list A):
+Lemma nodup_remove {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l: list A):
   NoDup l -> NoDup (List.remove eq_dec a l).
 Proof.
   intro nodup.
@@ -77,7 +26,7 @@ Proof.
     contradiction.
 Qed.
 
-Lemma NoDup_remove_inv:
+Lemma nodup_remove_inv:
   forall {A} (l l': list A) (a: A),
   NoDup (l ++ l') /\ ~ In a (l ++ l') -> NoDup (l ++ a :: l').
 Proof.
@@ -118,7 +67,59 @@ Proof.
     split; assumption.
 Qed.
 
-Lemma permutation_NoDup_remove_cons {A} (eq_dec : forall x y : A, {x = y} + {x <> y}) (a: A) (l l': list A):
+Lemma nodup_permutation_app_l {A} {l1 l2 l3: list A}:
+  Permutation l1 l3 -> NoDup (l1 ++ l2) -> NoDup (l3 ++ l2).
+Proof.
+  induction l2 as [ | a l2 IH].
+  1: do 2 rewrite app_nil_r.
+  1: apply Permutation_NoDup.
+
+  intros perm nodup.
+  apply NoDup_remove in nodup.
+  destruct nodup as [nodup notin].
+  specialize (IH perm nodup).
+
+  simpl.
+  apply nodup_remove_inv.
+  split.
+  1: assumption.
+  intro ina.
+  apply in_app_or in ina.
+
+  apply notin.
+  apply in_or_app.
+
+  destruct ina as [ina | ina].
+
+  - left.
+    exact (Permutation_in a (Permutation_sym perm) ina).
+  - right. assumption.
+Qed.
+
+Lemma nodup_permutation_app_r {A} {l1 l2 l3: list A}:
+  Permutation l2 l3 -> NoDup (l1 ++ l2) -> NoDup (l1 ++ l3).
+Proof.
+  induction l1 as [ | a l1 IH].
+  1: apply Permutation_NoDup.
+  
+  intros perm nodup.
+  simpl in nodup.
+  apply NoDup_cons_iff in nodup.
+  destruct nodup as [notin nodup].
+  specialize (IH perm nodup).
+  simpl.
+  apply NoDup_cons.
+  2: assumption.
+
+  apply (Permutation_app_head l1) in perm.
+
+  intro isin.
+
+  apply (Permutation_in a (Permutation_sym perm)) in isin.
+  contradiction.
+Qed.
+
+Lemma permutation_nodup_remove_cons {A} (eq_dec : forall x y : A, {x = y} + {x <> y}) (a: A) (l l': list A):
   Permutation (a::l) l' -> NoDup (a::l) -> Permutation l (List.remove eq_dec a l').
 Proof.
   intros permut nodup.
@@ -132,7 +133,7 @@ Proof.
 
   apply NoDup_Permutation.
   - assumption.
-  - apply (NoDup_remove eq_dec _ _ nodup_l').
+  - apply (nodup_remove eq_dec _ _ nodup_l').
   - intro x.
     destruct (eq_dec x a) as [? | noteq].
     + subst.
@@ -179,12 +180,12 @@ Proof.
     assumption.
 Qed.
 
-Lemma NoDup_app_list_remove_r {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
+Lemma nodup_app_list_remove_r {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
   NoDup (l1 ++ l2) -> NoDup (l1 ++ (List.remove eq_dec a l2)).
 Proof.
   intro nodup.
   induction l1 as [| b l1 IH].
-  - apply NoDup_remove.
+  - apply nodup_remove.
     assumption.
   - simpl.
     inversion nodup; subst.
@@ -202,7 +203,7 @@ Proof.
       tauto.
 Qed.
 
-Lemma NoDup_app_list_remove_l {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
+Lemma nodup_app_list_remove_l {A} (eq_dec: forall x y: A, {x = y} + {x <> y}) (a: A) (l1 l2: list A):
   NoDup (l1 ++ l2) -> NoDup ((List.remove eq_dec a l1) ++ l2).
 Proof.
   intro nodup.
@@ -291,4 +292,29 @@ Proof.
     apply in_or_app.
     left.
     assumption.
+Qed.
+
+Lemma permutation_remove_app {A} {eq_dec: forall x y: A, {x = y} + {x <> y}} (a: A) (l1 l2: list A):
+  Permutation (List.remove eq_dec a (l1 ++ l2)) ((List.remove eq_dec a l1) ++ (List.remove eq_dec a l2)).
+Proof.
+  rewrite remove_app.
+  apply Permutation_refl.
+Qed.
+
+Lemma NoDup_app_inv {A} (l1 l2: list A):
+  NoDup (l1 ++ l2) -> NoDup (l2 ++ l1).
+Proof.
+  intro nod.
+  induction l1.
+  - rewrite app_nil_r.
+    assumption.
+  - inversion nod; subst.
+    apply nodup_remove_inv.
+    split.
+    1: tauto.
+    intro f.
+    apply H1.
+    apply in_app_iff.
+    apply in_app_iff in f.
+    destruct f; tauto.
 Qed.

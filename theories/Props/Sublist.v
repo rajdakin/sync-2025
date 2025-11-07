@@ -139,8 +139,7 @@ Proof.
     + eapply H.
       apply s1.
     + apply sublist_app_cons.
-  - rewrite (app_assoc _ [_]).
-   rewrite (list_app_cons_rewrite x l1 l2).
+  - rewrite (list_app_cons_rewrite x l1 l2).
     rewrite (list_app_cons_rewrite x l1' l2').
     apply H.
     clear -s1.

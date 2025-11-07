@@ -126,28 +126,3 @@ Proof.
   apply in_map.
   tauto.
 Qed.
-
-Lemma permutation_remove_app {A} {eq_dec: forall x y: A, {x = y} + {x <> y}} (a: A) (l1 l2: list A):
-  Permutation (List.remove eq_dec a (l1 ++ l2)) ((List.remove eq_dec a l1) ++ (List.remove eq_dec a l2)).
-Proof.
-  rewrite remove_app.
-  apply Permutation_refl.
-Qed.
-
-Lemma NoDup_app_inv {A} (l1 l2: list A):
-  NoDup (l1 ++ l2) -> NoDup (l2 ++ l1).
-Proof.
-  intro nod.
-  induction l1.
-  - rewrite app_nil_r.
-    assumption.
-  - inversion nod; subst.
-    apply NoDup_remove_inv.
-    split.
-    1: tauto.
-    intro f.
-    apply H1.
-    apply in_app_iff.
-    apply in_app_iff in f.
-    destruct f; tauto.
-Qed.

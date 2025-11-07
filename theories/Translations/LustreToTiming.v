@@ -410,6 +410,7 @@ Proof.
     apply (translate_equations_assigned_step translation).
   - rewrite !map_app.
     rewrite !map_app in n_vars_unique.
+    unfold freshness in n_seed_always_fresh.
     rewrite !map_app in n_seed_always_fresh.
     rewrite app_assoc.
     rewrite Permutation_app_comm.
@@ -427,6 +428,7 @@ Proof.
     apply (n_seed_always_fresh n).
   - intros n isin.
     rewrite !map_app in isin.
+    unfold freshness in n_seed_always_fresh.
     rewrite !map_app in n_seed_always_fresh.
     rewrite app_assoc in isin.
     rewrite Permutation_app_comm in isin.
