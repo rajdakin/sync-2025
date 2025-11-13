@@ -21,6 +21,8 @@ Inductive r {type: Set} | : Set :=
   | UndeclaredVariable (vname: ident): r
   | NeverAssigned (vname: ident) (vtype: type): r
   | MultipleDeclaration (vname: ident) (loc1 loc2: declaration_location): r
+  | AssignToInput (vname: ident) (vtype: type): r
+  | CyclicDependency (loop: list ident): r
   | InternalError (msg: string): r
 .
 Arguments r _ : clear implicits.

@@ -4,24 +4,27 @@
   Ascii
   Bool
   List ListDef
-  Mergesort
   Nat
-  Orders
+  Specif
   String
   Base
-  Datatypes
-  Dict
-  Result
-  Sorted
-  Specif
-  Stream
-  LustreAst
-  Lustre
-  LustreOrdered
-  Imp
-  LustreAstToLustre
-  LustreOrdering
-  LustreOrderedToImp)
+   Datatypes
+    Array
+    Dict
+    Hashtable
+    Result
+    Sorted
+    Stream
+   ; Languages
+    LustreAst
+    Lustre
+    LustreOrdered
+    Imp
+   ; Translations
+    LustreAstToLustre
+    LustreOrdering
+    LustreOrderedToImp
+ )
  (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations))
 
 (library
@@ -31,4 +34,4 @@
 (env
  (dev
   (flags
-   (:standard -w -33))))
+   (:standard -w -20-33-39))))

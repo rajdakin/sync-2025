@@ -1,3 +1,4 @@
+From Reactive.Datatypes Require Array Hashtable.
 From Reactive.Translations Require LustreAstToLustre LustreOrderedToImp LustreOrdering.
 
 From Corelib Require Extraction.
@@ -6,7 +7,18 @@ From Stdlib Require Import ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlNativeString.
 #[local] Set Warnings "-extraction-default-directory".
 
 
-Extract Constant LustreOrdering.node_ordering => "Ordered.node_ordering".
+Extract Constant Array.t "'a" => "'a array".
+Extract Constant Array.length "'a" => "Stdlib.Array.length".
+Extract Constant Array.make "'a" => "Stdlib.Array.make".
+Extract Constant Array.get "'a" => "Stdlib.Array.get".
+Extract Constant Array.set "'a" => "(fun a i x -> Stdlib.Array.set a i x; a)".
+Extract Constant Hashtable.t "'a" "'b" => "('a, 'b) Stdlib.Hashtbl.t".
+Extract Constant Hashtable.create "'a" "'b" => "(fun n -> Stdlib.Hashtbl.create n)".
+Extract Constant Hashtable.add "'a" "'b" => "(fun m x y -> Stdlib.Hashtbl.add m x y; m)".
+Extract Constant Hashtable.find "'a" "'b" => "Stdlib.Hashtbl.find".
+Extract Constant Hashtable.find_opt "'a" "'b" => "Stdlib.Hashtbl.find_opt".
+Extract Constant LustreOrdering.List_mem => "Stdlib.List.mem". (* Small optimization? *)
+
 Extract Constant Base.ABORT_FIXME => "Abort.aBORT_FIXME".
 
 Separate Extraction

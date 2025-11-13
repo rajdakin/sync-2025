@@ -336,6 +336,20 @@ Defined.
 Definition equation : Type := ident * { ty : type & exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
 
+Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ => acc
+    | EVar (name, ty) => (name, ty) :: acc
+    | EUnop _ e => var_of_exp_aux e acc
+    | EBinop _ e1 e2 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
+  end.
+
+Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
+  var_of_exp_aux e [].
+
 Lemma equation_dec (e1 e2: equation) : {e1 = e2} + {e1 <> e2}.
 Proof.
   destruct e1 as [n1 [ty1 e1]].
@@ -357,6 +371,7 @@ Record node := mk_node {
 
   n_vars: list binder := n_in ++ n_out ++ n_locals;
   n_assigned_vars: list binder := map equation_dest n_body;
+  n_all_vars_exist: Forall (fun eq => incl (var_of_exp (projT2 (snd eq))) n_vars) n_body;
 
   n_vars_all_assigned: Permutation n_assigned_vars (n_out ++ n_locals);
   n_vars_unique: NoDup (map fst n_vars);
@@ -507,20 +522,6 @@ Fixpoint eval_exp (h: history) {ty} (e: exp ty): option (value ty) :=
 Definition is_evaluable (h: history) {ty} (e: exp ty): Prop :=
   exists v: value ty, eval_exp h e = Some v.
 
-
-Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
-  match e with
-    | EConst _ => acc
-    | EVar (name, ty) => (name, ty) :: acc
-    | EUnop _ e => var_of_exp_aux e acc
-    | EBinop _ e1 e2 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte e1 e2 e3 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
-  end.
-
-Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
-  var_of_exp_aux e [].
 
 (** ** Lemmas *)
 

@@ -1,7 +1,7 @@
 open Extracted
 open Format
 
-let usage_message = Sys.argv.(0) ^ " <file>"
+let usage_message = Stdlib.(Sys.argv.(0)) ^ " <file>"
 let input_file = ref ""
 let entry_file file = input_file := file
 
@@ -53,26 +53,33 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(locati
   fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
-  | BadType ([], got) -> fprintf fmt "untypeable expression, got type %a" pp_type got
-  | BadType ([expected], got) -> fprintf fmt "expected expression with type %a, got %a" pp_type expected pp_type got
+  | BadType ([], got) -> fprintf fmt "untypeable expression, got type %a@]" pp_type got
+  | BadType ([expected], got) -> fprintf fmt "expected expression with type %a, got %a@]" pp_type expected pp_type got
   | BadType (expected, got) ->
-      fprintf fmt "expected expression with type in %a, got %a"
+      fprintf fmt "expected expression with type in %a, got %a@]"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_type) expected pp_type got
   | IncompatibleTypeAssignment (i, t1, t2) ->
-      fprintf fmt "assigned expression with type %a to variable %d with type %a"
+      fprintf fmt "assigned expression with type %a to variable %d with type %a@]"
         pp_type t2 i pp_type t1
   | UndeclaredVariable i ->
-      fprintf fmt "use of undeclared variable %d" i
+      fprintf fmt "use of undeclared variable %d@]" i
   | NeverAssigned (i, t) ->
-      fprintf fmt "variable %d with type %a is never assigned to" i pp_type t
+      fprintf fmt "variable %d with type %a is never assigned to@]" i pp_type t
   | MultipleDeclaration (n, l1, l2) when l1 = l2 ->
-      fprintf fmt "variable %d is declared multiple times as %s" n
+      fprintf fmt "variable %d is declared multiple times as %s@]" n
         (match l1 with DeclInput -> "inputs" | DeclOutput -> "outputs" | DeclLocal -> "locals")
   | MultipleDeclaration (n, l1, l2) ->
-      fprintf fmt "variable %d is declared multiple times as %s and %s" n
+      fprintf fmt "variable %d is declared multiple times as %s and %s@]" n
         (match l1 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
         (match l2 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
-  | InternalError e -> fprintf fmt "internal error: %s" e
+  | AssignToInput (n, t) ->
+      fprintf fmt "input %d with type %a is assigned@]" n pp_type t
+  | CyclicDependency [] ->
+      fprintf fmt "internal error: there is an empty cyclic dependency"
+  | CyclicDependency vs ->
+      fprintf fmt "there is a cyclic dependency:@ @[<hov>%a@]"
+        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " depends on@ ") pp_print_int) vs
+  | InternalError e -> fprintf fmt "internal error: %s@]" e
 
 let () =
   Arg.parse [] entry_file usage_message;

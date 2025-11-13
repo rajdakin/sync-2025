@@ -50,75 +50,93 @@ Definition translate_binop (op: Source.binop): { tin1 & { tin2 & { tout & Target
   | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
   | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
 end.
-Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: Target.type): Result.t Target.type (Target.exp t) := match e, t with
-  | existT _ Target.TVoid e, Target.TVoid => Result.Ok e
-  | existT _ Target.TBool e, Target.TBool => Result.Ok e
-  | existT _ Target.TInt e, Target.TInt => Result.Ok e
-  | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
+Definition typecheck_exp {P : forall ty, Target.exp ty -> Prop} (loc: Result.location) (e: { ty & sig (P ty) }) (t: Target.type):
+    Result.t Target.type (sig (P t)) := match e, t with
+  | existT _ Target.TVoid (exist _ e H), Target.TVoid => Result.Ok (exist _ e H)
+  | existT _ Target.TBool (exist _ e H), Target.TBool => Result.Ok (exist _ e H)
+  | existT _ Target.TInt (exist _ e H), Target.TInt => Result.Ok (exist _ e H)
+  | existT _ ety (exist _ _ H), _ => Result.Err [(loc, Result.BadType [t] ety)]
 end.
 
-Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type
+  { ty & { exp : Target.exp ty | incl (Target.var_of_exp exp) (nvars temp) } }.
 Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
-    + exists Target.TVoid.
-      exact (Target.EConst Target.CVoid).
-    + exists Target.TBool.
-      exact (Target.EConst (Target.CBool b)).
-    + exists Target.TInt.
-      exact (Target.EConst (Target.CInt n)).
-  - destruct (Dict.find n (env temp)) as [ ty | ].
+    + exists Target.TVoid, (Target.EConst Target.CVoid); intros ? [].
+    + exists Target.TBool, (Target.EConst (Target.CBool b)); intros ? [].
+    + exists Target.TInt, (Target.EConst (Target.CInt n)); intros ? [].
+  - destruct (Dict.find n (env temp)) as [ ty | ] eqn:eqn.
     2: right; exact [(l, Result.UndeclaredVariable n)].
     left.
-    exists ty.
-    exact (Target.EVar (n, ty)).
+    exists ty, (Target.EVar (n, ty)).
+    intros ? [<-|[]]; cbn.
+    assert (TODO_removeme : exists ty0, ty = convert_type ty0)
+      by (destruct ty; [exists Source.TVoid|exists Source.TBool|exists Source.TInt]; exact eq_refl);
+      destruct TODO_removeme as [ty0 ->].
+    rewrite (Hnvars temp).
+    apply (in_map (fun '(x, t) => (x, convert_type t)) _ (n, ty0)).
+    exact (proj1 (Henv temp n ty0) eqn).
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
     destruct (translate_unop op) as [ tin [ tout top ]].
     refine (Result.bind (typecheck_exp l e' tin) _).
-    intros e''.
-    exact (Result.Ok (existT _ tout (Target.EUnop top e''))).
+    intros [ e'' He ].
+    refine (Result.Ok _); exists tout, (Target.EUnop top e'').
+    exact He.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     destruct (translate_binop op) as [ tin1 [ tin2 [ tout top ]]].
     refine (Result.bind (typecheck_exp l e1' tin1) _).
-    intros e1''.
+    intros [ e1'' He1 ].
     refine (Result.bind (typecheck_exp l e2' tin2) _).
-    intros e2''.
-    exact (Result.Ok (existT _ tout (Target.EBinop top e1'' e2''))).
+    intros [ e2'' He2 ].
+    refine (Result.Ok _); exists tout, (Target.EBinop top e1'' e2'').
+    cbn; rewrite Target.var_of_exp_aux_eq.
+    apply incl_app; assumption.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (typecheck_exp l e1' Target.TBool) _).
-    intros e1''.
+    intros [ e1'' He1 ].
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     refine (Result.bind (check_exp temp e3) _).
     intros e3'.
-    destruct e2' as [t e2''].
+    destruct e2' as [t [e2'' He2]].
     refine (Result.bind (typecheck_exp l e3' t) _).
-    intros e3''.
-    exact (Result.Ok (existT _ t (Target.EIfte e1'' e2'' e3''))).
+    intros [ e3'' He3 ].
+    refine (Result.Ok _); exists t, (Target.EIfte e1'' e2'' e3'').
+    cbn; rewrite !Target.var_of_exp_aux_eq, app_nil_r.
+    repeat apply incl_app; assumption.
 Defined.
 
 Definition check_body (temp: common_temp) (entry: Source.node): Result.t Target.type
-  { body : list Target.equation | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) }.
+  { body : list Target.equation
+  | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) /\
+    Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in temp ++ n_out temp ++ n_locals temp)) body }.
 Proof.
   destruct entry as [nloc n nin out loc eqs]; clear n nin out loc.
-  refine (Result.bind ((_ :
-    Result.t _
-      { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) } }
-    )) (fun res => match res with existT _ [] ret => Result.Ok ret | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.NeverAssigned i ty)] end)).
+  refine (Result.bind _
+    (fun res : { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) /\
+                                Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in temp ++ n_out temp ++ n_locals temp)) body } } =>
+      match res with existT _ [] ret => Result.Ok ret | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.NeverAssigned i ty)] end)).
   induction eqs as [ | [ l [ n e ] ] tl IH ].
-  - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))).
-    rewrite app_nil_r; exact (Permutation_refl _).
+  - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))); split.
+    1: rewrite app_nil_r; exact (Permutation_refl _).
+    exact (Forall_nil _).
   - refine (Result.bind (Result.combine (check_exp temp e) IH) _); clear IH.
-    intros [ [ ty e' ] [ rem [ eqs IH ] ] ].
-    pose (rev_lhs := @nil (ident * Target.type)); change rem with (rev_lhs ++ rem) in IH.
+    intros [ [ ty [ e' He ] ] [ rem [ eqs [ IH1 IH2 ] ] ] ].
+    pose (rev_lhs := @nil (ident * Target.type)); change rem with (rev_lhs ++ rem) in IH1.
     generalize dependent rev_lhs; induction rem as [ | [ i ty' ] rem IH ]; intros rev_lhs Hperm.
-    1: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
+    1: refine (Result.Err [(l, _)]); destruct temp as [? ? ? nin ? ? ?]; clear - n nin.
+    1: induction nin as [|[hdn hdt] tl IH].
+    1:  exact (Result.UndeclaredVariable n).
+    1: destruct (PeanoNat.Nat.eq_dec n hdn) as [_|_].
+    1:  exact (Result.AssignToInput n hdt).
+    1: exact IH.
     destruct (PeanoNat.Nat.eq_dec n i) as [ <- | nnei ].
     2: refine (IH ((i, ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
     2: rewrite (app_assoc _ [_] _ : _ ++ (i, ty') :: _ = _).
@@ -126,6 +144,7 @@ Proof.
     destruct (Target.type_dec ty ty') as [ <- | nety ].
     2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n ty' ty)]).
     refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((n, existT Target.exp ty e') :: eqs) _))).
+    split; [|refine (Forall_cons _ _ IH2); exact He].
     rewrite (app_assoc _ [_] _ : _ ++ map Target.equation_dest ((_, _) :: _) = (_ ++ _) ++ map _ _), rev_append_rev.
     refine (Permutation_trans (Permutation_app_tail _ _) Hperm); unfold Target.equation_dest, fst, snd, projT1.
     rewrite <-app_assoc; exact (Permutation_sym (Permutation_app (Permutation_rev _) (Permutation_cons_append _ _))).
@@ -346,7 +365,7 @@ Definition check_node_prop (entry: Source.node): Result.t Target.type Target.nod
     
     Hnvars := eq_sym (eq_trans (map_app _ _ _) (f_equal _ (map_app _ _ _)));
   |} in
-  do '(exist _ n_body vars_all_assigned, vars_unique) <-
+  do '(exist _ n_body (conj vars_all_assigned vars_exist), vars_unique) <-
     Result.combine (check_body temp entry) (vars_unique (Source.n_loc entry) temp);
   Result.Ok {|
       Target.n_loc := Source.n_loc entry;
@@ -357,4 +376,5 @@ Definition check_node_prop (entry: Source.node): Result.t Target.type Target.nod
       Target.n_body := n_body;
       Target.n_vars_all_assigned := vars_all_assigned;
       Target.n_vars_unique := vars_unique;
+      Target.n_all_vars_exist := vars_exist;
     |}.
