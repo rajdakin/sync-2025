@@ -1,5 +1,5 @@
 From Reactive.Datatypes Require Array Hashtable.
-From Reactive.Translations Require LustreAstToLustre LustreOrderedToImp LustreOrdering.
+From Reactive.Translations Require LustreAstToLustre LustreOrderedToImp LustreOrdering LustreToTiming.
 From Reactive.Props Require Axioms.
 
 From Corelib Require Extraction.
@@ -23,7 +23,8 @@ Extract Constant String.compare => "StringImpl.compare".
 Extract Constant Axioms.ABORT_FIXME => "Abort.aBORT_FIXME".
 
 Separate Extraction
+  LustreAstToLustre.check_node_prop
+  LustreToTiming.translate_node
   LustreOrdering.translate_node
   LustreOrderedToImp.translate_node
-  LustreAstToLustre.check_node_prop
   Stream.from.

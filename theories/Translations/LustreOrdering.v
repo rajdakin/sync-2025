@@ -14,13 +14,6 @@ Module Source := Lustre.
 Module Target := LustreOrdered.
 
 
-Definition list_eq_dec_binder :=
-  List.list_eq_dec binder_dec.
-
-Definition list_eq_dec_equation :=
-  List.list_eq_dec Source.equation_dec.
-
-
 Import Result.notations.
 
 Fixpoint find_in {B} (l: list (nat * B)) (x: nat): In x (map fst l) -> B.

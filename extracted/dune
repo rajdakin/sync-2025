@@ -27,10 +27,12 @@
     LustreAst
     Lustre
     LustreOrdered
+    LustreTiming
     Imp
     Semantics
    ; Translations
     LustreAstToLustre
+    LustreToTiming
     LustreOrdering
     LustreOrderedToImp
  )

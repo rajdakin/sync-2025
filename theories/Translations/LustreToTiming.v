@@ -9,44 +9,44 @@ From Stdlib.Arith Require Import PeanoNat.
 
 Import ListNotations.
 
-Module Lustre := Lustre.
-Module LustreTiming := LustreTiming.
+Module Source := Lustre.
+Module Target := LustreTiming.
 
 
-Fixpoint expr_to_raw {ty} (e: Lustre.exp ty): LustreTiming.raw_exp ty :=
+Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
   match e with
-    | Lustre.EConst c => LustreTiming.Raw_EConst c
-    | Lustre.EVar v => LustreTiming.Raw_EVar v
-    | Lustre.EIfte e1 e2 e3 => LustreTiming.Raw_EIfte (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
-    | Lustre.EUnop u e => match u in Lustre.unop tin tout return LustreTiming.raw_exp tin -> LustreTiming.raw_exp tout with
-      | Lustre.Uop_neg => fun e => LustreTiming.Raw_EUnop LustreTiming.Uop_neg e
-      | Lustre.Uop_not => fun e => LustreTiming.Raw_EUnop LustreTiming.Uop_not e
-      | Lustre.Uop_pre => fun e => LustreTiming.Raw_EPre e
+    | Source.EConst c => Target.Raw_EConst c
+    | Source.EVar v => Target.Raw_EVar v
+    | Source.EIfte e1 e2 e3 => Target.Raw_EIfte (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
+    | Source.EUnop u e => match u in Source.unop tin tout return Target.raw_exp tin -> Target.raw_exp tout with
+      | Source.Uop_neg => fun e => Target.Raw_EUnop Target.Uop_neg e
+      | Source.Uop_not => fun e => Target.Raw_EUnop Target.Uop_not e
+      | Source.Uop_pre => fun e => Target.Raw_EPre e
       end (expr_to_raw e)
-    | Lustre.EBinop b e1 e2 => match b in Lustre.binop ty1 ty2 tout return LustreTiming.raw_exp ty1 -> LustreTiming.raw_exp ty2 -> LustreTiming.raw_exp tout with
-      | Lustre.Bop_and => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_and e1 e2
-      | Lustre.Bop_or => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_or e1 e2
-      | Lustre.Bop_xor => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_xor e1 e2
-      | Lustre.Bop_plus => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_plus e1 e2
-      | Lustre.Bop_minus => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_minus e1 e2
-      | Lustre.Bop_mult => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_mult e1 e2
-      | Lustre.Bop_div => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_div e1 e2
-      | Lustre.Bop_eq => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_eq e1 e2
-      | Lustre.Bop_neq => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_neq e1 e2
-      | Lustre.Bop_le => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_le e1 e2
-      | Lustre.Bop_lt => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_lt e1 e2
-      | Lustre.Bop_ge => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_ge e1 e2
-      | Lustre.Bop_gt => fun e1 e2 => LustreTiming.Raw_EBinop LustreTiming.Bop_gt e1 e2
-      | Lustre.Bop_arrow => fun e1 e2 => LustreTiming.Raw_EArrow e1 e2
+    | Source.EBinop b e1 e2 => match b in Source.binop ty1 ty2 tout return Target.raw_exp ty1 -> Target.raw_exp ty2 -> Target.raw_exp tout with
+      | Source.Bop_and => fun e1 e2 => Target.Raw_EBinop Target.Bop_and e1 e2
+      | Source.Bop_or => fun e1 e2 => Target.Raw_EBinop Target.Bop_or e1 e2
+      | Source.Bop_xor => fun e1 e2 => Target.Raw_EBinop Target.Bop_xor e1 e2
+      | Source.Bop_plus => fun e1 e2 => Target.Raw_EBinop Target.Bop_plus e1 e2
+      | Source.Bop_minus => fun e1 e2 => Target.Raw_EBinop Target.Bop_minus e1 e2
+      | Source.Bop_mult => fun e1 e2 => Target.Raw_EBinop Target.Bop_mult e1 e2
+      | Source.Bop_div => fun e1 e2 => Target.Raw_EBinop Target.Bop_div e1 e2
+      | Source.Bop_eq => fun e1 e2 => Target.Raw_EBinop Target.Bop_eq e1 e2
+      | Source.Bop_neq => fun e1 e2 => Target.Raw_EBinop Target.Bop_neq e1 e2
+      | Source.Bop_le => fun e1 e2 => Target.Raw_EBinop Target.Bop_le e1 e2
+      | Source.Bop_lt => fun e1 e2 => Target.Raw_EBinop Target.Bop_lt e1 e2
+      | Source.Bop_ge => fun e1 e2 => Target.Raw_EBinop Target.Bop_ge e1 e2
+      | Source.Bop_gt => fun e1 e2 => Target.Raw_EBinop Target.Bop_gt e1 e2
+      | Source.Bop_arrow => fun e1 e2 => Target.Raw_EArrow e1 e2
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 
-Definition translate_expr {ty} (e: Lustre.exp ty) (seed: ident): (
-    LustreTiming.comb_exp ty (* init *)
-    * LustreTiming.comb_exp ty (* step *)
+Definition translate_expr {ty} (e: Source.exp ty) (seed: ident): (
+    Target.comb_exp ty (* init *)
+    * Target.comb_exp ty (* step *)
     * ident (* New identifier origin *)
     * (list binder) (* Variables created for pre *)
-    * (list LustreTiming.equation) (* pre equations *)
+    * (list Target.equation) (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
       prex = undef (a variable initialised later)
@@ -55,59 +55,59 @@ Definition translate_expr {ty} (e: Lustre.exp ty) (seed: ident): (
       prex = eqx (eqx being updated later with the current values)
     *)
     (* Equations NOT to be merged, but can be ordered separately *)
-    * (list LustreTiming.equation) (* init_post equations *)
-    * (list LustreTiming.equation) (* step_post equations *)
+    * (list Target.equation) (* init_post equations *)
+    * (list Target.equation) (* step_post equations *)
   ) :=
-    LustreTiming.raw_to_comb (expr_to_raw e) seed.
+    Target.raw_to_comb (expr_to_raw e) seed.
 
-Lemma translate_expr_nextseed {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_nextseed {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> exists n, seed' = iter n next_ident seed.
 Proof.
-  apply LustreTiming.raw_to_comb_nextseed.
+  apply Target.raw_to_comb_nextseed.
 Qed.
 
-Lemma freshness_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma freshness_translate_expr {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> freshness seed' pre_binders.
 Proof.
-  apply LustreTiming.freshness_raw_to_comb.
+  apply Target.freshness_raw_to_comb.
 Qed.
 
-Lemma isnext_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma isnext_translate_expr {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
 Proof.
-  apply LustreTiming.isnext_raw_to_comb.
+  apply Target.isnext_raw_to_comb.
 Qed.
 
-Lemma nodup_translate_expr {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma nodup_translate_expr {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
   -> NoDup (map fst pre_binders).
 Proof.
-  apply LustreTiming.nodup_raw_to_comb.
+  apply Target.nodup_raw_to_comb.
 Qed.
 
-Lemma translate_expr_assigned_init {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_assigned_init {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ init_post)) pre_binders.
+  -> Permutation (map Target.equation_dest (pre_eqs ++ init_post)) pre_binders.
 Proof.
-  apply LustreTiming.raw_to_comb_assigned_init.
+  apply Target.raw_to_comb_assigned_init.
 Qed.
 
-Lemma translate_expr_assigned_step {ty} {e: Lustre.exp ty} {ei es: LustreTiming.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_expr_assigned_step {ty} {e: Source.exp ty} {ei es: Target.comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list Target.equation}:
   translate_expr e seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ step_post)) pre_binders.
+  -> Permutation (map Target.equation_dest (pre_eqs ++ step_post)) pre_binders.
 Proof.
-  apply LustreTiming.raw_to_comb_assigned_step.
+  apply Target.raw_to_comb_assigned_step.
 Qed.
 
-Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
-    list LustreTiming.equation (* init *)
-    * list LustreTiming.equation (* step *)
+Fixpoint translate_equations (eqs: list Source.equation) (seed: ident): (
+    list Target.equation (* init *)
+    * list Target.equation (* step *)
     * ident (* New identifier origin *)
     * list binder (* Variables created for pre *)
-    * list LustreTiming.equation (* pre equations *)
+    * list Target.equation (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
       prex = undef (a variable initialised later)
@@ -116,8 +116,8 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
       prex = eqx (eqx being updated later with the current values)
     *)
     (* Equations NOT to be merged, but can be ordered separately *)
-    * list LustreTiming.equation (* init_post equations *)
-    * list LustreTiming.equation (* step_post equations *)
+    * list Target.equation (* init_post equations *)
+    * list Target.equation (* step_post equations *)
   ) :=
     match eqs with
       | [] => ([], [], seed, [], [], [], [])
@@ -135,7 +135,7 @@ Fixpoint translate_equations (eqs: list Lustre.equation) (seed: ident): (
             )
     end.
 
-Lemma translate_equations_nextseed {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_nextseed {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> exists n, seed' = iter n next_ident seed.
 Proof.
@@ -159,7 +159,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma freshness_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma freshness_translate_equations {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> freshness seed' pre_binders.
 Proof.
@@ -180,7 +180,7 @@ Proof.
     apply (freshness_fusion freshness_expr IH).
 Qed.
 
-Lemma isnext_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma isnext_translate_equations {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
 Proof.
@@ -213,7 +213,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma nodup_translate_equations {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma nodup_translate_equations {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
   -> NoDup (map fst pre_binders).
 Proof.
@@ -241,9 +241,9 @@ Proof.
     contradiction.
 Qed.
 
-Lemma translate_equations_assigned_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_assigned_init {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ init_post)) pre_binders.
+  -> Permutation (map Target.equation_dest (pre_eqs ++ init_post)) pre_binders.
 Proof.
   intro translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -259,19 +259,19 @@ Proof.
     rewrite !map_app.
     rewrite map_app in IH.
     rewrite map_app in perm_expr.
-    rewrite (Permutation_app_comm (map LustreTiming.equation_dest pre_eqs2)).
+    rewrite (Permutation_app_comm (map Target.equation_dest pre_eqs2)).
     rewrite <- app_assoc.
     rewrite Permutation_app_comm.
     rewrite <- !app_assoc.
     rewrite app_assoc.
-    rewrite (Permutation_app_comm (map LustreTiming.equation_dest init_post0)).
+    rewrite (Permutation_app_comm (map Target.equation_dest init_post0)).
     apply Permutation_app.
     all: assumption.
 Qed.
 
-Lemma translate_equations_assigned_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_assigned_step {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map LustreTiming.equation_dest (pre_eqs ++ step_post)) pre_binders.
+  -> Permutation (map Target.equation_dest (pre_eqs ++ step_post)) pre_binders.
 Proof.
   intro translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -287,19 +287,19 @@ Proof.
     rewrite !map_app.
     rewrite map_app in IH.
     rewrite map_app in perm_expr.
-    rewrite (Permutation_app_comm (map LustreTiming.equation_dest pre_eqs2)).
+    rewrite (Permutation_app_comm (map Target.equation_dest pre_eqs2)).
     rewrite <- app_assoc.
     rewrite Permutation_app_comm.
     rewrite <- !app_assoc.
     rewrite app_assoc.
-    rewrite (Permutation_app_comm (map LustreTiming.equation_dest step_post0)).
+    rewrite (Permutation_app_comm (map Target.equation_dest step_post0)).
     apply Permutation_app.
     all: assumption.
 Qed.
 
-Lemma translate_equations_conservation_init {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_conservation_init {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> map Lustre.equation_dest eqs = map LustreTiming.equation_dest init_eqs.
+  -> map Source.equation_dest eqs = map Target.equation_dest init_eqs.
 Proof.
   intro translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -312,14 +312,14 @@ Proof.
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_cons.
-    unfold Lustre.equation_dest at 1, LustreTiming.equation_dest at 1, fst, snd, projT1.
+    unfold Source.equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
     rewrite IH.
     reflexivity.
 Qed.
 
-Lemma translate_equations_conservation_step {eqs: list Lustre.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list LustreTiming.equation}:
+Lemma translate_equations_conservation_step {eqs: list Source.equation} {seed seed': ident} {pre_binders: list binder} {init_eqs step_eqs pre_eqs init_post step_post: list Target.equation}:
   translate_equations eqs seed = (init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> map Lustre.equation_dest eqs = map LustreTiming.equation_dest step_eqs.
+  -> map Source.equation_dest eqs = map Target.equation_dest step_eqs.
 Proof.
   intro translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -332,13 +332,15 @@ Proof.
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_cons.
-    unfold Lustre.equation_dest at 1, LustreTiming.equation_dest at 1, fst, snd, projT1.
+    unfold Source.equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
     rewrite IH.
     reflexivity.
 Qed.
 
-Definition translate_node (node: Lustre.node) : LustreTiming.node.
+Definition translate_node (node: Source.node) : Result.t type Target.node.
 Proof.
+  left. (* FIXME: check the timing before returning the node *)
+
   destruct node as [
     n_loc
     n_name
@@ -370,24 +372,24 @@ Proof.
   ] eqn: translation.
 
   refine {|
-    LustreTiming.n_loc := n_loc;
-    LustreTiming.n_name := n_name;
+    Target.n_loc := n_loc;
+    Target.n_name := n_name;
 
-    LustreTiming.n_in := n_in;
-    LustreTiming.n_out := n_out;
-    LustreTiming.n_locals := pre_binders ++ n_locals;
-    LustreTiming.n_pre := pre_eqs;
-    LustreTiming.n_init := init_eqs ++ init_post_eqs;
-    LustreTiming.n_step := step_eqs ++ step_post_eqs;
+    Target.n_in := n_in;
+    Target.n_out := n_out;
+    Target.n_locals := pre_binders ++ n_locals;
+    Target.n_pre := pre_eqs;
+    Target.n_init := init_eqs ++ init_post_eqs;
+    Target.n_step := step_eqs ++ step_post_eqs;
 
-    LustreTiming.n_seed := new_seed;
+    Target.n_seed := new_seed;
   |}.
 
   all: subst n_vars n_assigned_vars.
 
   - rewrite map_app.
     rewrite <- (translate_equations_conservation_init translation).
-    rewrite (Permutation_app_comm (map Lustre.equation_dest n_body)).
+    rewrite (Permutation_app_comm (map Source.equation_dest n_body)).
     rewrite !app_assoc.
     rewrite (Permutation_app_comm n_out).
     rewrite <- !app_assoc.
@@ -399,7 +401,7 @@ Proof.
     apply (translate_equations_assigned_init translation).
   - rewrite map_app.
     rewrite <- (translate_equations_conservation_step translation).
-    rewrite (Permutation_app_comm (map Lustre.equation_dest n_body)).
+    rewrite (Permutation_app_comm (map Source.equation_dest n_body)).
     rewrite !app_assoc.
     rewrite (Permutation_app_comm n_out).
     rewrite <- !app_assoc.

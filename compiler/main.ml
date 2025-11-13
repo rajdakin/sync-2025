@@ -49,7 +49,12 @@ let parse_file filename =
     Format.printf "%s@\n" (Printexc.to_string e);
     exit 1
 
-let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
+let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
+  | TVoid -> fprintf fmt "void"
+  | TBool -> fprintf fmt "bool"
+  | TInt -> fprintf fmt "int"
+
+let pp_error fn fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
   fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
@@ -94,23 +99,13 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
-          | TVoid -> fprintf fmt "void"
-          | TBool -> fprintf fmt "bool"
-          | TInt -> fprintf fmt "int"
-        in
-        printf "@[Error when node properties have been checked:@\n%a@]@."
-          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file pp_type)) x;
+        printf "@[Error(s) when node properties have been checked:@\n%a@]@."
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file)) x;
         exit 1
   in
 
   match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
   | Err x ->
-      let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
-        | TVoid -> fprintf fmt "void"
-        | TBool -> fprintf fmt "bool"
-        | TInt -> fprintf fmt "int"
-      in
       printf "@[Error lustre ordering translate:@\n%a@]@."
-        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file pp_type)) x
+        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file)) x
