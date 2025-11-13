@@ -120,11 +120,7 @@ Qed.
 Lemma list_app_cons_rewrite {A} (x: A) (l1 l2: list A):
   l1 ++ x :: l2 = (l1 ++ [x]) ++ l2.
 Proof.
-  induction l1.
-  - reflexivity.
-  - simpl.
-    f_equal.
-    assumption.
+  exact (app_assoc _ [_] _).
 Qed.
 
 Lemma sublist_app {A} (l1 l2 l1' l2': list A):
