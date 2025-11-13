@@ -1,12 +1,8 @@
 %{
+    open Extracted.Semantics
     open Extracted.LustreAst
     open LocationInfo
 
-    let ident_map = Hashtbl.create 19
-    let gen_id =
-      let i = ref 0 in
-      fun () -> incr i; !i - 1
-    
     let loc_of_ext (((_, ls, cs), (_, le, ce)): extent): Extracted.Result.location = Extracted.Result.{
       loc_start_line = ls;
       loc_start_col = cs;
@@ -50,7 +46,7 @@
   ((binder * coq_type) list) *
   ((binder * coq_type) list) *
   ((binder * coq_type) list) *
-  ((Extracted.Result.location * (int * exp)) list)
+  ((Extracted.Result.location * (string * exp)) list)
 > file
 
 %on_error_reduce expr
@@ -101,13 +97,7 @@ args:
 
 
 ident:
-  | id=IDENT
-    { ((match Hashtbl.find_opt ident_map id with
-      | Some x -> x
-      | None -> let new_id = gen_id () in
-         Hashtbl.add ident_map id new_id;
-         new_id),
-      extent_of_len (String.length id) $endpos) }
+  | id=IDENT { (id, extent_of_len (String.length id) $endpos) }
 
 node_name:
   | name=IDENT { (name, extent_of_len (String.length name) $endpos) }

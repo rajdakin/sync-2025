@@ -1,0 +1,150 @@
+(rule
+  (deps (source_tree examples/cyclic_test.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to cyclic_test.output (run ./main.exe examples/cyclic_test.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/cyclic_test.expected) cyclic_test.output)
+  (action (diff examples/cyclic_test.expected cyclic_test.output))
+)
+(rule
+  (deps (source_tree examples/test.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test.output (run ./main.exe examples/test.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test.expected) test.output)
+  (action (diff examples/test.expected test.output))
+)
+(rule
+  (deps (source_tree examples/test2.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test2.output (run ./main.exe examples/test2.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test2.expected) test2.output)
+  (action (diff examples/test2.expected test2.output))
+)
+(rule
+  (deps (source_tree examples/test2_args.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test2_args.output (run ./main.exe examples/test2_args.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test2_args.expected) test2_args.output)
+  (action (diff examples/test2_args.expected test2_args.output))
+)
+(rule
+  (deps (source_tree examples/test_args.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_args.output (run ./main.exe examples/test_args.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_args.expected) test_args.output)
+  (action (diff examples/test_args.expected test_args.output))
+)
+(rule
+  (deps (source_tree examples/test_debug.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_debug.output (run ./main.exe examples/test_debug.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_debug.expected) test_debug.output)
+  (action (diff examples/test_debug.expected test_debug.output))
+)
+(rule
+  (deps (source_tree examples/test_if.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_if.output (run ./main.exe examples/test_if.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_if.expected) test_if.output)
+  (action (diff examples/test_if.expected test_if.output))
+)
+(rule
+  (deps (source_tree examples/test_if_encapsulated.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_if_encapsulated.output (run ./main.exe examples/test_if_encapsulated.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_if_encapsulated.expected) test_if_encapsulated.output)
+  (action (diff examples/test_if_encapsulated.expected test_if_encapsulated.output))
+)
+(rule
+  (deps (source_tree examples/test_pres.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_pres.output (run ./main.exe examples/test_pres.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_pres.expected) test_pres.output)
+  (action (diff examples/test_pres.expected test_pres.output))
+)
+(rule
+  (deps (source_tree examples/test_timing.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to test_timing.output (run ./main.exe examples/test_timing.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/test_timing.expected) test_timing.output)
+  (action (diff examples/test_timing.expected test_timing.output))
+)

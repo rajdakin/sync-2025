@@ -1,9 +1,13 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Array Hashtable Result Sorted.
 From Reactive.Languages Require Lustre LustreOrdered.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Dec Identifier.
 
-From Stdlib Require Import Sorting Permutation.
+From Stdlib Require Import List Nat Permutation Sorting String.
+
+Import ListNotations.
 
 
 Module Source := Lustre.
@@ -11,19 +15,10 @@ Module Target := LustreOrdered.
 
 
 Definition list_eq_dec_binder :=
-  List.list_eq_dec Source.binder_dec.
+  List.list_eq_dec binder_dec.
 
 Definition list_eq_dec_equation :=
   List.list_eq_dec Source.equation_dec.
-
-Definition check_eq_node (source: Source.node) (guess: list Source.equation): Permutation source.(Source.n_body) guess -> (
-  Permutation source.(Source.n_body) guess /\
-  Forall (fun eq => incl (Source.var_of_exp (projT2 (snd eq))) source.(Source.n_vars)) guess).
-Proof.
-  intros H; refine (conj H _).
-  apply Forall_forall; intros eq Heq; apply (Permutation_in _ (Permutation_sym H)) in Heq.
-  exact (proj1 (Forall_forall _ _) source.(Source.n_all_vars_exist) _ Heq).
-Defined.
 
 
 Import Result.notations.
@@ -146,6 +141,8 @@ Definition check_order (source: Source.node) (guess: list Source.equation) Hperm
       Lustre.n_vars_unique := Lustre.n_vars_unique source;
       Lustre.n_all_vars_exist := proj2 (Forall_forall _ _) (fun eq Heq =>
         proj1 (Forall_forall _ _) source.(Source.n_all_vars_exist) eq (Permutation_in _ (Permutation_sym Hperm) Heq));
+      Lustre.n_seed := Lustre.n_seed source;
+      Lustre.n_seed_always_fresh := Lustre.n_seed_always_fresh source;
     |};
     Target.ordered := Hord;
   |}.
@@ -565,8 +562,8 @@ Proof using.
     exact (Hashtable.find_add _ _).
 Qed.
 
-Definition node_to_graph_filtering (excl : list ident) (expvars: list (ident * Source.type)) :
-  node_to_graph_fun'0 (fun v0 i0 n0 => forall x : ident * Source.type, In x expvars -> option (node_to_graph_ret' v0 i0 n0 vertex)).
+Definition node_to_graph_filtering (excl : list ident) (expvars: list (ident * type)) :
+  node_to_graph_fun'0 (fun v0 i0 n0 => forall x : ident * type, In x expvars -> option (node_to_graph_ret' v0 i0 n0 vertex)).
 Proof using.
   intros i1 i2 i3 Hi [i ty'] _.
   destruct (List_mem i excl) as [|] eqn:eqm.
@@ -574,7 +571,7 @@ Proof using.
   exact (Some (var_idx i1 i2 i3 Hi i)).
 Defined.
 
-Lemma node_to_graph_filtering_prop (excl : list ident) (expvars: list (ident * Source.type)) Vars :
+Lemma node_to_graph_filtering_prop (excl : list ident) (expvars: list (ident * type)) Vars :
   incl (map fst expvars) (excl ++ Vars) ->
   forall v0 i0 n0 H1, node_to_graph_assumption_n Vars v0 n0 ->
   forall x Hx,
@@ -606,7 +603,7 @@ Proof using.
 Qed.
 
 Lemma node_to_graph_filtering_inv :
-  forall x : ident * Source.type, node_to_graph_consistent_prop (fun _ imap _ y => Hashtable.find_opt imap y = Some (fst x)).
+  forall x : ident * type, node_to_graph_consistent_prop (fun _ imap _ y => Hashtable.find_opt imap y = Some (fst x)).
 Proof using.
   intros x _ i0 _ _ i1 _ (_ & [H1 H2] & _) y H.
   apply Hashtable.find_opt_Some in H; destruct H as [Hin Heq]; rewrite <-Heq; clear Heq.
@@ -745,7 +742,7 @@ Qed.
 
 Definition node_to_graph (source: Source.node): graph * Hashtable.t vertex ident.
 Proof using.
-  destruct source as [loc _ n_in n_out n_locals n_body n_vars _ _ _ _]; clear n_vars.
+  destruct source as [loc _ n_in n_out n_locals n_body n_vars _ _ _ _ _ _]; clear n_vars.
   pose (excl := map fst n_in).
   pose (n := List.length n_out + List.length n_locals).
   pose (g := Array.make n [] : graph).
@@ -823,7 +820,8 @@ Lemma node_to_graph_prop' (source: Source.node):
 Proof using.
   intros n.
   unfold graph_imap_prop, node_to_graph;
-    destruct source as [loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_all_vars_exist n_vars_all_assigned n_vars_unique];
+    destruct source as [loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_all_vars_exist n_vars_all_assigned n_vars_unique
+                        n_seed n_seed_always_fresh];
     simpl in n |- *.
   unfold Source.n_assigned_vars, Source.n_body; fold n_assigned_vars.
   pose (Vars := map fst n_assigned_vars).
@@ -834,7 +832,7 @@ Proof using.
   assert (HVars : List.length Vars <= n).
   1:{
     unfold Vars, n.
-    rewrite (length_map (A:=Source.binder)), (Permutation_length n_vars_all_assigned), length_app.
+    rewrite (length_map (A:=binder)), (Permutation_length n_vars_all_assigned), length_app.
     exact (le_n _).
   }
   pose (var_table := Hashtable.create ident vertex n); fold var_table.
@@ -894,9 +892,9 @@ Proof using.
       unfold Vars, n; rewrite <-length_app, <-(Permutation_length n_vars_all_assigned).
       unfold n_vars in n_vars_unique; rewrite map_app in n_vars_unique; apply NoDup_app_remove_l in n_vars_unique.
       rewrite <-(Permutation_map _ n_vars_all_assigned) in n_vars_unique.
-      fold Source.binder; rewrite (nodup_remove_dup _ n_vars_unique), <-(length_map (A := Source.binder) fst n_assigned_vars).
+      fold binder; rewrite (nodup_remove_dup _ n_vars_unique), <-(length_map (A := binder) fst n_assigned_vars).
       refine (f_equal (fun p => List.length (fst p)) (y := (_, [])) _).
-      assert (tmp : Forall (fun i => Hashtable.InMap i f1) (map (A:=Source.binder) fst n_assigned_vars)).
+      assert (tmp : Forall (fun i => Hashtable.InMap i f1) (map (A:=binder) fst n_assigned_vars)).
       1:{
         apply Forall_forall; intros i Hi.
         apply in_map_iff in Hi; destruct Hi as [b [<- Hb]].
@@ -906,7 +904,7 @@ Proof using.
         specialize (Hf2 _ Hin) as [Hin2 Heq2].
         exact Hin2.
       }
-      pose (l := map (A:=Source.binder) fst n_assigned_vars); fold l in tmp |- *; generalize dependent l.
+      pose (l := map (A:=binder) fst n_assigned_vars); fold l in tmp |- *; generalize dependent l.
       clear; intros l Hl; induction l as [|hd tl IH]; [exact eq_refl|cbn].
       inversion Hl as [|? ? Hh Ht]; subst; rewrite (IH Ht).
       destruct (Hashtable.find_opt f1 hd) as [?|] eqn:eq; [exact eq_refl|contradiction (proj1 (Hashtable.find_opt_None _ _) eq Hh)].
@@ -1074,13 +1072,13 @@ Definition rev_map_in {A B} l f := rev (@map_in A B l f).
 
 Fixpoint visit_node_inner
   (n: nat) (imap: Hashtable.t vertex ident)
-  (rec: Array.t color -> forall v : vertex, v < n /\ Hashtable.InMap v imap -> list vertex -> Result.t Source.type (Array.t color * list vertex))
+  (rec: Array.t color -> forall v : vertex, v < n /\ Hashtable.InMap v imap -> list vertex -> Result.t type (Array.t color * list vertex))
   (cs: Array.t color)
   (neighs: list vertex)
   (Hneighs: Forall (fun v => v < n /\ Hashtable.InMap v imap) neighs)
   (acc: list vertex)
   {struct neighs}:
-  Result.t Source.type (Array.t color * list vertex).
+  Result.t type (Array.t color * list vertex).
 Proof using.
   destruct neighs as [|hd tl]; [exact (Result.Ok (cs, acc))|].
   refine (Result.bind (rec cs hd (Forall_inv Hneighs) acc) _); clear cs acc.
@@ -1095,7 +1093,7 @@ Fixpoint visit_node (loc: Result.location)
   (cs: Array.t color) (fuel: nat)
   (hist: list vertex) (Himaph : Forall (fun v => Hashtable.InMap v imap) hist)
   (cur: vertex) (Hcur : cur < Array.length g) (Himapc : Hashtable.InMap cur imap)
-  (acc: list vertex) {struct fuel}: Result.t Source.type (Array.t color * list vertex).
+  (acc: list vertex) {struct fuel}: Result.t type (Array.t color * list vertex).
 Proof using.
   destruct fuel as [|fuel]; [exact (Result.Err [(loc, Result.InternalError "topological sort ran out of fuel")])|].
   pose (hist' := cur :: hist).
@@ -1505,7 +1503,7 @@ Fixpoint topological_sort_inner (loc: Result.location)
   (imap: Hashtable.t vertex ident) (Himap : forall k, k < Array.length g -> Hashtable.InMap k imap)
   (cs: Array.t color)
   (cur: vertex) (Hcur : cur < Array.length g)
-  (acc: list vertex) {struct cur}: Result.t Source.type (Array.t color * list vertex).
+  (acc: list vertex) {struct cur}: Result.t type (Array.t color * list vertex).
 Proof using.
   assert (Himap' : forall k, k < Array.length g -> Forall (fun v => Hashtable.InMap v imap) (Array.get g k)).
   1:{
@@ -1525,9 +1523,9 @@ Defined.
 Definition topological_sort_inner_eq : forall loc (g: graph) Hg imap Himap cs cur Hcur acc,
   topological_sort_inner loc g Hg imap Himap cs cur Hcur acc =
   match cur as n return
-    Result.t Source.type (Array.t color * list vertex) ->
+    Result.t type (Array.t color * list vertex) ->
     n < Array.length g -> Hashtable.InMap n imap ->
-    Result.t Source.type (Array.t color * list vertex) with
+    Result.t type (Array.t color * list vertex) with
   | O => fun v _ _ => v
   | S n => fun v Hcur0 Himapc0 =>
       Result.bind v (fun ret => let (t, l) := ret in let Hcur' := le_S_n _ _ (le_S _ _ Hcur0) in topological_sort_inner loc g Hg imap Himap t n Hcur' l)
@@ -1600,7 +1598,7 @@ Qed.
 Definition topological_sort (loc: Result.location)
   (g: graph) (Hg : forall k, k < Array.length g -> Forall (fun v => v < Array.length g) (Array.get g k))
   (imap: Hashtable.t vertex ident) (Himap : forall k, k < Array.length g -> Hashtable.InMap k imap)
-  : Result.t Source.type (list vertex).
+  : Result.t type (list vertex).
 Proof using.
   pose (n := Array.length g).
   assert (Hn := le_n n : n <= Array.length g).
@@ -1676,7 +1674,7 @@ Proof using.
   1: exact (in_map _ _ _ H1).
 Qed.
 
-Definition translate_node (source: Source.node): Result.t Lustre.type Target.node_ordered.
+Definition translate_node (source: Source.node): Result.t type Target.node_ordered.
 Proof using.
   unshelve refine (
     match node_to_graph source with (graph, index_table) => fun Heqg =>
@@ -1783,11 +1781,11 @@ Proof using.
         apply (in_map fst) in Hitye; cbn in Hitye.
         remember (Hashtable.find _ _ (Hord _ (or_introl eq_refl))) as i; clear - Hitye tmp H.
         apply in_split in H; destruct H as [l1 [l2 H]].
-        rewrite map_app, (H : map (fst : ident * Source.type -> _) _ = _), <-app_assoc in tmp.
+        rewrite map_app, (H : map (fst : ident * type -> _) _ = _), <-app_assoc in tmp.
         refine (NoDup_remove_2 l1 (l2 ++ map fst _) i tmp _); clear tmp.
         apply in_or_app, or_intror, in_or_app, or_intror; clear l1 l2 H.
         rewrite <-(Permutation_map _ source.(Source.n_vars_all_assigned)),
-          (map_map _ _ _ : map (A:=Source.binder) fst source.(Source.n_assigned_vars) = map fst source.(Source.n_body)).
+          (map_map _ _ _ : map (A:=binder) fst source.(Source.n_assigned_vars) = map fst source.(Source.n_body)).
         exact Hitye.
       }
       rewrite Target.equations_to_dag_is_map, map_map in H.
@@ -1815,7 +1813,7 @@ Proof using.
         1: apply in_map_in_iff; exists v, (proj1 (Forall_forall _ _) Hhd _ Hv).
         1: apply Hashtable.find_opt_Some in eqv; destruct eqv as [tmp eqv]; exact (eq_trans (Hashtable.find_ext _ _ _ _) eqv).
         assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_vars_exist) _ Hitye _ Hjty); clear - Hej jinvars.
-        apply (in_map (B:=ident * Source.type) Source.equation_dest) in Hej;
+        apply (in_map (B:=ident * type) Source.equation_dest) in Hej;
           fold source.(Source.n_assigned_vars) in Hej; unfold Source.equation_dest in Hej; cbn in Hej.
         exact (eq_sym (ident_types_same _ _ _ _ jinvars (in_or_app _ _ _ (or_intror Hej)))).
 Defined.

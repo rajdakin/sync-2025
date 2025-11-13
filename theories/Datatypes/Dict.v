@@ -1,5 +1,10 @@
-From Reactive Require Import Base.
-From Reactive.Datatypes Require Comparison Sorted.
+Set Default Goal Selector "!".
+
+From Stdlib Require Import Nat List.
+From Reactive.Datatypes Require Sorted.
+From Reactive.Props Require Axioms Comparison.
+
+Import ListNotations.
 
 
 Record t (A: Type): Type := {
@@ -324,7 +329,7 @@ Proof.
     apply equivalence_is_elements_eq in H.
     simpl in H.
     subst.
-    pose proof (ProofIrrelevance _ Hsort1 Hsort2).
+    pose proof (Axioms.ProofIrrelevance _ Hsort1 Hsort2).
     subst.
     reflexivity.
   - intros.

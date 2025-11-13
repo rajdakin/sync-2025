@@ -1,16 +1,11 @@
+Set Default Goal Selector "!".
 
-From Reactive Require Import Base.
 From Reactive.Datatypes Require Dict Result Stream.
-
+From Reactive.Languages Require Import Semantics.
 
 From Stdlib Require Import Permutation String.
 
-Inductive type: Type :=
-  | TVoid
-  | TBool
-  | TInt.
-
-Definition binder := ident.
+Definition binder := string.
 
 Inductive const: Type :=
   | CVoid: const
@@ -70,7 +65,7 @@ Inductive exp: Type :=
   | EBinop: Result.location -> binop -> exp -> exp -> exp
   | EIfte: Result.location -> exp -> exp -> exp -> exp.
 
-Definition equation: Set := ident * exp.
+Definition equation: Set := binder * exp.
 
 
 Record node := mk_node {
@@ -93,84 +88,39 @@ Definition node_eq (n1 n2: node) :=
 Definition name_dec := String.string_dec.
 
 
-Fixpoint var_of_exp_aux (e: exp) (acc: list ident): list ident :=
-  match e with
-    | EConst _ _ => acc
-    | EVar _ name => name :: acc
-    | EUnop _ _ e => var_of_exp_aux e acc
-    | EBinop _ _ e1 e2 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte _ e1 e2 e3 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
-  end.
-
-Definition var_of_exp (e: exp): list ident :=
-  var_of_exp_aux e [].
-
-
 (** ** Equality of binders *)
-
-Definition type_eqb (x y: type): bool :=
-  match x, y with
-    | TVoid, TVoid => true
-    | TBool, TBool => true
-    | TInt, TInt => true
-    | _, _ => false
-  end.
-
-Lemma type_eqb_eq (x y: type):
-  type_eqb x y = true <-> x = y.
-Proof.
-  destruct x, y.
-  all: firstorder.
-  all: discriminate.
-Qed.
-
-Lemma type_eqb_refl (t: type):
-  type_eqb t t = true.
-Proof.
-  destruct t; reflexivity.
-Qed.
-
-Lemma type_dec (x y: type): {x = y} + {x <> y}.
-Proof.
-  destruct x, y.
-  all: try (left; reflexivity).
-  all: right; inversion 1.
-Defined.
-
-Definition binder_eqb (x y: binder): bool := (x =? y).
+Definition binder_eqb (x y: binder): bool := (x =? y)%string.
 
 Lemma binder_eqb_eq (x y: binder):
   binder_eqb x y = true <-> x = y.
 Proof.
-  apply PeanoNat.Nat.eqb_eq.
+  apply String.eqb_eq.
 Qed.
 
 Lemma binder_dec (x y: binder): {x = y} + {x <> y}.
 Proof.
-  exact (PeanoNat.Nat.eq_dec x y).
+  exact (string_dec x y).
 Defined.
 
 Lemma binder_eqb_refl (b: binder):
   binder_eqb b b = true.
 Proof.
-  apply PeanoNat.Nat.eqb_refl.
+  apply String.eqb_refl.
 Qed.
 
 Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
 Proof.
   unfold binder_eqb, andb.
-  destruct (x =? y) eqn:Heq; [| discriminate ].
+  destruct (x =? y)%string eqn:Heq; [| discriminate ].
 
-  now rewrite PeanoNat.Nat.eqb_eq in Heq.
+  now rewrite String.eqb_eq in Heq.
 Qed.
 
 Lemma binder_eq_to_eqb (x y : binder): x = y -> binder_eqb x y = true.
 Proof.
   unfold binder_eqb.
   intros ->.
-  apply PeanoNat.Nat.eqb_refl.
+  apply String.eqb_refl.
 Qed.
 
 
@@ -462,7 +412,7 @@ Proof.
 Qed.
 
 Definition equation_eqb (eq1 eq2: equation): bool :=
-  (fst eq1 =? fst eq2) && (exp_eqb (snd eq1) (snd eq2)).
+  (fst eq1 =? fst eq2)%string && (exp_eqb (snd eq1) (snd eq2)).
 
 Definition equation_eq : equation -> equation -> Prop := fun eq1 eq2 => (fst eq1 = fst eq2) /\ (exp_eq (snd eq1) (snd eq2)).
 
@@ -470,7 +420,7 @@ Lemma equation_dec (e1 e2: equation) : { equation_eq e1 e2 } + { ~ equation_eq e
 Proof.
   destruct e1 as [ e1_name e1_exp ].
   destruct e2 as [ e2_name e2_exp ].
-  pose proof (PeanoNat.Nat.eq_dec e1_name e2_name) as H.
+  pose proof (string_dec e1_name e2_name) as H.
   destruct H.
   2: {
     right.
@@ -496,7 +446,7 @@ Proof.
   destruct eq as (i, e).
   apply andb_true_intro.
   split.
-  - apply PeanoNat.Nat.eqb_refl.
+  - apply String.eqb_refl.
   - apply exp_eqb_refl.
 Qed.
 
@@ -507,7 +457,7 @@ Proof.
   - intro H.
     destruct eq1, eq2.
     apply andb_prop in H as [ H1 H2 ].
-    apply PeanoNat.Nat.eqb_eq in H1.
+    apply String.eqb_eq in H1.
     apply exp_eqb_eq in H2.
     simpl in H1, H2.
     rewrite H1.
@@ -516,7 +466,7 @@ Proof.
     intros [eq H]; cbn in eq, H; subst i'.
     apply andb_true_intro.
     split.
-    1: exact (PeanoNat.Nat.eqb_refl _).
+    1: exact (String.eqb_refl _).
     apply exp_eqb_eq in H.
     exact H.
 Qed.

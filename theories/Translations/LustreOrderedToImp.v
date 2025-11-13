@@ -1,39 +1,26 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
+
 From Reactive.Datatypes Require Ordered.
 From Reactive.Languages Require LustreOrdered Imp.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Axioms Identifier.
+
+From Stdlib Require Import List Nat.
+
 
 Module Source := LustreOrdered.
 Module Target := Imp.
 
-
-Definition translate_type (ty: Source.type): Target.type :=
-  match ty with
-  | Source.Lustre.TVoid => Target.TVoid
-  | Source.Lustre.TBool => Target.TBool
-  | Source.Lustre.TInt => Target.TInt
-  end.
-
-Definition translate_const {ty} (c: Source.const ty): Target.const (translate_type ty) :=
-  match c with
-  | Source.Lustre.CVoid => Target.CVoid
-  | Source.Lustre.CBool b => Target.CBool b
-  | Source.Lustre.CInt n => Target.CInt n
-  end.
-
-Definition translate_binder (b: Source.binder): Target.binder :=
-  (fst b, translate_type (snd b)).
-
-Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop (translate_type ty) (translate_type tout) :=
+Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop ty tout :=
   match op with
-  (* ???? *)
-  | Source.Lustre.Uop_not => Target.Uop_not : Target.unop (translate_type Source.Lustre.TInt) (translate_type Source.Lustre.TInt)
+  | Source.Lustre.Uop_not => Target.Uop_not
   | Source.Lustre.Uop_neg => Target.Uop_neg
   | Source.Lustre.Uop_pre => ABORT_FIXME _ tt
   end.
 
 Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
     match op with Source.Lustre.Bop_and | Source.Lustre.Bop_or => False | _ => True end ->
-    Target.binop (translate_type ty1) (translate_type ty2) (translate_type tout) :=
+    Target.binop ty1 ty2 tout :=
   match op with
   | Source.Lustre.Bop_and => fun f => False_rect _ f
   | Source.Lustre.Bop_or => fun f => False_rect _ f
@@ -51,23 +38,23 @@ Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
   | Source.Lustre.Bop_arrow => fun _ => ABORT_FIXME _ tt
   end.
 
-Fixpoint translate_value {ty} (v: Source.value ty): Target.value (translate_type ty) :=
+Fixpoint translate_value {ty} (v: Source.value ty): Target.value ty :=
   match v with
-  | Source.Lustre.VConst c => Target.VConst (translate_const c)
+  | Source.Lustre.VConst c => Target.VConst c
   | Source.Lustre.VUnop op v => Target.VUnop (translate_unop op) (translate_value v)
   | Source.Lustre.VBinop op v1 v2 =>
       (match op in Source.Lustre.binop ty1 ty2 tout
-                return Target.value (translate_type ty1) -> Target.value (translate_type ty2) -> Target.value (translate_type tout) with
+                return Target.value ty1 -> Target.value ty2 -> Target.value tout with
       | Source.Lustre.Bop_and => fun v1 v2 =>
           match v1 with
-          | Target.VConst (Target.CBool false) => Target.VConst (Target.CBool false)
-          | Target.VConst (Target.CBool true) => v2
+          | Target.VConst (CBool false) => Target.VConst (CBool false)
+          | Target.VConst (CBool true) => v2
           | _ => Target.VBAnd v1 v2
           end
       | Source.Lustre.Bop_or => fun v1 v2 =>
           match v1 with
-          | Target.VConst (Target.CBool false) => v2
-          | Target.VConst (Target.CBool true) => Target.VConst (Target.CBool true)
+          | Target.VConst (CBool false) => v2
+          | Target.VConst (CBool true) => Target.VConst (CBool true)
           | _ => Target.VBOr v1 v2
           end
       | op => fun v1 v2 => Target.VBinop (translate_binop op I) v1 v2
@@ -75,13 +62,13 @@ Fixpoint translate_value {ty} (v: Source.value ty): Target.value (translate_type
   | Source.Lustre.VIfte v1 v2 v3 => Target.VIfte (translate_value v1) (translate_value v2) (translate_value v3)
   end.
 
-Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp (translate_type ty) :=
+Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp ty :=
   match e with
-  | Source.Lustre.EConst c => Target.EConst (translate_const c)
-  | Source.Lustre.EVar b => Target.EVar (translate_binder b)
+  | Source.Lustre.EConst c => Target.EConst c
+  | Source.Lustre.EVar b => Target.EVar b
   | Source.Lustre.EUnop op e => Target.EUnop (translate_unop op) (translate_exp e)
   | Source.Lustre.EBinop op e1 e2 =>
-      (match op in Source.Lustre.binop ty1 ty2 tout return Source.exp ty1 -> Source.exp ty2 -> Target.exp (translate_type tout) with
+      (match op in Source.Lustre.binop ty1 ty2 tout return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout with
       | Source.Lustre.Bop_and => fun e1 e2 => Target.EBAnd (translate_exp e1) (translate_exp e2)
       | Source.Lustre.Bop_or => fun e1 e2 => Target.EBOr (translate_exp e1) (translate_exp e2)
       | op => fun e1 e2 => Target.EBinop (translate_binop op I) (translate_exp e1) (translate_exp e2)
@@ -90,18 +77,18 @@ Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp (translate_type ty) :
   end.
 
 Definition translate_equation (eq: Source.equation): Target.stmt :=
-  Target.SAssign (fst eq, translate_type (projT1 (snd eq))) (translate_exp (projT2 (snd eq))).
+  Target.SAssign (fst eq, projT1 (snd eq)) (translate_exp (projT2 (snd eq))).
 
 Definition translate_history (h: Source.history): Target.stack :=
-  Dict.map (fun x => existT Target.value (translate_type (projT1 x)) (translate_value (Stream.hd (projT2 x)))) h.
+  Dict.map (fun x => existT Target.value  (projT1 x) (translate_value (Stream.hd (projT2 x)))) h.
 
 Definition translate_node_body (body: list Source.equation): Target.stmt :=
   fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
 
-Lemma lustre_assignment_is_substmt (name: ident) (ty: Source.type) (exp: Source.exp ty):
+Lemma lustre_assignment_is_substmt (name: ident) (ty: type) (exp: Source.exp ty):
   forall body,
   In (name, existT Source.exp ty exp) body ->
-  Target.is_substmt (Target.SAssign (name, translate_type ty) (translate_exp exp)) (translate_node_body body) = true.
+  Target.is_substmt (Target.SAssign (name, ty) (translate_exp exp)) (translate_node_body body) = true.
 Proof.
   intros n_body Hin.
   induction n_body as [ | (eq_left, (ty', eq_right)) body IH ]; [ inversion Hin | ].
@@ -110,7 +97,7 @@ Proof.
   destruct Hin as [ Heq | Hin ].
   - injection Heq as eql eqt eqr.
     subst.
-    apply Source.sig2T_eq_type in eqr.
+    apply sig2T_eq_type in eqr.
     subst.
     right.
     rewrite PeanoNat.Nat.eqb_refl.
@@ -150,20 +137,14 @@ Proof.
   refine ({|
     Target.m_name := n_name;
 
-    Target.m_in := map translate_binder n_in;
-    Target.m_out := map translate_binder n_out;
-    Target.m_vars := map translate_binder n_vars;
+    Target.m_in := n_in;
+    Target.m_out := n_out;
+    Target.m_vars := n_vars;
 
     Target.m_body := translate_node_body n_body
   |}).
 
   intros b Hb.
-  assert (tmp : exists b', In b' n_out /\ b = translate_binder b').
-  { clear - Hb.
-    induction n_out as [|hd tl IH]; [contradiction Hb|].
-    destruct Hb as [Hb|Hb]; [exists hd; split; [left; exact eq_refl|exact (eq_sym Hb)]|].
-    destruct (IH Hb) as [b' [H1 H2]]; exists b'; split; [right; exact H1|exact H2]. }
-  destruct tmp as [b' [Hb' ->]]; clear Hb; rename b' into b, Hb' into Hb.
   specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
     as b_assigned.
   apply in_map_iff in b_assigned.
@@ -187,7 +168,7 @@ Proof.
     apply Target.SeConst.
 
   - (* EVar *)
-    apply Target.SeVar with (b := translate_binder b); simpl.
+    apply Target.SeVar with (b := b); simpl.
 
     exact (Dict.maps_to_map _ _ _ _ H).
 
@@ -210,12 +191,12 @@ Proof.
     1,2: destruct (Target.value_inv tv1) as [ [ [ [ [
       (c' & ->) | (tin & op & v1' & ->) ] | (e & v1' & v2' & ->) ] | (e & v1' & v2' & ->) ] |
       (ty1 & ty2 & op & v1' & v2' & ->) ] | (eb & et & ef & ->) ].
-    3,4: rewrite (Eqdep_dec.UIP_dec Target.type_dec _ eq_refl) in *.
+    3,4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
     2-6: apply Target.SeBAndDefer; try assumption; discriminate.
-    4,5: rewrite (Eqdep_dec.UIP_dec Target.type_dec _ eq_refl) in *.
+    4,5: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
     3-7: apply Target.SeBOrDefer; try assumption; discriminate.
-    1,2: destruct (Target.const_inv c') as [ [ (e & [|] & ->) | (f & _) ] | (f & _) ]; try discriminate f.
-    1-4: rewrite (Eqdep_dec.UIP_dec Target.type_dec _ eq_refl) in *.
+    1,2: destruct (const_inv c') as [ [ (e & [|] & ->) | (f & _) ] | (f & _) ]; try discriminate f.
+    1-4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
     1: apply Target.SeBAndConstT; assumption.
     1: apply Target.SeBAndConstF; assumption.
     1: apply Target.SeBOrConstT; assumption.
@@ -236,12 +217,12 @@ Proof.
   induction e as [ ty c | (i, t) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
   - inversion Hexp.
     subst.
-    apply Source.sig2T_eq_type in H2, H3.
+    apply sig2T_eq_type in H2, H3.
     subst.
     apply Source.Lustre.SeConst.
   - inversion Hexp.
     subst.
-    apply Source.sig2T_eq_type in H4.
+    apply sig2T_eq_type in H4.
     subst.
     unfold Source.var_of_exp in Hnin.
     simpl in Hnin.
@@ -257,15 +238,15 @@ Proof.
     assumption.
   - inversion Hexp.
     subst.
-    apply Source.sig2T_eq_type in H3, H4, H5.
-    apply Source.sig2T_eq_type in H3.
+    apply sig2T_eq_type in H3, H4, H5.
+    apply sig2T_eq_type in H3.
     subst.
     apply Source.Lustre.SeUnop.
     apply IH; assumption.
   - inversion Hexp.
     subst.
-    apply Source.sig2T_eq_type in H4, H5, H6, H7.
-    do 2 apply Source.sig2T_eq_type in H4.
+    apply sig2T_eq_type in H4, H5, H6, H7.
+    do 2 apply sig2T_eq_type in H4.
     subst.
     pose proof (Source.var_of_exp_not_in_binop e1 e2 name op) as tmp.
     pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
@@ -276,7 +257,7 @@ Proof.
     + apply IH2; assumption.
   - inversion Hexp.
     subst.
-    apply Source.sig2T_eq_type in H0, H1, H4.
+    apply sig2T_eq_type in H0, H1, H4.
     subst.
     pose proof (Source.var_of_exp_not_in_ifte e1 e2 e3 name) as tmp.
     pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
@@ -522,7 +503,7 @@ Proof.
             exfalso.
             apply Ordered.vars_no_dups in ordered.
             apply ordered.
-            assert (tmp : forall l : list (ident * Source.type * list (ident * Source.type)), map (fun '(y, _, _) => y) l = map fst (map fst l))
+            assert (tmp : forall l : list (ident * type * list (ident * type)), map (fun '(y, _, _) => y) l = map fst (map fst l))
              by (clear; induction l as [|[[a b] c] tl IH]; [reflexivity|exact (f_equal _ IH)]).
             rewrite tmp, !map_app, <- Source.dag_names, !map_map.
             exact Hi.
@@ -544,7 +525,7 @@ Proof.
             exfalso.
             apply Ordered.vars_no_dups in ordered.
             apply ordered.
-            assert (tmp : forall l : list (ident * Source.type * list (ident * Source.type)), map (fun '(y, _, _) => y) l = map fst (map fst l))
+            assert (tmp : forall l : list (ident * type * list (ident * type)), map (fun '(y, _, _) => y) l = map fst (map fst l))
              by (clear; induction l as [|[[a b] c] tl IH]; [reflexivity|exact (f_equal _ IH)]).
             rewrite tmp, !map_app, <- Source.dag_names, !map_map.
             refine (in_or_app _ _ _ (or_introl (eq_ind _ (In eq_left) (in_map fst _ _ Hin) _ (map_ext _ _ _ _)))).

@@ -1,11 +1,11 @@
 From Reactive.Datatypes Require Array Hashtable.
 From Reactive.Translations Require LustreAstToLustre LustreOrderedToImp LustreOrdering.
+From Reactive.Props Require Axioms.
 
 From Corelib Require Extraction.
 From Stdlib Require Import ExtrOcamlBasic ExtrOcamlNatInt ExtrOcamlNativeString.
 
 #[local] Set Warnings "-extraction-default-directory".
-
 
 Extract Constant Array.t "'a" => "'a array".
 Extract Constant Array.length "'a" => "Stdlib.Array.length".
@@ -18,8 +18,9 @@ Extract Constant Hashtable.add "'a" "'b" => "(fun m x y -> Stdlib.Hashtbl.add m 
 Extract Constant Hashtable.find "'a" "'b" => "Stdlib.Hashtbl.find".
 Extract Constant Hashtable.find_opt "'a" "'b" => "Stdlib.Hashtbl.find_opt".
 Extract Constant LustreOrdering.List_mem => "Stdlib.List.mem". (* Small optimization? *)
+Extract Constant String.compare => "StringImpl.compare".
 
-Extract Constant Base.ABORT_FIXME => "Abort.aBORT_FIXME".
+Extract Constant Axioms.ABORT_FIXME => "Abort.aBORT_FIXME".
 
 Separate Extraction
   LustreOrdering.translate_node
