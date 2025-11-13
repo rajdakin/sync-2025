@@ -78,7 +78,7 @@ let node_to_graph (node : Lustre.node) : graph * (int, vertex) Hashtbl.t =
   (g, index_table)
 
 (** Orders the equations in a node *)
-let node_ordering (node : Lustre.node) : (Lustre.coq_type, LustreOrdered.node_ordered) Result.t =
+let node_ordering (node : Lustre.node) : (Semantics.coq_type, LustreOrdered.node_ordered) Result.t =
   let graph, index_table = node_to_graph node in
   match has_cycle graph with
   | None ->

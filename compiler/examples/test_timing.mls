@@ -1,0 +1,4 @@
+node add(x: int) returns (z:int)
+let
+	z = pre x;
+tel

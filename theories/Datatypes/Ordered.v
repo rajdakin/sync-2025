@@ -1,4 +1,8 @@
-From Reactive Require Export Base.
+Set Default Goal Selector "!".
+
+From Stdlib Require Import List.
+
+Import ListNotations.
 
 
 Inductive t {A B: Type}: list ((A * B) * list (A * B)) -> Prop :=

@@ -49,7 +49,7 @@ let parse_file filename =
     Format.printf "%s@\n" (Printexc.to_string e);
     exit 1
 
-let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(location * 'a r)) =
+let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
   fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
@@ -58,20 +58,26 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): Extracted.Result.(locati
   | BadType (expected, got) ->
       fprintf fmt "expected expression with type in %a, got %a"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt ", ") pp_type) expected pp_type got
-  | IncompatibleTypeAssignment (i, t1, t2) ->
-      fprintf fmt "assigned expression with type %a to variable %d with type %a"
-        pp_type t2 i pp_type t1
-  | UndeclaredVariable i ->
-      fprintf fmt "use of undeclared variable %d" i
-  | NeverAssigned (i, t) ->
-      fprintf fmt "variable %d with type %a is never assigned to" i pp_type t
-  | MultipleDeclaration (n, l1, l2) when l1 = l2 ->
-      fprintf fmt "variable %d is declared multiple times as %s" n
+  | UndeclaredVariable n ->
+      fprintf fmt "use of undeclared variable %s" n
+  | MultipleDeclaration (n, i, l1, l2) when l1 = l2 ->
+      fprintf fmt "variable %s(%d) is declared multiple times as %s" n i
         (match l1 with DeclInput -> "inputs" | DeclOutput -> "outputs" | DeclLocal -> "locals")
-  | MultipleDeclaration (n, l1, l2) ->
-      fprintf fmt "variable %d is declared multiple times as %s and %s" n
+  | MultipleDeclaration (n, i, l1, l2) ->
+      fprintf fmt "variable %s(%d) is declared multiple times as %s and %s" n i
         (match l1 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
         (match l2 with DeclInput -> "an input" | DeclOutput -> "an output" | DeclLocal -> "a local")
+  | MissingAssignment (n, i, t) ->
+      fprintf fmt "variable %s(%d) with type %a is never assigned to" n i pp_type t
+  | IncompatibleTypeAssignment (n, i, t1, t2) ->
+      fprintf fmt "assigned expression with type %a to variable %s(%d) with type %a"
+        pp_type t2 n i pp_type t1
+  | MultipleAssignment (n, i, t) ->
+      fprintf fmt "multiple assignments to variable %s(%d) with type %a"
+        n i pp_type t
+  | InvalidTiming (n, i, t) ->
+      fprintf fmt "invalid delay of pre expression with type %a in assignment of variable %s(%d)"
+        pp_type t n i
   | InternalError e -> fprintf fmt "internal error: %s" e
 
 let () =
@@ -83,7 +89,7 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        let pp_type fmt (t: Extracted.Lustre.coq_type) = match t with
+        let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
           | TVoid -> fprintf fmt "void"
           | TBool -> fprintf fmt "bool"
           | TInt -> fprintf fmt "int"
@@ -96,7 +102,7 @@ let () =
   match LustreOrdering.translate_node checked_node with
   | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
   | Err x ->
-      let pp_type fmt (t: Extracted.Lustre.coq_type) = match t with
+      let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
         | TVoid -> fprintf fmt "void"
         | TBool -> fprintf fmt "bool"
         | TInt -> fprintf fmt "int"

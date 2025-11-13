@@ -1,31 +1,90 @@
-From Reactive Require Import Base.
+Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Result.
 From Reactive.Languages Require LustreAst Lustre.
+From Reactive.Languages Require Import Semantics.
+From Reactive.Props Require Import Dec Forall Identifier.
 
-From Stdlib Require ListDec.
-From Stdlib Require Import Bool Sorting Permutation.
+From Stdlib Require ListDec FMaps.
+From Stdlib Require Import Bool List Nat Permutation Sorting String.
+
+Import ListNotations.
 
 Module Source := LustreAst.
 Module Target := Lustre.
 
-Definition convert_type (t : Source.type) : Target.type := match t with
-  | Source.TVoid => Target.TVoid
-  | Source.TBool => Target.TBool
-  | Source.TInt => Target.TInt
-end.
+From Stdlib Require FMaps.
 
-Record common_temp : Set := {
+Module StringKey.
+  Definition t : Type := string.
+  Definition eq (s1 s2 : t) := s1 = s2.
+  Definition lt (s1 s2 : t) := ltb s1 s2 = true.
+  Definition eq_refl : forall s : t, eq s s := @eq_refl _.
+  Definition eq_sym : forall s1 s2 : t, eq s1 s2 -> eq s2 s1 := @eq_sym _.
+  Definition eq_trans : forall s1 s2 s3 : t, eq s1 s2 -> eq s2 s3 -> eq s1 s3 := @eq_trans _.
+  Definition lt_trans : forall s1 s2 s3 : t, lt s1 s2 -> lt s2 s3 -> lt s1 s3.
+  Proof using.
+    unfold lt, ltb.
+    intros s1 s2 s3 H12 H23.
+    induction s1 as [|c1 s1 IH1] in s2, s3, H12, H23 |- *.
+    1: destruct s2; [discriminate H12|destruct s3; [discriminate H23|reflexivity]].
+    destruct s2 as [|c2 s2]; [discriminate H12|].
+    destruct s3 as [|c3 s3]; [discriminate H23|].
+    cbn in *.
+    destruct (Ascii.compare c1 c2) as [| |] eqn:eq12; [apply Ascii.compare_eq_iff in eq12; subst c1|clear H12|discriminate H12].
+    1: destruct (Ascii.compare c2 c3); [exact (IH1 _ _ H12 H23)|reflexivity|discriminate H23].
+    destruct (Ascii.compare c2 c3) eqn:eq23; [| |discriminate H23].
+    1: apply Ascii.compare_eq_iff in eq23; subst c3; rewrite eq12; reflexivity.
+    unfold Ascii.compare in eq12; rewrite BinNat.N.compare_lt_iff in eq12.
+    unfold Ascii.compare in eq23; rewrite BinNat.N.compare_lt_iff in eq23.
+    specialize (BinNat.N.lt_trans _ _ _ eq12 eq23) as lt13.
+    apply BinNat.N.compare_lt_iff in lt13.
+    unfold Ascii.compare; rewrite lt13.
+    reflexivity.
+  Defined.
+  Definition lt_not_eq : forall s1 s2 : t, lt s1 s2 -> ~ eq s1 s2.
+  Proof using.
+    intros s ? H <-.
+    induction s as [|c s IH]; [discriminate H|refine (IH _)].
+    unfold lt, ltb, compare, Ascii.compare in *; fold compare in *.
+    rewrite (BinNat.N.compare_refl _) in H.
+    exact H.
+  Defined.
+  Definition compare : forall s1 s2 : t, OrderedType.Compare lt eq s1 s2.
+  Proof using.
+    intros s1 s2; destruct (String.compare s1 s2) eqn:eqcmp;
+      [refine (OrderedType.EQ _)|refine (OrderedType.LT _)|refine (OrderedType.GT _)].
+    1: apply String.compare_eq_iff; exact eqcmp.
+    1: unfold lt, ltb; rewrite eqcmp; reflexivity.
+    1: unfold lt, ltb; rewrite String.compare_antisym, eqcmp; reflexivity.
+  Defined.
+  Definition eq_dec : forall s1 s2 : t, { eq s1 s2 } + { ~ eq s1 s2 } := String.string_dec.
+End StringKey.
+Module StringMap <: FMapInterface.S with Module E := StringKey := FMapList.Make(StringKey).
+
+Record common_temp : Type := {
   orig :> Source.node;
-  env: Dict.t Target.type;
-  Henv: forall x t, Dict.maps_to x (convert_type t) env <-> In (x, t) (orig.(Source.n_in) ++ orig.(Source.n_out) ++ orig.(Source.n_locals));
   
-  n_in: list Target.binder;
-  n_out: list Target.binder;
-  n_locals: list Target.binder;
+  smap: StringMap.t (ident * Result.declaration_location);
+  n_in: list binder;
+  n_out: list binder;
+  n_locals: list binder;
   
   nvars := n_in ++ n_out ++ n_locals;
-  Hnvars: nvars = map (fun '(x, t) => (x, convert_type t)) (orig.(Source.n_in) ++ orig.(Source.n_out) ++ orig.(Source.n_locals));
+  Hnvars:
+    Forall2 (fun '(x, tx) '(l, (v, tv)) =>
+        StringMap.find v smap = Some (x, l) /\
+        tx = tv)
+      nvars
+      (map (pair Result.DeclInput) orig.(Source.n_in) ++
+       map (pair Result.DeclOutput) orig.(Source.n_out) ++
+       map (pair Result.DeclLocal) orig.(Source.n_locals));
+  
+  seed: ident;
+  Hseed: forall n, ~ In (iter n next_ident seed) (map fst nvars);
+  
+  env: Dict.t type;
+  Henv: forall x t, Dict.maps_to x t env <-> In (x, t) (n_in ++ n_out ++ n_locals);
 }.
 
 Definition translate_unop (op: Source.unop): { tin & { tout & Target.unop tin tout } } := match op with
@@ -50,29 +109,31 @@ Definition translate_binop (op: Source.binop): { tin1 & { tin2 & { tout & Target
   | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
   | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
 end.
-Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: Target.type): Result.t Target.type (Target.exp t) := match e, t with
-  | existT _ Target.TVoid e, Target.TVoid => Result.Ok e
-  | existT _ Target.TBool e, Target.TBool => Result.Ok e
-  | existT _ Target.TInt e, Target.TInt => Result.Ok e
+Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: type): Result.t type (Target.exp t) := match e, t with
+  | existT _ TVoid e, TVoid => Result.Ok e
+  | existT _ TBool e, TBool => Result.Ok e
+  | existT _ TInt e, TInt => Result.Ok e
   | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
 end.
 
-Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t Target.type (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t type (sigT Target.exp).
 Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
-    + exists Target.TVoid.
-      exact (Target.EConst Target.CVoid).
-    + exists Target.TBool.
-      exact (Target.EConst (Target.CBool b)).
-    + exists Target.TInt.
-      exact (Target.EConst (Target.CInt n)).
-  - destruct (Dict.find n (env temp)) as [ ty | ].
+    + exists TVoid.
+      exact (Target.EConst CVoid).
+    + exists TBool.
+      exact (Target.EConst (CBool b)).
+    + exists TInt.
+      exact (Target.EConst (CInt n)).
+  - destruct (StringMap.find n (smap temp)) as [ [ i _ ] | ].
     2: right; exact [(l, Result.UndeclaredVariable n)].
+    destruct (Dict.find i (env temp)) as [ ty | ].
+    2: right; exact [(l, Result.InternalError ("Variable " ++ n ++ " has an ID but no type"))].
     left.
     exists ty.
-    exact (Target.EVar (n, ty)).
+    exact (Target.EVar (i, ty)).
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
     destruct (translate_unop op) as [ tin [ tout top ]].
@@ -91,7 +152,7 @@ Proof.
     exact (Result.Ok (existT _ tout (Target.EBinop top e1'' e2''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
-    refine (Result.bind (typecheck_exp l e1' Target.TBool) _).
+    refine (Result.bind (typecheck_exp l e1' TBool) _).
     intros e1''.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
@@ -103,29 +164,33 @@ Proof.
     exact (Result.Ok (existT _ t (Target.EIfte e1'' e2'' e3''))).
 Defined.
 
-Definition check_body (temp: common_temp) (entry: Source.node): Result.t Target.type
+Definition check_body (temp: common_temp) (entry: Source.node): Result.t type
   { body : list Target.equation | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) }.
 Proof.
   destruct entry as [nloc n nin out loc eqs]; clear n nin out loc.
   refine (Result.bind ((_ :
     Result.t _
       { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) } }
-    )) (fun res => match res with existT _ [] ret => Result.Ok ret | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.NeverAssigned i ty)] end)).
+    )) (fun res => match res with
+      | existT _ [] ret => Result.Ok ret
+      | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.MissingAssignment "<information lost>" i ty)] end)).
   induction eqs as [ | [ l [ n e ] ] tl IH ].
   - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))).
     rewrite app_nil_r; exact (Permutation_refl _).
   - refine (Result.bind (Result.combine (check_exp temp e) IH) _); clear IH.
     intros [ [ ty e' ] [ rem [ eqs IH ] ] ].
-    pose (rev_lhs := @nil (ident * Target.type)); change rem with (rev_lhs ++ rem) in IH.
-    generalize dependent rev_lhs; induction rem as [ | [ i ty' ] rem IH ]; intros rev_lhs Hperm.
-    1: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
-    destruct (PeanoNat.Nat.eq_dec n i) as [ <- | nnei ].
-    2: refine (IH ((i, ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
-    2: rewrite (app_assoc _ [_] _ : _ ++ (i, ty') :: _ = _).
+    destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ].
+    2: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
+    pose (rev_lhs := @nil (ident * type)); change rem with (rev_lhs ++ rem) in IH.
+    generalize dependent rev_lhs; induction rem as [ | [ i' ty' ] rem IH ]; intros rev_lhs Hperm.
+    1: exact (Result.Err [(l, Result.MultipleAssignment n i ty)]).
+    destruct (PeanoNat.Nat.eq_dec i i') as [ <- | nnei ].
+    2: refine (IH ((i', ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
+    2: rewrite (app_assoc _ [_] _ : _ ++ (i', ty') :: _ = _).
     2: exact (Permutation_app_tail _ (Permutation_cons_append _ _)).
-    destruct (Target.type_dec ty ty') as [ <- | nety ].
-    2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n ty' ty)]).
-    refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((n, existT Target.exp ty e') :: eqs) _))).
+    destruct (type_dec ty ty') as [ <- | nety ].
+    2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n i ty' ty)]).
+    refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((i, existT Target.exp ty e') :: eqs) _))).
     rewrite (app_assoc _ [_] _ : _ ++ map Target.equation_dest ((_, _) :: _) = (_ ++ _) ++ map _ _), rev_append_rev.
     refine (Permutation_trans (Permutation_app_tail _ _) Hperm); unfold Target.equation_dest, fst, snd, projT1.
     rewrite <-app_assoc; exact (Permutation_sym (Permutation_app (Permutation_rev _) (Permutation_cons_append _ _))).
@@ -136,48 +201,28 @@ Definition n_assigned_vars (body: list Target.equation) :=
 
 Scheme Equality for list.
 
-Module EquationOrder <: Orders.TotalLeBool.
-  Local Coercion is_true : bool >-> Sortclass.
-
-  Definition t := Source.equation.
-
-  Definition leb (x y: Source.equation): bool := Nat.leb (fst x) (fst y).
-  Infix "<=?" := leb (at level 70, no associativity).
-
-  Theorem leb_total: forall x y, x <=? y \/ y <=? x.
-  Proof.
-    intros [] [].
-    unfold leb; simpl.
-
-    revert i i0.
-    induction i; destruct i0; simpl; auto.
-  Qed.
-End EquationOrder.
-
-Module Import EquationSort := Sort EquationOrder.
-
-Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t Target.type (incl (n_out temp) (n_assigned_vars body)).
+Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t type (incl (n_out temp) (n_assigned_vars body)).
 Proof.
   refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
   intros b.
-  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Target.type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
+  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
   1: exact (Result.Ok Hin).
-  exact (Result.Err [(l, Result.NeverAssigned (fst b) (snd b))]).
+  exact (Result.Err [(l, Result.MissingAssignment "<information lost>" (fst b) (snd b))]).
 Defined.
 
 (* TODO: merge with check_Henv *)
 Definition vars_unique (l: Result.location) (temp: common_temp) :
-  Result.t Target.type (NoDup ((map fst (n_in temp ++ n_out temp ++ n_locals temp)))).
+  Result.t type (NoDup ((map fst (n_in temp ++ n_out temp ++ n_locals temp)))).
 Proof using.
   induction (n_in temp) as [ | hd tl IH ].
   2:{
     refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclInput Result.DeclInput)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclInput)]).
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_out temp))) as [ _ | nout ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclInput Result.DeclOutput)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclOutput)]).
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_locals temp))) as [ _ | nloc ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclInput Result.DeclLocal)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclInput Result.DeclLocal)]).
     refine (Result.Ok _).
     rewrite !map_app, !in_app_iff; tauto.
   }
@@ -185,9 +230,9 @@ Proof using.
   2:{
     refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclOutput Result.DeclOutput)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclOutput Result.DeclOutput)]).
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst (n_locals temp))) as [ _ | nloc ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclOutput Result.DeclLocal)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclOutput Result.DeclLocal)]).
     refine (Result.Ok _).
     rewrite !map_app, !in_app_iff; tauto.
   }
@@ -195,68 +240,163 @@ Proof using.
   2:{
     refine (Result.bind (Result.combine_prop _ IH) (fun '(conj H1 H2) => Result.Ok (NoDup_cons _ H1 H2))); clear IH.
     destruct (In_dec PeanoNat.Nat.eq_dec (fst hd) (map fst tl)) as [ _ | nin ].
-    1: exact (Result.Err [(l, Result.MultipleDeclaration (fst hd) Result.DeclLocal Result.DeclLocal)]).
+    1: exact (Result.Err [(l, Result.MultipleDeclaration "<information lost>" (fst hd) Result.DeclLocal Result.DeclLocal)]).
     refine (Result.Ok _).
     rewrite !map_app, !in_app_iff; tauto.
   }
   exact (Result.Ok (NoDup_nil _)).
 Defined.
 
-
-Lemma forall_type_dec : forall (P : Source.type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
+Definition build_map (entry: Source.node) :
+  { sm & { seed & Result.t type { n_in & { n_out & { n_locals |
+    Forall (fun v => forall ty', In (fst v, ty') n_in -> ty' = snd v) n_in /\
+    Forall (fun v => forall ty', In (fst v, ty') n_out -> ty' = snd v) n_out /\
+    Forall (fun v => forall ty', In (fst v, ty') n_locals -> ty' = snd v) n_locals /\
+    Forall (fun v => ~ In (fst v) (map fst n_out)) n_in /\
+    Forall (fun v => ~ In (fst v) (map fst n_locals)) n_in /\
+    Forall (fun v => ~ In (fst v) (map fst n_locals)) n_out /\
+    Forall2 (fun '(x, tx) '(l, (v, tv)) =>
+        StringMap.find v sm = Some (x, l) /\
+        tx = tv)
+      (n_in ++ n_out ++ n_locals)
+      (map (pair Result.DeclInput) entry.(Source.n_in) ++
+       map (pair Result.DeclOutput) entry.(Source.n_out) ++
+       map (pair Result.DeclLocal) entry.(Source.n_locals)) /\
+    (forall n, ~ In (iter n next_ident seed) (map fst (n_in ++ n_out ++ n_locals))) } } } } }.
 Proof using.
-  intros P dec.
-  destruct (dec Source.TVoid) as [Pvoid | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  destruct (dec Source.TBool) as [Pbool | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  destruct (dec Source.TInt)  as [Pint  | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  left; intros []; assumption.
+  destruct entry as [l n nin out loc body]; unfold Source.n_in, Source.n_out, Source.n_locals; clear n body.
+  induction nin as [ | [n ty] vars (sm & seed & IH) ].
+  2:{
+    destruct (StringMap.find n sm) as [ [ i dl ] | ] eqn:eqnsm.
+    1: exists sm, seed;
+       refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclInput dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
+    exists (StringMap.add n (seed, Result.DeclInput) sm), (next_ident seed);
+      refine (Result.bind IH _);
+      intros (IHnin & IHout & IHloc & IHii & IHoo & IHll & IHio & IHil & IHol & IH1 & IH2);
+      left; exists ((seed, ty) :: IHnin), IHout, IHloc; repeat split; try assumption.
+    + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
+      1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
+      assert (Hseed : ~ In seed (map fst IHnin))
+        by (rewrite map_app in IH2; exact (fun f => IH2 O (in_or_app _ _ _ (or_introl f)))).
+      clear - IHii Hseed.
+      refine (proj2 (Forall_forall _ _) _).
+      intros [v tv] Hv ty' [[=f _]|H]; [contradict Hseed; subst; exact (in_map fst _ _ Hv)|].
+      exact (proj1 (Forall_forall _ _) IHii _ Hv _ H).
+    + constructor; [|assumption]. refine (fun f => IH2 O _).
+      rewrite map_app; refine (in_or_app _ _ _ (or_intror _)).
+      rewrite map_app; exact (in_or_app _ _ _ (or_introl f)).
+    + constructor; [|assumption]. refine (fun f => IH2 O _).
+      rewrite map_app; refine (in_or_app _ _ _ (or_intror _)).
+      rewrite map_app; exact (in_or_app _ _ _ (or_intror f)).
+    + constructor; [split; [|exact eq_refl]|].
+      1: exact (StringMap.find_1 (StringMap.add_1 _ _ eq_refl)).
+      refine (Forall2_impl _ _ IH1); clear - eqnsm.
+      intros [x tx] [l' [v tv]] [H1 H2]; split; [clear tx tv H2|exact H2].
+      refine (StringMap.find_1 (StringMap.add_2 _ _ (StringMap.find_2 H1))).
+      intros <-; rewrite eqnsm in H1; discriminate H1.
+    + intros k [H|H]; [|exact (eq_ind _ (fun v => ~ In v _) (IH2 (S k)) _ (PeanoNat.Nat.iter_succ_r _ _ _ _) H)].
+      cbn in H; clear - H.
+      assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
+      induction k as [|n IH] in seed |- *; [exact (le_n _)|].
+      exact (le_S _ _ (IH _)).
+  }
+  refine (match _ : { sm & { seed & Result.t _ { n_out & { n_locals |
+                      _ /\ _ /\ _ /\ Forall2 _ (n_out ++ _) (map _ out ++ _) /\ (forall n, ~ In _ (map _ (n_out ++ _)))}}}} with
+    | existT _ sm (existT _ seed (Result.Ok (existT _ n_out (exist _ n_locals (conj Hoo (conj Hll (conj Hol (conj H1 H2)))))))) =>
+        existT _ sm (existT _ seed (Result.Ok (
+          existT _ [] (existT _ n_out (exist _ n_locals
+            (conj (Forall_nil _) (conj Hoo (conj Hll (conj (Forall_nil _) (conj (Forall_nil _) (conj Hol (conj H1 H2))))))))))))
+    | existT _ sm (existT _ seed (Result.Err e)) => existT _ sm (existT _ seed (Result.Err e)) end).
+  induction out as [ | [n ty] vars (sm & seed & IH) ].
+  2:{
+    destruct (StringMap.find n sm) as [ [ i dl ] | ] eqn:eqnsm.
+    1: exists sm, seed;
+       refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclOutput dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
+    exists (StringMap.add n (seed, Result.DeclOutput) sm), (next_ident seed);
+      refine (Result.bind IH _);
+      intros (IHout & IHloc & IHoo & IHll & IHol & IH1 & IH2);
+      left; exists ((seed, ty) :: IHout), IHloc; repeat split; try assumption.
+    + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
+      1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
+      assert (Hseed : ~ In seed (map fst IHout))
+        by (rewrite map_app in IH2; exact (fun f => IH2 O (in_or_app _ _ _ (or_introl f)))).
+      clear - IHoo Hseed.
+      refine (proj2 (Forall_forall _ _) _).
+      intros [v tv] Hv ty' [[=f _]|H]; [contradict Hseed; subst; exact (in_map fst _ _ Hv)|].
+      exact (proj1 (Forall_forall _ _) IHoo _ Hv _ H).
+    + constructor; [|assumption]. refine (fun f => IH2 O _).
+      rewrite map_app; exact (in_or_app _ _ _ (or_intror f)).
+    + constructor; [split; [|exact eq_refl]|].
+      1: exact (StringMap.find_1 (StringMap.add_1 _ _ eq_refl)).
+      refine (Forall2_impl _ _ IH1); clear - eqnsm.
+      intros [x tx] [l' [v tv]] [H1 H2]; split; [clear tx tv H2|exact H2].
+      refine (StringMap.find_1 (StringMap.add_2 _ _ (StringMap.find_2 H1))).
+      intros <-; rewrite eqnsm in H1; discriminate H1.
+    + intros k [H|H]; [|exact (eq_ind _ (fun v => ~ In v _) (IH2 (S k)) _ (PeanoNat.Nat.iter_succ_r _ _ _ _) H)].
+      cbn in H; clear - H.
+      assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
+      induction k as [|n IH] in seed |- *; [exact (le_n _)|].
+      exact (le_S _ _ (IH _)).
+  }
+  refine (match _ : { sm & { seed & Result.t _ { n_locals |
+                      _ /\ Forall2 _ n_locals (map _ _) /\ (forall n, ~ In _ (map _ n_locals))}}} with
+    | existT _ sm (existT _ seed (Result.Ok (exist _ n_locals (conj Hll (conj H1 H2))))) =>
+        existT _ sm (existT _ seed (Result.Ok (
+          existT _ [] (exist _ n_locals
+            (conj (Forall_nil _) (conj Hll (conj (Forall_nil _) (conj H1 H2))))))))
+    | existT _ sm (existT _ seed (Result.Err e)) => existT _ sm (existT _ seed (Result.Err e)) end).
+  induction loc as [ | [n ty] vars (sm & seed & IH) ].
+  2:{
+    destruct (StringMap.find n sm) as [ [ i dl ] | ] eqn:eqnsm.
+    1: exists sm, seed;
+       refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclLocal dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
+    exists (StringMap.add n (seed, Result.DeclLocal) sm), (next_ident seed);
+      refine (Result.bind IH _);
+      intros (IHloc & IHll & IH1 & IH2);
+      left; exists ((seed, ty) :: IHloc); repeat split; try assumption.
+    + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
+      1: exact (in_map fst _ _ H).
+      assert (Hseed : ~ In seed (map fst IHloc))
+        by (exact (fun f => IH2 O f)).
+      clear - IHll Hseed.
+      refine (proj2 (Forall_forall _ _) _).
+      intros [v tv] Hv ty' [[=f _]|H]; [contradict Hseed; subst; exact (in_map fst _ _ Hv)|].
+      exact (proj1 (Forall_forall _ _) IHll _ Hv _ H).
+    + constructor; [split; [|exact eq_refl]|].
+      1: exact (StringMap.find_1 (StringMap.add_1 _ _ eq_refl)).
+      refine (Forall2_impl _ _ IH1); clear - eqnsm.
+      intros [x tx] [l' [v tv]] [H1 H2]; split; [clear tx tv H2|exact H2].
+      refine (StringMap.find_1 (StringMap.add_2 _ _ (StringMap.find_2 H1))).
+      intros <-; rewrite eqnsm in H1; discriminate H1.
+    + intros k [H|H]; [|exact (eq_ind _ (fun v => ~ In v _) (IH2 (S k)) _ (PeanoNat.Nat.iter_succ_r _ _ _ _) H)].
+      cbn in H; clear - H.
+      assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
+      induction k as [|n IH] in seed |- *; [exact (le_n _)|].
+      exact (le_S _ _ (IH _)).
+  }
+  exists (StringMap.empty _), O; left; exists []; split; [exact (Forall_nil _)|split; [exact (Forall2_nil _)|intros ? f; exact f]].
 Defined.
 
-Import Result.notations.
-
-Lemma check_Henv {entry} :
-  let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
-  let n_out := map (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
-  let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
-  Result.t Target.type (forall n t,
-    Dict.maps_to n (convert_type t)
+Lemma check_Henv {n_in n_out n_loc} :
+  Forall (fun v => forall ty', In (fst v, ty') n_in -> ty' = snd v) n_in ->
+  Forall (fun v => forall ty', In (fst v, ty') n_out -> ty' = snd v) n_out ->
+  Forall (fun v => forall ty', In (fst v, ty') n_loc -> ty' = snd v) n_loc ->
+  Forall (fun v => ~ In (fst v) (map fst n_out)) n_in ->
+  Forall (fun v => ~ In (fst v) (map fst n_loc)) n_in ->
+  Forall (fun v => ~ In (fst v) (map fst n_loc)) n_out ->
+  forall n t,
+    Dict.maps_to n t
       (fold_left (fun acc '(n, t) => Dict.add n t acc)
-      (n_in ++ n_out ++ n_locals)
-      (Dict.empty Target.type)) <->
-    In (n, t) (Source.n_in entry ++ Source.n_out entry ++ Source.n_locals entry)).
+       (n_in ++ n_out ++ n_loc)
+       (Dict.empty type)) <->
+    In (n, t) (n_in ++ n_out ++ n_loc)%list.
 Proof using.
-  destruct entry as [l ? nin nout nloc ?]; cbn; clear - l.
-  refine (Result.bind
-    (Result.combine_prop (Result.list_map (P := fun v => forall ty', In (fst v, ty') nin -> ty' = snd v) _ nin)
-    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nout)) _ nin)
-    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nloc)) _ nin)
-    (Result.combine_prop (Result.list_map (P := fun v => forall ty', In (fst v, ty') nout -> ty' = snd v) _ nout)
-    (Result.combine_prop (Result.list_map (P := fun v => ~ In (fst v) (map fst nloc)) _ nout)
-                         (Result.list_map (P := fun v => forall ty', In (fst v, ty') nloc -> ty' = snd v) _ nloc)))))) _).
-  all: try refine (fun v => match In_dec PeanoNat.Nat.eq_dec _ _ with left _ => _ | right h => Result.Ok h end).
-  1: rename nin into nlist.
-  4: rename nout into nlist.
-  6: rename nloc into nlist.
-  1-6: try (intros [b t]; refine (match forall_type_dec (* Technically, does not check for duplicates, only variables with same ID but different types *)
-        (fun ty' => In (b, ty') nlist -> ty' = t)
-        ltac:(
-          intros ty;
-          destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec Source.type_dec) (b, ty) nlist) as [Hin|Hnin]; [|left; intros f; contradiction (Hnin f)];
-          destruct (Source.type_dec ty t) as [eqty|nety]; [left; intros _; exact eqty|];
-          right; intros f; exact (nety (f Hin)))
-        with left h => Result.Ok h | right _ => _ end)).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclInput Result.DeclInput)]).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclInput Result.DeclOutput)]).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclInput Result.DeclLocal)]).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclOutput Result.DeclOutput)]).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration (fst v) Result.DeclOutput Result.DeclLocal)]).
-  1: exact (Result.Err [(l, Result.MultipleDeclaration b Result.DeclLocal Result.DeclLocal)]).
-  intros (innotdup' & innotout' & innotloc' & outnotdup' & outnotloc' & locnotdup').
-  left; intros n t.
+  rename n_in into nin, n_out into nout, n_loc into nloc.
+  intros innotdup' outnotdup' locnotdup' innotout' innotloc' outnotloc' n t.
   match goal with |- Dict.maps_to _ _ (fold_left ?f ?l ?d) <-> _ =>
   rewrite <-(fold_left_rev_right (fun x y => f y x) l d) end.
   rewrite (in_rev (nin ++ nout ++ nloc) (n, t)),
-          !rev_app_distr, <-!app_assoc, <-!map_rev.
+          !rev_app_distr, <-!app_assoc.
   apply Forall_rev in innotdup', innotloc', innotout', outnotloc', outnotdup', locnotdup'.
   specialize (Forall_impl _ (fun v HP ty' Hin => HP ty' (proj2 (in_rev _ _) Hin)) innotdup') as innotdup.
   specialize (Forall_impl _ (fun v Hnin Hin => Hnin (proj2 (in_rev _ _) (eq_ind _ _ Hin _ (map_rev _ _)))) innotout') as innotout.
@@ -267,7 +407,7 @@ Proof using.
   remember (rev nin) as l3 eqn:eq3.
   remember (rev nout) as l2 eqn:eq2.
   remember (rev nloc) as l1 eqn:eq1.
-  clear l nin nout nloc eq1 eq2 eq3 innotdup' innotout' innotloc' outnotdup' outnotloc' locnotdup'.
+  clear nin nout nloc eq1 eq2 eq3 innotdup' innotout' innotloc' outnotdup' outnotloc' locnotdup'.
   split.
   - intros H.
     clear innotout innotloc outnotloc.
@@ -330,21 +470,26 @@ Proof using.
     1-3: clear; intros x H t Hin; exact (H _ (or_intror Hin)).
 Defined.
 
-Definition check_node_prop (entry: Source.node): Result.t Target.type Target.node :=
-  let n_in := map (fun '(n, t) => (n, convert_type t)) (Source.n_in entry) in
-  let n_out := map (fun '(n, t) => (n, convert_type t)) (Source.n_out entry) in
-  let n_locals := map (fun '(n, t) => (n, convert_type t)) (Source.n_locals entry) in
-  do Henv <- check_Henv;
+Import Result.notations.
+
+Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
+  let '(existT _ sm (existT _ seed tmp)) := build_map entry in
+  do '(existT _ n_in (existT _ n_out (exist _ n_loc
+        (conj Hii (conj Hoo (conj Hll (conj Hio (conj Hil (conj Hol (conj Hnvars Hseed)))))))))) <- tmp;
+  let Henv := check_Henv Hii Hoo Hll Hio Hil Hol in
   let temp := {|
     orig := entry;
-    env := fold_left (fun acc '(n, t) => Dict.add n t acc) (n_in ++ n_out ++ n_locals) (Dict.empty _);
-    Henv := Henv;
-    
     n_in := n_in;
     n_out := n_out;
-    n_locals := n_locals;
+    n_locals := n_loc;
     
-    Hnvars := eq_sym (eq_trans (map_app _ _ _) (f_equal _ (map_app _ _ _)));
+    Hnvars := Hnvars;
+    
+    seed := seed;
+    Hseed := Hseed;
+    
+    env := fold_left (fun acc '(n, t) => Dict.add n t acc) (n_in ++ n_out ++ n_loc) (Dict.empty _);
+    Henv := Henv;
   |} in
   do '(exist _ n_body vars_all_assigned, vars_unique) <-
     Result.combine (check_body temp entry) (vars_unique (Source.n_loc entry) temp);
@@ -353,8 +498,10 @@ Definition check_node_prop (entry: Source.node): Result.t Target.type Target.nod
       Target.n_name := Source.n_name entry;
       Target.n_in := n_in;
       Target.n_out := n_out;
-      Target.n_locals := n_locals;
+      Target.n_locals := n_loc;
       Target.n_body := n_body;
       Target.n_vars_all_assigned := vars_all_assigned;
       Target.n_vars_unique := vars_unique;
+      Target.n_seed := seed;
+      Target.n_seed_always_fresh := Hseed;
     |}.
