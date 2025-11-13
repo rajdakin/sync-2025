@@ -65,7 +65,7 @@ Inductive exp: Type :=
   | EBinop: Result.location -> binop -> exp -> exp -> exp
   | EIfte: Result.location -> exp -> exp -> exp -> exp.
 
-Definition equation: Set := string * exp.
+Definition equation: Set := binder * exp.
 
 
 Record node := mk_node {

@@ -13,7 +13,6 @@ Module Target := Imp.
 
 Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop ty tout :=
   match op with
-  (* ???? *)
   | Source.Lustre.Uop_not => Target.Uop_not
   | Source.Lustre.Uop_neg => Target.Uop_neg
   | Source.Lustre.Uop_pre => ABORT_FIXME _ tt
@@ -146,12 +145,6 @@ Proof.
   |}).
 
   intros b Hb.
-  assert (tmp : exists b', In b' n_out /\ b = b').
-  { clear - Hb.
-    induction n_out as [|hd tl IH]; [contradiction Hb|].
-    destruct Hb as [Hb|Hb]; [exists hd; split; [left; exact eq_refl|exact (eq_sym Hb)]|].
-    destruct (IH Hb) as [b' [H1 H2]]; exists b'; split; [right; exact H1|exact H2]. }
-  destruct tmp as [b' [Hb' ->]]; clear Hb; rename b' into b, Hb' into Hb.
   specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
     as b_assigned.
   apply in_map_iff in b_assigned.
