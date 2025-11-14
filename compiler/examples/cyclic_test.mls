@@ -1,0 +1,7 @@
+node main(a: int) returns (b: int)
+var x: int; y: int;
+let
+  y = b + a;
+  b = x + 1;
+  x = y - 2;
+tel

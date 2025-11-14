@@ -428,7 +428,7 @@ Proof.
   assert (assignments_wd : incl (map Source.Lustre.equation_dest n_body) (n_out ++ n_locals)).
   { intros x Hx.
     exact (Permutation.Permutation_in x n_vars_all_assigned Hx). }
-  clear n_vars_all_assigned.
+  clear n_vars_all_assigned n_all_vars_exist.
   revert h Hagree Hhist Hsource.
   induction n_body as [ | (eq_left, (ty, eq_right)) n_body IH ]; intros h Hagree Hhist Hsource.
   - simpl.
