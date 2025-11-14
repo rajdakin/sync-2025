@@ -215,11 +215,11 @@ Definition node_to_graph_fun'0 rt := node_to_graph_fun0 (fun v i n => node_to_gr
 Definition node_to_graph_fun' rt := node_to_graph_fun'0 (fun _ _ _ => rt).
 
 Definition node_to_graph_ret rt :=
-  @sig (Hashtable.t ident vertex * Hashtable.t vertex ident * nat * rt)%type (fun r =>
-    let '(v1, i1, n1, _) := r in node_to_graph_assumptions v1 i1 n1).
+  { r : Hashtable.t ident vertex * Hashtable.t vertex ident * nat * rt
+  | let '(v1, i1, n1, _) := r in node_to_graph_assumptions v1 i1 n1 }.
 Definition node_to_graph_ret' v0 i0 n0 rt :=
-  @sig (Hashtable.t ident vertex * Hashtable.t vertex ident * nat * rt)%type (fun r =>
-    let '(v1, i1, n1, _) := r in node_to_graph_consistency v0 i0 n0 v1 i1 n1 /\ node_to_graph_assumptions v1 i1 n1).
+  { r : Hashtable.t ident vertex * Hashtable.t vertex ident * nat * rt
+  | let '(v1, i1, n1, _) := r in node_to_graph_consistency v0 i0 n0 v1 i1 n1 /\ node_to_graph_assumptions v1 i1 n1 }.
 
 Definition node_to_graph_consistent_prop {A} P : Prop :=
   forall v0 i0 n0 v1 i1 n1, node_to_graph_consistency v0 i0 n0 v1 i1 n1 -> forall x : A, P v0 i0 n0 x -> P v1 i1 n1 x.
@@ -733,11 +733,9 @@ Proof using.
       exact (in_map (Hashtable.find_opt f2) _ _ Hin).
 Qed.
 
-Definition node_to_graph (source: Source.node): graph * Hashtable.t vertex ident.
+Definition node_to_graph (excl_list: list ident) (eqns: list Source.equation): graph * Hashtable.t vertex ident.
 Proof using.
-  destruct source as [loc _ n_in n_out n_locals n_body n_vars _ _ _ _ _ _]; clear n_vars.
-  pose (excl := map fst n_in).
-  pose (n := List.length n_out + List.length n_locals).
+  pose (n := List.length eqns).
   pose (g := Array.make n [] : graph).
   pose (var_table := Hashtable.create ident vertex n).
   pose (index_table := Hashtable.create vertex ident n).
@@ -749,9 +747,9 @@ Proof using.
     1-3: intros ? f; exfalso; exact (Hashtable.In_create f).
     intros ? f; inversion f.
   }
-  pose (f := node_to_graph_iter excl).
+  pose (f := node_to_graph_iter excl_list).
   unshelve refine (
-    let 'exist _ (_, idx_map, _, g) _ := (fix inner (body : list _) i1 i2 i3 Hi g {struct body} := _) n_body var_table index_table nxt H g
+    let 'exist _ (_, idx_map, _, g) _ := (fix inner (body : list _) i1 i2 i3 Hi g {struct body} := _) eqns var_table index_table nxt H g
       : node_to_graph_ret graph
     in (g, idx_map)); clear - f inner body i1 i2 i3 Hi g.
   destruct body as [|e tl].
@@ -776,27 +774,28 @@ Qed.
 Definition graph_prop (g: graph): Prop :=
   forall k, k < Array.length g -> Forall (fun v : vertex => v < Array.length g) (Array.get g k).
 
-Definition graph_imap_prop (source: Source.node) n (g: graph) (imap: Hashtable.t vertex ident) :=
+Definition graph_imap_prop
+    (excl_list: list ident) (eqn_list: list Source.equation)
+    n (g: graph) (imap: Hashtable.t vertex ident) :=
   Array.length g = n /\
   (forall v, Hashtable.InMap v imap <-> v < n) /\
   (forall k1 k2 H1 H2, Hashtable.find imap k1 H1 = Hashtable.find imap k2 H2 -> k1 = k2) /\
-  (forall v H, In (Hashtable.find imap v H) (map fst source.(Source.n_assigned_vars))) /\
-  (forall i, In i source.(Source.n_assigned_vars) -> exists v, Hashtable.find_opt imap v = Some (fst i)) /\
+  (forall v H, In (Hashtable.find imap v H) (map fst (map Source.equation_dest eqn_list))) /\
+  (forall i, In i (map Source.equation_dest eqn_list) -> exists v, Hashtable.find_opt imap v = Some (fst i)) /\
   Forall (fun '(i, existT _ ty e) =>
     forall v, Hashtable.find_opt imap v = Some i ->
     incl (map (Hashtable.find_opt imap) (Array.get g v))
          (map (fun p => Some (fst p)) (Source.var_of_exp e)) /\
     incl (map (fun p => Some (fst p)) (Source.var_of_exp e))
-         (map Some (map fst source.(Source.n_in)) ++
-          map (Hashtable.find_opt imap) (Array.get g v))) source.(Source.n_body).
+         (map Some excl_list ++ map (Hashtable.find_opt imap) (Array.get g v))) eqn_list.
 
-Lemma graph_prop_is_graph_wd {source n g imap}: graph_imap_prop source n g imap ->
+Lemma graph_prop_is_graph_wd {elist eqns n g imap}: graph_imap_prop elist eqns n g imap ->
   forall i, i < Array.length g -> Forall (fun k => k < n) (Array.get g i).
 Proof using.
   intros (h1 & h2 & h3 & h4 & h5 & h6) v Hv.
   rewrite h1, <-h2 in Hv.
   specialize (h4 v Hv) as Hin.
-  unfold Source.n_assigned_vars in Hin; rewrite map_map in Hin; cbn in Hin.
+  rewrite map_map in Hin; cbn in Hin.
   apply in_map_iff in Hin; destruct Hin as [[i [ty e]] [eqi Hity]].
   specialize (proj1 (Forall_forall _ _) h6 _ Hity v) as tmp.
   specialize (Hashtable.find_opt_In _ _ Hv) as tmp2; rewrite <-eqi in tmp2; specialize (tmp tmp2); clear tmp2.
@@ -806,35 +805,32 @@ Proof using.
   exact (Hashtable.find_opt_Some_In _ _ _ (eq_sym Hity)).
 Qed.
 
-Lemma node_to_graph_prop' (source: Source.node):
-  let n := List.length source.(Source.n_out) + List.length source.(Source.n_locals) in
-  let (g, imap) := node_to_graph source in
-  graph_imap_prop source n g imap.
+Lemma node_to_graph_prop' excl_list eqns:
+  NoDup (excl_list ++ map fst (map Source.equation_dest eqns)) ->
+  Forall (fun e => incl (map fst (Source.var_of_exp (projT2 (snd e)))) (excl_list ++ map fst (map Source.equation_dest eqns))) eqns ->
+  let n := List.length eqns in
+  let (g, imap) := node_to_graph excl_list eqns in
+  graph_imap_prop excl_list eqns n g imap.
 Proof using.
-  intros n.
-  unfold graph_imap_prop, node_to_graph;
-    destruct source as [loc n_name n_in n_out n_locals n_body n_vars n_assigned_vars n_all_vars_exist n_vars_all_assigned n_vars_unique
-                        n_seed n_seed_always_fresh];
-    simpl in n |- *.
-  unfold Source.n_assigned_vars, Source.n_body; fold n_assigned_vars.
-  pose (Vars := map fst n_assigned_vars).
-  pose (excl := map fst n_in); fold excl.
+  intros Hnodup Hall_def n.
+  unfold graph_imap_prop, node_to_graph.
+  pose (Vars := map fst (map Source.equation_dest eqns)); fold Vars in Hnodup |- *.
   fold n.
   pose (g := Array.make n (@nil ident) : graph); fold g.
   assert (Hg : Array.length g = n) by exact (Array.length_make _ _).
   assert (HVars : List.length Vars <= n).
   1:{
     unfold Vars, n.
-    rewrite (length_map (A:=binder)), (Permutation_length n_vars_all_assigned), length_app.
+    rewrite (length_map (A:=binder)), length_map.
     exact (le_n _).
   }
   pose (var_table := Hashtable.create ident vertex n); fold var_table.
   pose (index_table := Hashtable.create vertex ident n); fold index_table.
   pose (nxt := O).
-  match goal with |- context[?f0 n_body var_table index_table O ?P0] =>
+  match goal with |- context[?f0 eqns var_table index_table O ?P0] =>
     pose (f := f0); pose (P := P0 : node_to_graph_assumptions _ _ nxt); fold f P end.
   match goal with |- let (g0, imap) := _ in ?ret =>
-    change (let (g0, imap) := let 'exist _ (_, idx_map, _, g0) _ := f n_body var_table index_table nxt P g
+    change (let (g0, imap) := let 'exist _ (_, idx_map, _, g0) _ := f eqns var_table index_table nxt P g
             in (g0, idx_map) in ret) end.
   rename var_table into i1, index_table into i2, nxt into i3, P into Hi.
   assert (Hni : node_to_graph_assumption_n Vars i1 i3).
@@ -842,23 +838,19 @@ Proof using.
     split.
     2: intros ? Hf; contradict Hf.
     2: solve [apply Hashtable.In_create].
-    assert (tmp : NoDup Vars).
-    1:{ unfold Vars, n_assigned_vars in *; unfold n_vars in n_vars_unique.
-      apply (Permutation_NoDup (Permutation_map _ (Permutation_sym n_vars_all_assigned))); clear - n_vars_unique.
-      induction n_in as [|hd tl IH]; [exact n_vars_unique|].
-      inversion n_vars_unique; apply IH; assumption. }
+    assert (tmp := NoDup_app_remove_l _ _ Hnodup : NoDup Vars).
     unfold node_to_graph_assumption_n.
     rewrite (nodup_remove_dup _ tmp).
-    unfold Vars, i1, i3, n_assigned_vars in n_vars_all_assigned |- *; clear - n_vars_all_assigned.
-    refine (f_equal (fun v => List.length (fst v)) (x := ([], map fst (map Source.equation_dest n_body))) _).
-    clear; induction n_body as [|[i tmp] tl IH]; [exact eq_refl|cbn; rewrite <-IH; clear tmp IH].
+    unfold Vars, i1, i3; clear; generalize dependent n; intros n.
+    refine (f_equal (fun v => List.length (fst v)) (x := ([], map fst (map Source.equation_dest eqns))) _).
+    clear; induction eqns as [|[i tmp] tl IH]; [exact eq_refl|cbn; rewrite <-IH; clear tmp IH].
     rewrite (proj2 (Hashtable.find_opt_None _ _) (@Hashtable.In_create _ _ _ _)).
     exact eq_refl.
   }
-  destruct (f n_body i1 i2 i3 Hi g) as [[[[f1 f2] f3] fg] Hf] eqn:eqf.
+  destruct (f eqns i1 i2 i3 Hi g) as [[[[f1 f2] f3] fg] Hf] eqn:eqf.
   refine (match _ :
     (forall k,
-      (forall i, In i (map Source.equation_dest n_body) -> Hashtable.find_opt f2 k <> Some (fst i)) ->
+      (forall i, In i (map Source.equation_dest eqns) -> Hashtable.find_opt f2 k <> Some (fst i)) ->
       Array.get g k = Array.get fg k) /\
     node_to_graph_assumption_n Vars f1 f3 /\
     node_to_graph_consistency i1 i2 i3 f1 f2 f3 /\
@@ -869,7 +861,7 @@ Proof using.
     conj H1 (conj _ (conj (proj1 (proj2 (proj2 Hf))) (conj _ (conj H4 H5)))) end).
   2:{
     destruct Hnf as [eqf3 _].
-    destruct Hf as (Hf1 & Hf2 & Hf3 & Hf4 & Hf5); clear - Hf1 Hf2 Hf4 Hf5 eqf3 H4 n_vars_unique n_vars_all_assigned.
+    destruct Hf as (Hf1 & Hf2 & Hf3 & Hf4 & Hf5); clear - Hf1 Hf2 Hf4 Hf5 eqf3 H4 Hnodup.
     assert (Hf5' : forall j, j < f3 -> Hashtable.InMap j f2).
     1:{
       clear - Hf1 Hf5.
@@ -882,12 +874,11 @@ Proof using.
     1:{
       rewrite eqf3.
       clear Hf1 Hf4 Hf5.
-      unfold Vars, n; rewrite <-length_app, <-(Permutation_length n_vars_all_assigned).
-      unfold n_vars in n_vars_unique; rewrite map_app in n_vars_unique; apply NoDup_app_remove_l in n_vars_unique.
-      rewrite <-(Permutation_map _ n_vars_all_assigned) in n_vars_unique.
-      fold binder; rewrite (nodup_remove_dup _ n_vars_unique), <-(length_map (A := binder) fst n_assigned_vars).
-      refine (f_equal (fun p => List.length (fst p)) (y := (_, [])) _).
-      assert (tmp : Forall (fun i => Hashtable.InMap i f1) (map (A:=binder) fst n_assigned_vars)).
+      unfold Vars, n.
+      apply NoDup_app_remove_l in Hnodup.
+      fold Vars; rewrite (nodup_remove_dup _ Hnodup), <-(length_map (fun e => fst (Source.equation_dest e)) eqns), <-(map_map _ _ _ : Vars = _).
+      refine (f_equal (fun p => List.length (fst p)) (y := (Vars, [])) _).
+      assert (tmp : Forall (fun i => Hashtable.InMap i f1) Vars).
       1:{
         apply Forall_forall; intros i Hi.
         apply in_map_iff in Hi; destruct Hi as [b [<- Hb]].
@@ -897,10 +888,9 @@ Proof using.
         specialize (Hf2 _ Hin) as [Hin2 Heq2].
         exact Hin2.
       }
-      pose (l := map (A:=binder) fst n_assigned_vars); fold l in tmp |- *; generalize dependent l.
-      clear; intros l Hl; induction l as [|hd tl IH]; [exact eq_refl|cbn].
-      inversion Hl as [|? ? Hh Ht]; subst; rewrite (IH Ht).
-      destruct (Hashtable.find_opt f1 hd) as [?|] eqn:eq; [exact eq_refl|contradiction (proj1 (Hashtable.find_opt_None _ _) eq Hh)].
+      clear - tmp; induction Vars as [|hd tl IH]; [exact eq_refl|cbn; rewrite (IH (Forall_inv_tail tmp))].
+      rewrite (Hashtable.find_opt_In _ _ (Forall_inv tmp)).
+      exact eq_refl.
     }
     clear eqf3; subst f3.
     intros v; split; [intros Hv|exact (Hf5' v)].
@@ -920,33 +910,21 @@ Proof using.
     specialize (H4 (Hashtable.find f2 v Hv) Hi); rewrite Heq in H4.
     exact (Arith_base.lt_not_le_stt _ _ H4).
   }
-  subst n_assigned_vars; subst n_vars.
-  assert (HinVars : incl (map fst n_body) Vars).
+  assert (HinVars : incl (map fst eqns) Vars).
   1:{ unfold Vars; clear; intros i Hi.
     apply in_map_iff in Hi; destruct Hi as [[j te] [<- Hj]].
     rewrite map_map; apply in_map; exact Hj.
   }
-  assert (HexpVars : Forall (fun ie => incl (map fst (Source.var_of_exp (projT2 (snd ie)))) (excl ++ Vars)) n_body).
-  1:{ unfold excl, Vars.
-    refine (Forall_impl _ _ n_all_vars_exist); clear - n_vars_all_assigned.
-    intros [i [ty e]] H; cbn in H |- *.
-    rewrite <-map_app; apply incl_map.
-    intros ity Hity.
-    specialize (H _ Hity).
-    apply in_or_app.
-    apply in_app_or in H; destruct H as [H|H]; [left; exact H|right].
-    exact (Permutation_in _ (Permutation_sym n_vars_all_assigned) H).
-  }
-  assert (Hnodup_body : NoDup (map fst n_body)).
-  1: rewrite <-(map_map Source.equation_dest fst);
-       refine (Permutation_NoDup (Permutation_sym (Permutation_map fst n_vars_all_assigned)) _).
-  1: rewrite map_app in n_vars_unique; exact (NoDup_app_remove_l _ _ n_vars_unique).
-  clear n_all_vars_exist n_vars_all_assigned n_vars_unique.
-  generalize dependent Vars; intros Vars HVars Hni HinVars HexpVars.
+  assert (Hnodup_body : NoDup (map fst eqns)).
+  1: rewrite <-(map_map Source.equation_dest fst); exact (NoDup_app_remove_l _ _ Hnodup).
+  clear Hnodup.
+  fold Vars in Hall_def.
+  generalize dependent n; intros n g Hg HVars i1 i2 Hi Hni eqf.
+  generalize dependent Vars; intros Vars HexpVars HinVars HVars Hni.
   generalize dependent fg; generalize dependent f3; generalize dependent f2; generalize dependent f1;
   generalize dependent g;
   generalize dependent Hi; generalize dependent Hni; generalize dependent i3; generalize dependent i2; generalize dependent i1.
-  induction n_body as [|hd tl IH]; intros i1 i2 i3 Hni Hi g Hg f1 f2 f3 Hf fg Heqf.
+  induction eqns as [|hd tl IH]; intros i1 i2 i3 Hni Hi g Hg f1 f2 f3 Hf fg Heqf.
   - injection Heqf as <- <- <- <-; repeat match goal with |- _ /\ _ => split end; try assumption.
     + intros k _; exact eq_refl.
     + exact node_to_graph_consistency_refl.
@@ -961,11 +939,11 @@ Proof using.
     + intros ? [].
     + exact (Forall_nil _).
   - cbn in Heqf.
-    destruct (node_to_graph_iter excl i1 i2 i3 Hi g) as [[[[m1 m2] m3] g'] Hm] eqn:eqiter.
+    destruct (node_to_graph_iter excl_list i1 i2 i3 Hi g) as [[[[m1 m2] m3] g'] Hm] eqn:eqiter.
     inversion HexpVars as [|tmp1 tmp2 HeVars HbodyVars]; subst tmp1 tmp2.
     inversion Hnodup_body as [|tmp1 tmp2 Hhd_not_tl Hnodup_tl]; subst tmp1 tmp2.
     specialize (node_to_graph_iter_prop
-      Vars excl i1 i2 i3 Hi Hni g
+      Vars excl_list i1 i2 i3 Hi Hni g
       (eq_ind _ (fun v => _ <= v) HVars _ (eq_sym Hg))
       hd (HinVars _ (or_introl eq_refl)) HeVars) as Hiter.
     rewrite eqiter in Hiter.
@@ -974,12 +952,12 @@ Proof using.
     1:{
       rewrite <-Hg; clear - eqiter.
       unfold node_to_graph_iter in eqiter; destruct hd as [i [ty e]].
-      destruct (List_filter_map_fold i1 i2 i3 Hi (Source.var_of_exp e) (node_to_graph_filtering excl (Source.var_of_exp e))) as [[[[l1 l2] l3] vl] [Hcil Hl]].
+      destruct (List_filter_map_fold i1 i2 i3 Hi (Source.var_of_exp e) (node_to_graph_filtering excl_list (Source.var_of_exp e))) as [[[[l1 l2] l3] vl] [Hcil Hl]].
       destruct (var_idx l1 l2 l3 Hl i) as [[[[v1 v2] v3] v] [Hclv Hv]].
       injection eqiter as <- <- <- <-.
       exact (Array.length_set _ _ _).
     }
-    specialize (IH Hnodup_tl (fun _ h => HinVars _ (or_intror h)) HbodyVars m1 m2 m3 Hnm Hm g' Hg' f1 f2 f3 Hf fg Heqf); clear Hg'.
+    specialize (IH Hnodup_tl HbodyVars (fun _ h => HinVars _ (or_intror h)) m1 m2 m3 Hnm Hm g' Hg' f1 f2 f3 Hf fg Heqf); clear Hg'.
     destruct IH as (IH1 & Hnf & Hcmf & IH2 & IH3 & IH4 & IH5).
     repeat match goal with |- _ /\ _ => split end; try assumption.
     + intros v' Hv'.
@@ -1022,7 +1000,7 @@ Proof using.
       cbn in Hv3; destruct Hcmf as (? & [Hcmfi Hcmfe] & ?).
       unfold Source.var_of_exp; rewrite <-(map_map fst Some) in Hv3 |- *; remember (map fst (Source.var_of_exp_aux e [])) as l0 eqn:eql0.
       remember (Array.get g' v) as l eqn:eql.
-      subst excl; clear - Hv3 Hcmfi Hcmfe.
+      clear - Hv3 Hcmfi Hcmfe.
       split; [destruct Hv3 as [H _]; induction l as [|hd tl IH]|destruct Hv3 as [_ H]; induction l0 as [|hd tl IH]].
       1,3: intros ? [].
       1,2: intros ? [<-|h]; [|exact (IH (fun _ h => H _ (or_intror h)) _ h)].
@@ -1034,10 +1012,11 @@ Proof using.
       1,2: exact (eq_trans (Hashtable.find_opt_In _ _ _) (f_equal Some Hx1)).
 Qed.
 
-Definition node_to_graph_prop (source: Source.node) : forall g imap, (g, imap) = node_to_graph source -> _ :=
-  fun g imap Heq => eq_ind_r (fun gimap => let '(g, imap) := gimap in _) (node_to_graph_prop' source) Heq.
+Definition node_to_graph_prop excl_list eqns : _ -> _ -> forall g imap, (g, imap) = node_to_graph excl_list eqns -> _ :=
+  fun Hnodup Hall_def g imap Heq => eq_ind_r (fun gimap => let '(g, imap) := gimap in _)
+    (node_to_graph_prop' excl_list eqns Hnodup Hall_def) Heq.
 
-Lemma graph_imap_prop_graph_prop source n g imap: graph_imap_prop source n g imap -> graph_prop g.
+Lemma graph_imap_prop_graph_prop excl_list eqns n g imap: graph_imap_prop excl_list eqns n g imap -> graph_prop g.
 Proof using.
   intros (<- & H2 & H3 & H4 & H5 & H6) v Hv. clear - Hv H2 H4 H6.
   apply H2 in Hv.
@@ -1667,41 +1646,112 @@ Proof using.
   1: exact (in_map _ _ _ H1).
 Qed.
 
+Lemma to_graph_prop1 : forall source,
+  NoDup (map fst source.(Source.n_in) ++ map fst (map Source.equation_dest source.(Source.n_body))).
+Proof using.
+  intros source.
+  specialize (source.(Source.n_vars_unique)) as tmp; unfold Source.n_vars in tmp.
+  rewrite map_app in tmp.
+  rewrite <-(Permutation_map fst source.(Source.n_vars_all_assigned)) in tmp.
+  exact tmp.
+Qed.
+
+Lemma to_graph_prop2 : forall source,
+  Forall (fun e => incl (map fst (Source.var_of_exp (projT2 (snd e))))
+                        (map fst source.(Source.n_in) ++ map fst (map Source.equation_dest (Source.n_body source))))
+    (Source.n_body source).
+Proof using.
+  intros source.
+  refine (Forall_impl _ _ source.(Source.n_all_vars_exist));
+    assert (vars_all_assigned := source.(Source.n_vars_all_assigned)); clear - vars_all_assigned.
+  intros [i [ty e]] H; cbn in H |- *.
+  rewrite <-map_app; apply incl_map.
+  intros ity Hity.
+  specialize (H _ Hity).
+  apply in_or_app.
+  apply in_app_or in H; destruct H as [H|H]; [left; exact H|right].
+  exact (Permutation_in _ (Permutation_sym vars_all_assigned) H).
+Qed.
+
+Lemma topological_sort_prop1 : forall {excl_list eqns g imap},
+  graph_imap_prop excl_list eqns (List.length eqns) g imap ->
+  (forall k : nat,
+   k < Array.length g ->
+   Forall (fun v : vertex => v < Array.length g) (Array.get g k)).
+Proof using.
+  intros elist eqns g imap Hg k Hk.
+  rewrite (proj1 Hg); exact (graph_prop_is_graph_wd Hg k Hk).
+Qed.
+
+Lemma topological_sort_prop2 : forall {excl_list eqns g imap},
+  graph_imap_prop excl_list eqns (List.length eqns) g imap ->
+  (forall v : vertex,
+   v < Array.length g ->
+   Hashtable.InMap v imap).
+Proof using.
+  intros elist eqns g imap (Hglen & Himap_iff & Himap_inj & Himap_def & Hdef_imap & Hbetween) k Hk.
+  apply Himap_iff; rewrite <-Hglen; exact Hk.
+Qed.
+
+Lemma ord_graph_to_order : forall {excl_list eqns loc g Hg imap Himap ord_graph},
+  graph_imap_prop excl_list eqns (List.length eqns) g imap ->
+  topological_sort loc g Hg imap Himap = Result.Ok ord_graph ->
+  forall v, In v ord_graph -> Hashtable.InMap v imap.
+Proof using.
+  intros excl_list eqns loc g Hg imap Himap ord_graph props eqgraph v Hv.
+  specialize (topological_sort_prop loc g Hg imap Himap) as tmp.
+  specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
+    cbn in Hgraph; clear tmp.
+  rewrite (proj1 (proj2 props)), <-(proj1 props).
+  exact (proj2 (proj2 Hgraph _) Hv).
+Qed.
+
+Lemma reorder_prop : forall {excl_list eqns loc g Hg imap Himap ord_graph}
+  {props : graph_imap_prop excl_list eqns (List.length eqns) g imap}
+  {eqgraph : topological_sort loc g Hg imap Himap = Result.Ok ord_graph},
+  incl (map_in ord_graph (fun v Hv => Hashtable.find imap v (ord_graph_to_order props eqgraph v Hv))) (map fst eqns).
+Proof using.
+  intros excl_list eqns loc g Hg imap Himap ord_graph props eqgraph.
+  intros i Hi.
+  apply in_map_in_iff in Hi; destruct Hi as [v [Hv Hi]].
+  refine (eq_ind _ (In _) (eq_ind _ (fun v => In v _) (proj1 (proj2 (proj2 (proj2 props))) _ _) _ Hi) _ _).
+  clear; unfold Source.n_assigned_vars.
+  exact (map_map _ _ _).
+Qed.
+
 Definition translate_node (source: Source.node): Result.t type Target.node_ordered.
 Proof using.
   unshelve refine (
-    match node_to_graph source with (graph, index_table) => fun Heqg =>
-    let props := node_to_graph_prop source graph index_table Heqg in
-    do ord_graph remember eqgraph <- topological_sort source.(Source.n_loc) graph _ index_table _;
+    let excl_list := map fst source.(Source.n_in) in
+    match node_to_graph excl_list source.(Source.n_body) with (graph, index_table) => fun Heqg =>
+    let props := node_to_graph_prop
+      excl_list
+      source.(Source.n_body)
+      (to_graph_prop1 source)
+      (to_graph_prop2 source)
+      graph
+      index_table
+      Heqg in
+    do ord_graph remember eqgraph <-
+      topological_sort
+        source.(Source.n_loc)
+        graph
+        (topological_sort_prop1 props)
+        index_table
+        (topological_sort_prop2 props);
     Result.Ok (
-      let new_order := map_in ord_graph _ in
-      let sorted_new_order := reorder_list source.(Source.n_body) new_order _ in
+      let new_order := map_in ord_graph (fun v Hv => Hashtable.find index_table v (ord_graph_to_order props eqgraph v Hv)) in
+      let sorted_new_order := reorder_list source.(Source.n_body) new_order reorder_prop in
+      let nodup_body : NoDup (map fst source.(Source.n_body)) := _ in
       check_order source sorted_new_order _ _
     )
     end eq_refl
   ).
-  - intros k Hk; rewrite (proj1 props); exact (graph_prop_is_graph_wd props k Hk).
-  - intros k Hk; rewrite (proj1 props), <-(proj1 (proj2 props)) in Hk; exact Hk.
-  - intros v Hv; refine (Hashtable.find index_table v _).
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
-      specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
-    specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
-      cbn in Hgraph; clear tmp.
-    rewrite (proj1 (proj2 props)), <-(proj1 props).
-    exact (proj2 (proj2 Hgraph _) Hv).
-  - intros i Hi.
-    apply in_map_in_iff in Hi; destruct Hi as [v [Hv Hi]].
-    refine (eq_ind _ (In _) (eq_ind _ (fun v => In v _) (proj1 (proj2 (proj2 (proj2 props))) _ _) _ Hi) _ _).
-    clear; unfold Source.n_assigned_vars.
-    exact (map_map _ _ _).
-  - assert (nodup_body : NoDup (map fst (Source.n_body source))).
-    1:{
-      assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
-        change (map Source.equation_dest source.(Source.n_body)) with source.(Source.n_assigned_vars); clear - Hvars.
-      rewrite source.(Source.n_vars_all_assigned); unfold Source.n_vars in Hvars.
-      rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ Hvars).
-    }
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
+  - assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
+      change (map Source.equation_dest source.(Source.n_body)) with source.(Source.n_assigned_vars); clear - Hvars.
+    rewrite source.(Source.n_vars_all_assigned); unfold Source.n_vars in Hvars.
+    rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ Hvars).
+  - match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
       specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
     specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
       cbn in Hgraph; clear tmp.
@@ -1737,24 +1787,14 @@ Proof using.
           specialize (proj1 (proj2 (proj2 (proj2 props))) v h) as tmp; rewrite Hi in tmp end; clear Hi.
         exact (eq_ind _ (In _) tmp _ (map_map _ _ _)).
   - cbn.
-    assert (nodup_body : NoDup (map fst (Source.n_body source))).
-    1:{
-      assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
-        change (map Source.equation_dest source.(Source.n_body)) with source.(Source.n_assigned_vars); clear - Hvars.
-      rewrite source.(Source.n_vars_all_assigned); unfold Source.n_vars in Hvars.
-      rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ Hvars).
-    }
     match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
       specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
     specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
       cbn in Hgraph; clear tmp.
     match type of (eq_refl : sorted_new_order = reorder_list _ _ _) with _ = reorder_list _ _ ?h =>
       assert (Hsrt := h); rewrite (reorder_list_ext _ _ _ Hsrt : sorted_new_order = _); clear sorted_new_order end.
-    match type of (eq_refl : new_order = map_in _ _) with _ = map_in _ (fun v Hv => Hashtable.find _ _ ?p) =>
-      pose (Hord := fun v (Hv : In v ord_graph) => p);
-        change new_order with (map_in ord_graph (fun v Hv => Hashtable.find index_table v (Hord v Hv)));
-        change new_order with (map_in ord_graph (fun v Hv => Hashtable.find index_table v (Hord v Hv))) in Hsrt;
-        clear new_order; generalize dependent Hord; intros Hord Hsrt end.
+    pose (Hord := ord_graph_to_order props eqgraph); fold Hord in Hsrt |- *.
+    clear new_order; generalize dependent Hord; intros Hord Hsrt.
     clear eqgraph.
     destruct Hgraph as [[Hg1 Hg2] _].
     induction ord_graph as [|hdv tl IH].
@@ -1792,13 +1832,14 @@ Proof using.
         as [incl1 incl2].
       specialize (incl2 _ (in_map _ _ _ Hjty)); cbn in incl2.
       apply in_app_or in incl2; destruct incl2 as [Hj|Hj].
-      * rewrite map_map, in_map_iff in Hj; destruct Hj as [[? ty2] [[=->] Hj]]; exists []; apply in_or_app, or_intror.
+      * unfold excl_list in Hj.
+        rewrite map_map, in_map_iff in Hj; destruct Hj as [[? ty2] [[=->] Hj]]; exists []; apply in_or_app, or_intror.
         refine (in_map _ _ (j, tyj) (eq_ind _ (fun v => In (_, v) _) Hj _ _)).
         assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_vars_exist) _ Hitye _ Hjty); clear - Hj jinvars.
         exact (eq_sym (ident_types_same _ _ _ _ jinvars (in_or_app _ _ _ (or_introl Hj)))).
       * apply in_map_iff in Hj; destruct Hj as [v [eqv Hv]].
         specialize (proj1 (proj2 (proj2 (proj2 props))) _ (Hashtable.find_opt_Some_In _ _ _ eqv)) as tmp;
-          rewrite (Hashtable.find_opt_Some_eq _ _ _ eqv), (map_map _ _ _ : map fst source.(Source.n_assigned_vars) = _) in tmp.
+          rewrite (Hashtable.find_opt_Some_eq _ _ _ eqv), map_map in tmp.
         cbn in tmp; apply in_map_iff in tmp; destruct tmp as [[? [tyj' ej]] [[=->] Hej]].
         exists (Source.var_of_exp ej); apply in_or_app; left; rewrite Target.equations_to_dag_is_map.
         refine (eq_ind _ (fun t => In (_, t, _) _) (in_map _ _ (j, existT Source.exp tyj' ej) _) _ _).
