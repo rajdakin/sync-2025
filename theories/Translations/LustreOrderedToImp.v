@@ -64,16 +64,16 @@ Fixpoint translate_value {ty} (v: Source.value ty): Target.value ty :=
 
 Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp ty :=
   match e with
-  | Source.Lustre.EConst c => Target.EConst c
-  | Source.Lustre.EVar b => Target.EVar b
-  | Source.Lustre.EUnop op e => Target.EUnop (translate_unop op) (translate_exp e)
-  | Source.Lustre.EBinop op e1 e2 =>
+  | Source.Lustre.EConst _ c => Target.EConst c
+  | Source.Lustre.EVar _ b => Target.EVar b
+  | Source.Lustre.EUnop _ op e => Target.EUnop (translate_unop op) (translate_exp e)
+  | Source.Lustre.EBinop _ op e1 e2 =>
       (match op in Source.Lustre.binop ty1 ty2 tout return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout with
       | Source.Lustre.Bop_and => fun e1 e2 => Target.EBAnd (translate_exp e1) (translate_exp e2)
       | Source.Lustre.Bop_or => fun e1 e2 => Target.EBOr (translate_exp e1) (translate_exp e2)
       | op => fun e1 e2 => Target.EBinop (translate_binop op I) (translate_exp e1) (translate_exp e2)
       end) e1 e2
-  | Source.Lustre.EIfte e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
+  | Source.Lustre.EIfte _ e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
   end.
 
 Definition translate_equation (eq: Source.equation): Target.stmt :=
@@ -97,7 +97,7 @@ Proof.
   destruct Hin as [ Heq | Hin ].
   - injection Heq as eql eqt eqr.
     subst.
-    apply sig2T_eq_type in eqr.
+    simpl_exist_type.
     subst.
     right.
     rewrite PeanoNat.Nat.eqb_refl.
@@ -162,7 +162,7 @@ Lemma correctness_exp (h: Source.history) {ty} (e: Source.exp ty) (out: Source.v
   Source.Lustre.sem_exp h e out ->
     Target.sem_exp (translate_history h) (translate_exp e) (translate_value out).
 Proof.
-  induction 1 as [| | |h ty1 ty2 tout op e1 e2 v1 v2 H1 IH1 H2 IH2|].
+  induction 1 as [| | |h loc ty1 ty2 tout op e1 e2 v1 v2 H1 IH1 H2 IH2|].
 
   - (* EConst *)
     apply Target.SeConst.
@@ -214,20 +214,20 @@ Lemma sem_exp_without_useless_var (h: Source.history) (name: ident) {ty} (e: Sou
 Proof.
   intros Hexp Hnin.
   revert v Hexp.
-  induction e as [ ty c | (i, t) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
+  induction e as [ loc ty c | loc (i, t) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
   - inversion Hexp.
     subst.
-    apply sig2T_eq_type in H2, H3.
+    simpl_exist_type.
     subst.
     apply Source.Lustre.SeConst.
   - inversion Hexp.
     subst.
-    apply sig2T_eq_type in H4.
+    simpl_exist_type.
     subst.
     unfold Source.var_of_exp in Hnin.
     simpl in Hnin.
     destruct b.
-    injection H3 as ->.
+    injection H4 as ->.
     apply Source.Lustre.SeVar.
     simpl.
     apply Dict.maps_to_not_removed; [ assumption | ].
@@ -238,17 +238,15 @@ Proof.
     assumption.
   - inversion Hexp.
     subst.
-    apply sig2T_eq_type in H3, H4, H5.
-    apply sig2T_eq_type in H3.
+    simpl_exist_type.
     subst.
     apply Source.Lustre.SeUnop.
     apply IH; assumption.
   - inversion Hexp.
     subst.
-    apply sig2T_eq_type in H4, H5, H6, H7.
-    do 2 apply sig2T_eq_type in H4.
+    simpl_exist_type.
     subst.
-    pose proof (Source.var_of_exp_not_in_binop e1 e2 name op) as tmp.
+    pose proof (Source.var_of_exp_not_in_binop loc e1 e2 name op) as tmp.
     pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
     pose proof (fun ty => proj2 (tmp Hnin ty)) as H2'.
     clear tmp.
@@ -257,9 +255,9 @@ Proof.
     + apply IH2; assumption.
   - inversion Hexp.
     subst.
-    apply sig2T_eq_type in H0, H1, H4.
+    simpl_exist_type.
     subst.
-    pose proof (Source.var_of_exp_not_in_ifte e1 e2 e3 name) as tmp.
+    pose proof (Source.var_of_exp_not_in_ifte loc e1 e2 e3 name) as tmp.
     pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
     pose proof (fun ty => proj1 (proj2 (tmp Hnin ty))) as H2'.
     pose proof (fun ty => proj2 (proj2 (tmp Hnin ty))) as H3'.

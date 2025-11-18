@@ -122,24 +122,24 @@ Proof.
   - left.
     destruct c as [ | b | n ].
     + exists TVoid.
-      exact (Target.EConst CVoid).
+      exact (Target.EConst l CVoid).
     + exists TBool.
-      exact (Target.EConst (CBool b)).
+      exact (Target.EConst l (CBool b)).
     + exists TInt.
-      exact (Target.EConst (CInt n)).
+      exact (Target.EConst l (CInt n)).
   - destruct (StringMap.find n (smap temp)) as [ [ i _ ] | ].
     2: right; exact [(l, Result.UndeclaredVariable n)].
     destruct (Dict.find i (env temp)) as [ ty | ].
     2: right; exact [(l, Result.InternalError ("Variable " ++ n ++ " has an ID but no type"))].
     left.
     exists ty.
-    exact (Target.EVar (i, ty)).
+    exact (Target.EVar l (i, ty)).
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
     destruct (translate_unop op) as [ tin [ tout top ]].
     refine (Result.bind (typecheck_exp l e' tin) _).
     intros e''.
-    exact (Result.Ok (existT _ tout (Target.EUnop top e''))).
+    exact (Result.Ok (existT _ tout (Target.EUnop l top e''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (check_exp temp e2) _).
@@ -149,7 +149,7 @@ Proof.
     intros e1''.
     refine (Result.bind (typecheck_exp l e2' tin2) _).
     intros e2''.
-    exact (Result.Ok (existT _ tout (Target.EBinop top e1'' e2''))).
+    exact (Result.Ok (existT _ tout (Target.EBinop l top e1'' e2''))).
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (typecheck_exp l e1' TBool) _).
@@ -161,7 +161,7 @@ Proof.
     destruct e2' as [t e2''].
     refine (Result.bind (typecheck_exp l e3' t) _).
     intros e3''.
-    exact (Result.Ok (existT _ t (Target.EIfte e1'' e2'' e3''))).
+    exact (Result.Ok (existT _ t (Target.EIfte l e1'' e2'' e3''))).
 Defined.
 
 Definition check_body (temp: common_temp) (entry: Source.node): Result.t type
