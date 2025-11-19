@@ -1,11 +1,6 @@
-open Extracted
 open Format
 
-let usage_message = Sys.argv.(0) ^ " <file>"
-let input_file = ref ""
-let entry_file file = input_file := file
-
-let parse_file filename =
+let parse_file filename : (Extracted.LustreAst.node, string) result =
   let inx = open_in filename in
   let lexbuf = Lexing.from_channel inx in
   Lexing.set_filename lexbuf filename;
@@ -15,15 +10,14 @@ let parse_file filename =
   and supplier = MI.lexer_lexbuf_to_supplier Lexer.token lexbuf
   and succeed (loc, name, args, locals, ret, eqs) =
     close_in inx;
-    LustreAst.
-      {
-        n_loc = loc;
-        n_name = name;
-        n_in = args;
-        n_out = ret;
-        n_locals = locals;
-        n_body = eqs;
-      }
+    Result.Ok Extracted.LustreAst.{
+      n_loc = loc;
+      n_name = name;
+      n_in = args;
+      n_out = ret;
+      n_locals = locals;
+      n_body = eqs;
+    }
   and fail checkpoint =
     close_in inx;
     let position = lexbuf.lex_start_p in
@@ -33,11 +27,11 @@ let parse_file filename =
         | MI.HandlingError env -> env |> MI.current_state_number |> ParserMessages.message
         | _ -> assert false (* This should not happen. *)
       in
-      Format.printf "%a: %s" LocationInfo.pp_position (LocationInfo.position_of_lexerpos position) error_msg;
-      exit 1
+      Result.Error
+        (Format.asprintf "%a: %s" LocationInfo.pp_position (LocationInfo.position_of_lexerpos position) error_msg)
     with Not_found ->
-      Format.printf "%a: <unknown error message>" LocationInfo.pp_position (LocationInfo.position_of_lexerpos position);
-      exit 1
+      Result.Error
+        (Format.asprintf "%a: <unknown error message>" LocationInfo.pp_position (LocationInfo.position_of_lexerpos position))
   in
   try
     MI.loop_handle succeed fail supplier checkpoint
@@ -46,8 +40,7 @@ let parse_file filename =
     eprintf "lexer error: %s" msg;
     exit 1
   | e ->
-    Format.printf "%s@\n" (Printexc.to_string e);
-    exit 1
+    Result.Error (Format.sprintf "%s@\n" (Printexc.to_string e))
 
 let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
   fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
@@ -81,12 +74,49 @@ let pp_error fn (pp_type: _ -> 'a -> unit) fmt ((l, e): (Extracted.Result.locati
   | InternalError e -> fprintf fmt "internal error: %s" e
 
 let () =
-  Arg.parse [] entry_file usage_message;
+  let Config.{ test_mode; filename } = Config.parse Sys.argv in
+  let exit code = if test_mode then exit 0 else exit code in
+  let output mode =
+    if test_mode then
+      match Filename.chop_suffix_opt ~suffix:".mls" filename with
+      | None ->
+          Format.eprintf "%s: invalid test file name (does not ends with '.mls')" Sys.argv.(0);
+          exit 1
+      | Some fn ->
+          let outf = open_out (fn ^ ".output") in
+          let fmt = Format.formatter_of_out_channel outf in
+          at_exit (fun () -> Format.pp_print_flush fmt ());
+          let status = ref None in
+          let ret1 : 'a. ('a, formatter, unit) format -> 'a = fun s ->
+            if !status = None then begin
+              status := Some false;
+              Format.fprintf fmt "@[Test error@\n@]"
+            end;
+            Format.fprintf fmt s in
+          let ret2 : 'a. ('a, formatter, unit) format -> 'a = fun s ->
+            if !status = None then begin
+              status := Some true;
+              Format.fprintf fmt "@[Test success@\n@\n@]"
+            end;
+            Format.fprintf fmt s in
+          if mode then ret1 else ret2
+    else
+      let ret1 : 'a. ('a, formatter, unit) format -> 'a = Format.eprintf in
+      let ret2 : 'a. ('a, formatter, unit) format -> 'a = Format.printf in
+      if mode then ret1 else ret2
+  in
+  let output_err = true in let output_out = false in
 
-  let node = parse_file !input_file in
+  let node =
+    match parse_file filename with
+    | Ok m -> m
+    | Error s ->
+        output output_err "%s" s;
+        exit 1
+    in
 
   let checked_node =
-    match LustreAstToLustre.check_node_prop node with
+    match Extracted.LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
         let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
@@ -94,18 +124,20 @@ let () =
           | TBool -> fprintf fmt "bool"
           | TInt -> fprintf fmt "int"
         in
-        printf "@[Error when node properties have been checked:@\n%a@]@."
-          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file pp_type)) x;
+        output output_err "@[Error when node properties have been checked:@\n%a@]@."
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename pp_type)) x;
         exit 1
   in
 
-  match LustreOrdering.translate_node checked_node with
-  | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
+  match Extracted.LustreOrdering.translate_node checked_node with
+  | Ok m ->
+      let output f = output output_out f in
+      Generation.pp_coq_method Generation.{fprintf = output} (Extracted.LustreOrderedToImp.translate_node m)
   | Err x ->
       let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
         | TVoid -> fprintf fmt "void"
         | TBool -> fprintf fmt "bool"
         | TInt -> fprintf fmt "int"
       in
-      printf "@[Error lustre ordering translate:@\n%a@]@."
-        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file pp_type)) x
+      output output_err "@[Error lustre ordering translate:@\n%a@]@."
+        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename pp_type)) x

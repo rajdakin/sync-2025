@@ -1,3 +1,5 @@
+Test success
+
 char fun_test(char var_4, char var_3) {
     char var_0 = var_4;
     char var_1 = var_0;
