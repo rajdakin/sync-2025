@@ -192,33 +192,6 @@ Definition binop_eqb {ty1x ty2x toutx} (x: binop ty1x ty2x toutx) {ty1y ty2y tou
     | _, _ => false
   end.
 
-Lemma const_inv {ty} (x: const ty) :
-  {eq : ty = _ & {b : bool | x = eq_rect _ const (CBool b) _ (eq_sym eq)}} +
-  {eq : ty = _ & {n : nat | x = eq_rect _ const (CInt n) _ (eq_sym eq)}} +
-  {exists (eq : ty = _), x = eq_rect _ const CVoid _ (eq_sym eq)}.
-Proof using.
-  destruct x as [|b|n]; [right|left; left|left; right]; exists eq_refl; [|exists b|exists n]; exact eq_refl.
-Defined.
-Lemma const_dec {ty} (x y: const ty) : {x = y} + {x <> y}.
-Proof.
-  destruct x as [ | b | n ].
-  all: destruct (const_inv y) as [[[eq' [b' ->]]|[eq' [n' ->]]]|H].
-  all: try discriminate; try solve [right; destruct H as [f _]; discriminate f].
-  1: left; destruct H as [eq' ->].
-  2: destruct (Bool.bool_dec b b') as [eq|ne]; [left|right].
-  4: destruct (PeanoNat.Nat.eq_dec n n') as [eq|ne]; [left|right].
-  all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn; try intros [=f]; auto.
-  exact (f_equal _ eq).
-Defined.
-
-Definition const_eqb {ty1} (c1: const ty1) {ty2} (c2: const ty2): bool :=
-  match c1, c2 with
-    | CVoid, CVoid => true
-    | CBool b1, CBool b2 => Bool.eqb b1 b2
-    | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
-    | _, _ => false
-  end.
-
 Fixpoint exp_eqb {ty1} (e1: exp ty1) {ty2} (e2: exp ty2): bool :=
   match e1, e2 with
     | EConst c1, EConst c2 => const_eqb c1 c2
@@ -478,16 +451,6 @@ Proof.
   intros H.
   destruct op1, op2; reflexivity || inversion H.
 Qed. *)
-
-Lemma const_eqb_refl {ty} (c: const ty):
-  const_eqb c c = true.
-Proof.
-  destruct c as [ | b | n ].
-  - reflexivity.
-  - apply Bool.eqb_true_iff.
-    reflexivity.
-  - apply PeanoNat.Nat.eqb_refl.
-Qed.
 
 (* Lemma const_eqb_to_eq (c1 c2: const):
   const_eqb c1 c2 = true -> c1 = c2.

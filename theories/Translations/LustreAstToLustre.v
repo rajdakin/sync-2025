@@ -122,8 +122,7 @@ Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t type
 Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
-    destruct c as [ | b | n ].
-    + exists TVoid, (Target.EConst CVoid); intros ? [].
+    destruct c as [ b | n ].
     + exists TBool, (Target.EConst (CBool b)); intros ? [].
     + exists TInt, (Target.EConst (CInt n)); intros ? [].
   - destruct (StringMap.find n (smap temp)) as [ [ i dl ] | ] eqn:eqi.

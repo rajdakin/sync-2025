@@ -3,14 +3,13 @@ Set Default Goal Selector "!".
 From Reactive.Datatypes Require Dict Result Stream.
 From Reactive.Languages Require Import Semantics.
 
-From Stdlib Require Import Permutation String.
+From Stdlib Require Import Permutation String ZArith.
 
 Definition binder := string.
 
 Inductive const: Type :=
-  | CVoid: const
   | CBool: bool -> const
-  | CInt: nat -> const.
+  | CInt: Z -> const.
 
 (** A unary operator
 
@@ -198,9 +197,8 @@ Defined.
 
 Definition const_eqb (c1 c2: const): bool :=
   match c1, c2 with
-    | CVoid, CVoid => true
     | CBool b1, CBool b2 => Bool.eqb b1 b2
-    | CInt n1, CInt n2 => PeanoNat.Nat.eqb n1 n2
+    | CInt n1, CInt n2 => Z.eqb n1 n2
     | _, _ => false
   end.
 
@@ -218,12 +216,12 @@ Proof.
     subst.
     apply Bool.Is_true_eq_true.
     apply Bool.eqb_refl.
-  - apply PeanoNat.Nat.eqb_eq in H.
+  - apply Z.eqb_eq in H.
     subst.
     reflexivity.
   - inversion H.
     subst.
-    apply PeanoNat.Nat.eqb_refl.
+    apply Z.eqb_refl.
 Qed.
 
 Lemma const_eqb_refl (c: const):
@@ -235,13 +233,12 @@ Qed.
 
 Lemma const_dec (c1 c2: const) : {c1 = c2} + {c1 <> c2}.
 Proof.
-  destruct c1,c2.
+  destruct c1, c2.
   all: try (right; discriminate).
-  - left; reflexivity.
   - destruct (Bool.bool_dec b b0).
     + left. rewrite e. reflexivity.
     + right. inversion 1. contradiction.
-  - destruct (PeanoNat.Nat.eq_dec n n0).
+  - destruct (Z.eq_dec z z0).
     + left. rewrite e. reflexivity.
     + right. inversion 1. contradiction.
 Defined.

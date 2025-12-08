@@ -23,4 +23,15 @@ Definition hd {A: Type} (s: t A): A :=
   | Cons x _ => x
   end.
 
+Definition tl {A: Type} (s: t A): t A :=
+  match s with
+  | Cons _ s => s
+  end.
+
 Definition to_option {A} (x: t A): t (option A) := map (@Some A) x.
+
+Fixpoint nth {A: Type} (n: nat) (s: t A): A :=
+  match n with
+  | 0 => hd s
+  | S n => nth n (tl s)
+  end.

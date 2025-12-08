@@ -11,7 +11,6 @@ Import ListNotations.
 
 Module Lustre := Lustre.
 
-Definition value := Lustre.value.
 Definition unop := Lustre.unop.
 Definition binop := Lustre.binop.
 Definition exp := Lustre.exp.
@@ -20,9 +19,6 @@ Arguments var_of_exp {_} _.
 Definition equation := Lustre.equation.
 Definition equation_dest := Lustre.equation_dest.
 Definition node := Lustre.node.
-Definition history := Lustre.history.
-Definition in_history := Lustre.in_history.
-Definition in_history_iff := Lustre.in_history_iff.
 Definition var_of_exp_binop_eq := @Lustre.var_of_exp_binop_eq.
 Arguments var_of_exp_binop_eq {_ _ _} _ _ _.
 Definition var_of_exp_ifte_eq := @Lustre.var_of_exp_ifte_eq.

@@ -316,90 +316,137 @@ Definition node_eq (n1 n2: node) :=
   Permutation (n_body n1) (n_body n2).
 
 (** ** Semantics *)
+Inductive sem_unop : forall {tyin tyout : type}, unop tyin tyout -> value tyin -> value tyout -> Prop :=
+  | SeNot (v: value TInt) : sem_unop Uop_not v (vnot v)
+  | SeNeg (v: value TInt) : sem_unop Uop_neg v (vneg v).
 
-Definition history := Dict.t {ty & Stream.t (value ty)}.
-Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
-  | Some (existT _ ty' _) => ty' = ty
-  | None => False
-end.
-Definition in_history' (h : history) '((v, ty) : nat * type) := exists s, Dict.find v h = Some (existT _ ty s).
+Inductive sem_binop : forall {ty1 ty2 tyout : type}, binop ty1 ty2 tyout -> value ty1 -> value ty2 -> value tyout -> Prop :=
+  | SeAnd (v1 v2: value TBool) : sem_binop Bop_and v1 v2 (vand v1 v2)
+  | SeOr (v1 v2: value TBool) : sem_binop Bop_or v1 v2 (vor v1 v2)
+  | SeXor (v1 v2: value TBool) : sem_binop Bop_xor v1 v2 (vxor v1 v2)
+  | SePlus (v1 v2: value TInt) : sem_binop Bop_plus v1 v2 (vplus v1 v2)
+  | SeMinus (v1 v2: value TInt) : sem_binop Bop_minus v1 v2 (vminus v1 v2)
+  | SeMult (v1 v2: value TInt) : sem_binop Bop_mult v1 v2 (vmult v1 v2)
+  | SeDiv (v1 v2: value TInt) : sem_binop Bop_div v1 v2 (vdiv v1 v2)
+  | SeEq (v1 v2: value TInt) : sem_binop Bop_eq v1 v2 (veq v1 v2)
+  | SeNeq (v1 v2: value TInt) : sem_binop Bop_neq v1 v2 (vneq v1 v2)
+  | SeLe (v1 v2: value TInt) : sem_binop Bop_le v1 v2 (vle v1 v2)
+  | SeLt (v1 v2: value TInt) : sem_binop Bop_lt v1 v2 (vlt v1 v2)
+  | SeGe (v1 v2: value TInt) : sem_binop Bop_ge v1 v2 (vge v1 v2)
+  | SeGt (v1 v2: value TInt) : sem_binop Bop_gt v1 v2 (vgt v1 v2).
 
-Lemma in_history_iff : forall h v, in_history h v <-> in_history' h v.
-Proof using.
-  intros h [ v ty ].
-  unfold in_history, in_history'.
-  destruct (Dict.find v h) as [ [ ty' e ] | ]; split.
-  - intros H.
-    subst.
-    exists e.
-    reflexivity.
-  - intros [ e' He ].
-    injection He as He.
-    exact (EqdepFacts.eq_sigT_fst H).
-  - intros [].
-  - intros [ e He ].
-    discriminate He.
-Qed.
 
-Inductive sem_exp : history -> forall {ty}, exp ty -> value ty -> Prop :=
-  | SeConst (h: history) {ty} (c: const ty):
-      sem_exp h (EConst c) (VConst c)
+Inductive sem_exp (h: history) | : nat -> forall {ty}, exp ty -> value ty -> Prop :=
+  | SeConst (t: nat) {ty} (c: const ty):
+      sem_exp t (EConst c) (const_to_value c)
+  
+  | SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: exp _) (vin vout: value _):
+    sem_exp t e vin -> sem_unop op vin vout -> sem_exp t (EUnop op e) vout
+  
+  | SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: exp _) (v1 v2 vout: value _):
+    sem_exp t e1 v1 -> sem_exp t e2 v2 -> sem_binop op v1 v2 vout -> sem_exp t (EBinop op e1 e2) vout
 
-  | SeVar (h : history) (b: binder) (v: Stream.t (value (binder_ty b))):
+  | SeIfte (t: nat) {ty} (e1: exp TBool) (e2 e3: exp ty) (v1 v2 v3: value _):
+    sem_exp t e1 v1 ->
+    sem_exp t e2 v2 ->
+    sem_exp t e3 v3 ->
+    sem_exp t (EIfte e1 e2 e3) (vifte v1 v2 v3)
+
+  | SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
       Dict.maps_to (fst b) (existT _ _ v) h ->
-      sem_exp h (EVar b) (Stream.hd v)
+      sem_exp t (EVar b) (Stream.nth t v)
 
-  | SeUnop (h: history) {ty tout} (op: unop ty tout) (e: exp ty) (v: value ty):
-      sem_exp h e v ->
-      sem_exp h (EUnop op e) (VUnop op v)
+  | SePre (t: nat) (e: exp TInt) (v: value TInt):
+    sem_exp t e v -> sem_exp (S t) (EUnop Uop_pre e) v
 
-  | SeBinop (h: history) {ty1 ty2 tout} (op: binop ty1 ty2 tout) (e1 e2: exp _) (v1 v2: value _):
-      sem_exp h e1 v1 ->
-      sem_exp h e2 v2 ->
-      sem_exp h (EBinop op e1 e2) (VBinop op v1 v2)
+  | SeArrow0 (e1 e2: exp TInt) (v: value TInt):
+    sem_exp O e1 v -> sem_exp O (EBinop Bop_arrow e1 e2) v
 
-  | SeIfte (h: history) {ty} (e1: exp TBool) (e2 e3: exp ty) (v1 v2 v3: value _):
-      sem_exp h e1 v1 ->
-      sem_exp h e2 v2 ->
-      sem_exp h e3 v3 ->
-      sem_exp h (EIfte e1 e2 e3) (VIfte v1 v2 v3)
+  | SeArrowS (t: nat) (e1 e2: exp TInt) (v: value TInt):
+    sem_exp (S t) e2 v -> sem_exp (S t) (EBinop Bop_arrow e1 e2) v
 .
 
 
 (** ** Properties *)
 
-Definition extract_stream (ty : type) {ty'} (s : Stream.t (value ty')) : option (value ty) := match type_dec ty' ty with
-  | left e => Some (eq_rect ty' value (Stream.hd s) ty e)
-  | right _ => None
-end.
-Lemma extract_stream_eqty : forall {ty} (s : Stream.t (value ty)), extract_stream ty s = Some (Stream.hd s).
-Proof using.
-  intros ty s.
-  unfold extract_stream.
-  rewrite type_dec_same.
-  reflexivity.
-Qed.
-
-Fixpoint eval_exp (h: history) {ty} (e: exp ty): option (value ty) :=
+Fixpoint eval_exp (h: history) (t: nat) {ty} (e: exp ty): option (value ty) :=
   match e with
-    | EConst c => Some (VConst c)
-    | EVar (name, typ) => match Dict.find name h with None => None | Some (existT _ ty' s) => extract_stream _ s end
-    | EUnop op e => match eval_exp h e with
-      | Some v => Some (VUnop op v)
-      | None => None
+    | EConst c => Some (const_to_value c)
+    | EVar (name, typ) => match Dict.find name h with None => None | Some (existT _ ty' s) => extract_stream _ t s end
+    | EUnop op e => match op, e with
+      | Uop_not, e => option_map (fun v => vnot v) (eval_exp h t e)
+      | Uop_neg, e => option_map (fun v => vneg v) (eval_exp h t e)
+      | Uop_pre, e => match t with
+        | 0 => None
+        | S t => eval_exp h t e
+        end
     end
-    | EBinop op e1 e2 => match eval_exp h e1, eval_exp h e2 with
-      | Some v1, Some v2 => Some (VBinop op v1 v2)
-      | _, _ => None
+    | EBinop op e1 e2 => match op, e1, e2 with
+      | Bop_and, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vand v1 v2)
+        | _, _ => None
+        end
+      | Bop_or, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vor v1 v2)
+        | _, _ => None
+        end
+      | Bop_xor, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vxor v1 v2)
+        | _, _ => None
+        end
+      | Bop_plus, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vplus v1 v2)
+        | _, _ => None
+        end
+      | Bop_minus, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vminus v1 v2)
+        | _, _ => None
+        end
+      | Bop_mult, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vmult v1 v2)
+        | _, _ => None
+        end
+      | Bop_div, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vdiv v1 v2)
+        | _, _ => None
+        end
+      | Bop_eq, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (veq v1 v2)
+        | _, _ => None
+        end
+      | Bop_neq, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vneq v1 v2)
+        | _, _ => None
+        end
+      | Bop_le, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vle v1 v2)
+        | _, _ => None
+        end
+      | Bop_lt, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vlt v1 v2)
+        | _, _ => None
+        end
+      | Bop_ge, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vge v1 v2)
+        | _, _ => None
+        end
+      | Bop_gt, e1, e2 => match (eval_exp h t e1), (eval_exp h t e2) with
+        | Some v1, Some v2 => Some (vgt v1 v2)
+        | _, _ => None
+        end
+      | Bop_arrow, e1, e2 => match t with
+        | 0 => eval_exp h 0 e1
+        | S t => eval_exp h (S t) e2
+        end
     end
-    | EIfte e1 e2 e3 => match eval_exp h e1, eval_exp h e2, eval_exp h e3 with
-      | Some v1, Some v2, Some v3 => Some (VIfte v1 v2 v3)
+    | EIfte e1 e2 e3 => match eval_exp h t e1, eval_exp h t e2, eval_exp h t e3 with
+      | Some v1, Some v2, Some v3 => Some (vifte v1 v2 v3)
       | _, _, _ => None
     end
   end.
 
-Definition is_evaluable (h: history) {ty} (e: exp ty): Prop :=
-  exists v: value ty, eval_exp h e = Some v.
+Definition is_evaluable (h: history) (t: nat) {ty} (e: exp ty): Prop :=
+  exists v: value ty, eval_exp h t e = Some v.
 
 
 Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
@@ -418,6 +465,137 @@ Definition deps_of_exp {ty} (e: exp ty): list (ident * type) :=
   deps_of_exp_aux e [].
 
 (** ** Lemmas *)
+
+Theorem sem_eval_exp {ty} (t: nat) (e: exp ty) (h: history) (v: value ty):
+  eval_exp h t e = Some v <-> sem_exp h t e v.
+Proof.
+  split.
+  - intros H.
+    revert v H.
+    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
+    + inversion H.
+      apply SeConst.
+    + cbn in H.
+      destruct (Dict.find i h) as [ [ ty' s ] | ] eqn: Heq; [ | discriminate H ].
+      unfold extract_stream in H.
+      destruct (type_dec ty' ty) as [ -> | n ]; [ | discriminate H ].
+      injection H as <-.
+      apply SeVar.
+      assumption.
+    + inversion H.
+      destruct op.
+      1, 2: specialize (IH t).
+      1, 2: destruct (eval_exp h t e) as [ v' | ]; [ | discriminate ].
+      1, 2: specialize (IH v' eq_refl).
+      1, 2: inversion H1; subst.
+      1, 2: apply (SeUnop _ _ _ _ v').
+      all: try assumption.
+      all: try constructor.
+      (* pre *)
+      destruct t as [ | t].
+      1: discriminate.
+      apply SePre.
+      apply IH.
+      assumption.
+    + simpl in H.
+      specialize (IH1 t).
+      specialize (IH2 t).
+      destruct op.
+      14: {
+        destruct t as [| t].
+        all: constructor.
+        all: auto.
+      }
+      all: destruct (eval_exp h t e1) as [ v1 | ]; [ | discriminate ].
+      all: destruct (eval_exp h t e2) as [ v2 | ]; [ | discriminate ].
+      all: specialize (IH1 v1 eq_refl).
+      all: specialize (IH2 v2 eq_refl).
+      all: inversion H.
+      all: apply (SeBinop _ _ _ _ _ v1 v2).
+      all: try assumption.
+      all: constructor.
+    + simpl in H.
+      specialize (IH1 t).
+      specialize (IH2 t).
+      specialize (IH3 t).
+      destruct (eval_exp h t e1) as [ v1 | ]; [ | discriminate ].
+      destruct (eval_exp h t e2) as [ v2 | ]; [ | discriminate ].
+      destruct (eval_exp h t e3) as [ v3 | ]; [ | discriminate ].
+      specialize (IH1 v1 eq_refl).
+      specialize (IH2 v2 eq_refl).
+      specialize (IH3 v3 eq_refl).
+      inversion H.
+      apply SeIfte; assumption.
+  - intros H.
+    revert v H.
+    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
+    + inversion H.
+      apply sig2T_eq_type in H3, H4.
+      subst.
+      reflexivity.
+    + inversion H; subst.
+      apply sig2T_eq_type in H5; subst.
+      simpl.
+      rewrite H3.
+      unfold extract_stream; cbn; rewrite type_dec_same.
+      reflexivity.
+    + destruct op.
+      3: {
+        destruct t as [| t].
+        1: inversion H; subst.
+        1: repeat apply sig2T_eq_type in H1; subst.
+        1: inversion H7.
+        specialize (IH t).
+        simpl.
+        apply IH.
+        inversion H; subst.
+        1: repeat apply sig2T_eq_type in H1; subst.
+        1: inversion H7.
+        apply sig2T_eq_type in H1, H2; subst.
+        assumption.
+      }
+      all: specialize (IH t).
+      all: inversion H.
+      all: apply sig2T_eq_type in H1, H5, H6.
+      all: apply sig2T_eq_type in H1.
+      all: subst.
+      all: simpl.
+      all: rewrite (IH _ H4).
+      all: simpl.
+      all: inversion H7.
+      all: apply sig2T_eq_type in H1, H0; subst.
+      all: reflexivity.
+    + specialize (IH1 t).
+      specialize (IH2 t).
+      destruct op.
+      14: {
+        destruct t as [| t].
+        all: simpl.
+        all: inversion H; subst.
+        all: repeat apply sig2T_eq_type in H2; subst.
+        4: {
+          apply sig2T_eq_type in H1, H3; subst.
+          apply (IH2 _ H4).
+        }
+        1,3: inversion H10.
+        apply sig2T_eq_type in H0, H1; subst.
+        apply (IH1 _ H3).
+      }
+      all: inversion H; subst.
+      all: apply sig2T_eq_type in H2, H6, H7, H8.
+      all: repeat apply sig2T_eq_type in H2.
+      all: subst; simpl.
+      all: rewrite (IH1 _ H5), (IH2 _ H9).
+      all: inversion H10.
+      all: apply sig2T_eq_type in H0, H1, H2; subst.
+      all: reflexivity.
+    + inversion H.
+      apply sig2T_eq_type in H1, H2, H5.
+      subst.
+      simpl.
+      rewrite (IH1 _ _ H6), (IH2 _ _ H7), (IH3 _ _ H8).
+      reflexivity.
+Qed.
 
 Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
   var_of_exp_aux e l = var_of_exp e ++ l.
@@ -539,167 +717,6 @@ Proof.
       apply var_of_exp_aux_in_acc.
       apply var_of_exp_aux_in_acc.
       assumption.
-Qed.
-
-Lemma exp_with_evaluable_vars_is_evaluable (h: history) {ty} (e: exp ty):
-  Forall (in_history h) (var_of_exp e) ->
-  is_evaluable h e.
-Proof.
-  intros H.
-  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ].
-  - exists (VConst c).
-    reflexivity.
-  - apply Forall_inv, in_history_iff in H.
-    destruct H as [ s Hs ].
-    exists (Stream.hd s).
-    simpl.
-    rewrite Hs.
-    exact (extract_stream_eqty _).
-  - unfold var_of_exp in H.
-    simpl in H.
-    apply IH in H as [ v Hv ].
-    exists (VUnop op v).
-    simpl.
-    rewrite Hv.
-    reflexivity.
-  - rewrite var_of_exp_binop_eq in H.
-    apply Forall_app in H as [ H1 H2 ].
-    specialize (IH1 H1) as [ v1 Hv1 ].
-    specialize (IH2 H2) as [ v2 Hv2 ].
-    exists (VBinop op v1 v2).
-    simpl.
-    rewrite Hv1, Hv2.
-    reflexivity.
-  - rewrite var_of_exp_ifte_eq in H.
-    apply Forall_app in H as [ H1 H2 ].
-    apply Forall_app in H2 as [ H2 H3 ].
-    apply IH1 in H1 as [ v1 Hv1 ].
-    apply IH2 in H2 as [ v2 Hv2 ].
-    apply IH3 in H3 as [ v3 Hv3 ].
-    exists (VIfte v1 v2 v3).
-    simpl.
-    rewrite Hv1, Hv2, Hv3.
-    reflexivity.
-Qed.
-
-Lemma exp_evaluable_have_evaluable_vars (h: history) {ty} (e: exp ty) (v: value ty):
-  eval_exp h e = Some v ->
-  Forall (in_history h) (var_of_exp e).
-Proof.
-  intros H.
-  revert v H.
-  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
-  - constructor.
-  - constructor; [ | constructor ].
-    apply in_history_iff.
-    simpl in H |- *.
-    destruct (Dict.find i h) as [ [ ty' s ] | ]; [ | discriminate H ].
-    unfold extract_stream in H.
-    destruct (type_dec ty' ty) as [ e | n ]; [ subst | discriminate H ].
-    exists s.
-    reflexivity.
-  - unfold var_of_exp.
-    simpl in *.
-    destruct (eval_exp h e); [ | discriminate ].
-    apply IH with (v := v0).
-    reflexivity.
-  - simpl in H.
-    destruct (eval_exp h e1) as [ v1 | ]; [ | discriminate ].
-    destruct (eval_exp h e2) as [ v2 | ]; [ | discriminate ].
-    specialize (IH1 v1 eq_refl).
-    specialize (IH2 v2 eq_refl).
-    rewrite var_of_exp_binop_eq.
-    apply Forall_app.
-    split; assumption.
-  - simpl in H.
-    destruct (eval_exp h e1) as [ v1 | ]; [ | discriminate ].
-    destruct (eval_exp h e2) as [ v2 | ]; [ | discriminate ].
-    destruct (eval_exp h e3) as [ v3 | ]; [ | discriminate ].
-    rewrite var_of_exp_ifte_eq.
-    apply Forall_app.
-    split.
-    + apply IH1 with (v := v1).
-      reflexivity.
-    + apply Forall_app.
-      split.
-      * apply IH2 with (v := v2).
-        reflexivity.
-      * apply IH3 with (v := v3).
-        reflexivity.
-Qed.
-
-Theorem sem_eval_exp {ty} (e: exp ty) (h: history) (v: value ty):
-  eval_exp h e = Some v <-> sem_exp h e v.
-Proof.
-  split.
-  - intros H.
-    revert v H.
-    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
-    + inversion H.
-      apply SeConst.
-    + cbn in H.
-      destruct (Dict.find i h) as [ [ ty' s ] | ] eqn: Heq; [ | discriminate H ].
-      unfold extract_stream in H.
-      destruct (type_dec ty' ty) as [ -> | n ]; [ | discriminate H ].
-      injection H as <-.
-      apply SeVar.
-      assumption.
-    + inversion H.
-      destruct (eval_exp h e) as [ v' | ]; [ | discriminate ].
-      specialize (IH v' eq_refl).
-      inversion H1.
-      apply SeUnop.
-      assumption.
-    + simpl in H.
-      destruct (eval_exp h e1) as [ v1 | ]; [ | discriminate ].
-      destruct (eval_exp h e2) as [ v2 | ]; [ | discriminate ].
-      specialize (IH1 v1 eq_refl).
-      specialize (IH2 v2 eq_refl).
-      inversion H.
-      apply SeBinop; assumption.
-    + simpl in H.
-      destruct (eval_exp h e1) as [ v1 | ]; [ | discriminate ].
-      destruct (eval_exp h e2) as [ v2 | ]; [ | discriminate ].
-      destruct (eval_exp h e3) as [ v3 | ]; [ | discriminate ].
-      specialize (IH1 v1 eq_refl).
-      specialize (IH2 v2 eq_refl).
-      specialize (IH3 v3 eq_refl).
-      inversion H.
-      apply SeIfte; assumption.
-  - intros H.
-    revert v H.
-    induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
-    + inversion H.
-      apply sig2T_eq_type in H3, H4.
-      subst.
-      reflexivity.
-    + inversion H; subst.
-      apply sig2T_eq_type in H5; subst.
-      simpl.
-      rewrite H3.
-      unfold extract_stream; cbn; rewrite type_dec_same.
-      reflexivity.
-    + inversion H.
-      apply sig2T_eq_type in H4, H5, H6.
-      apply sig2T_eq_type in H4.
-      subst.
-      simpl.
-      rewrite (IH _ H3).
-      reflexivity.
-    + inversion H.
-      subst ty3.
-      apply sig2T_eq_type in H5, H6, H7, H8.
-      repeat apply sig2T_eq_type in H5.
-      subst.
-      simpl.
-      rewrite (IH1 _ H4), (IH2 _ H9).
-      reflexivity.
-    + inversion H.
-      apply sig2T_eq_type in H1, H2, H5.
-      subst.
-      simpl.
-      rewrite (IH1 _ H6), (IH2 _ H7), (IH3 _ H8).
-      reflexivity.
 Qed.
 
 Lemma deps_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
