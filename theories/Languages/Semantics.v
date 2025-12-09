@@ -197,6 +197,22 @@ Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v
 end.
 Definition in_history' (h : history) '((v, ty) : nat * type) := exists s, Dict.find v h = Some (existT _ ty s).
 
+Definition h_maps_to {ty} i (s: Stream.t (value ty)) (h: history) := Dict.maps_to i (existT _ ty s) h.
+
+Definition eq_support (support: list nat) (h1 h2: history) := forall n, List.In n support -> Dict.find n h1 = Dict.find n h2.
+
+Lemma eq_support_app (s1 s2: list nat) (h1 h2: history) :
+  eq_support s1 h1 h2 -> eq_support s2 h1 h2 -> eq_support (s1 ++ s2) h1 h2.
+Proof.
+  unfold eq_support.
+  intros eq1 eq2 n isin.
+  rewrite List.in_app_iff in isin.
+  specialize (eq1 n).
+  specialize (eq2 n).
+  destruct isin as [in1 | in2].
+  all: tauto.
+Qed.
+
 Lemma in_history_iff : forall h v, in_history h v <-> in_history' h v.
 Proof using.
   intros h [ v ty ].
@@ -225,6 +241,33 @@ Proof using.
   unfold extract_stream.
   rewrite type_dec_same.
   reflexivity.
+Qed.
+
+Definition sub_history (sub h: history) := Dict.inclusion sub h.
+
+Lemma sub_history_refl h : sub_history h h.
+Proof.
+  unfold sub_history.
+  rewrite Dict.inclusion_is_list_incl.
+  apply List.incl_refl.
+Qed.
+
+Lemma sub_history_trans h1 h2 h3 : sub_history h1 h2 -> sub_history h2 h3 -> sub_history h1 h3.
+Proof.
+  unfold sub_history.
+  do 3 rewrite Dict.inclusion_is_list_incl.
+  unfold List.incl.
+  intros sub12 sub23 a isin.
+  apply (sub23 a (sub12 a isin)).
+Qed.
+
+Lemma sub_history_antirefl h1 h2 : sub_history h1 h2 -> sub_history h2 h1 -> h1 = h2.
+Proof.
+  unfold sub_history.
+  intros sub12 sub21.
+  rewrite <- (Dict.equivalence_is_eq h1 h2).
+  unfold Dict.equivalence.
+  split; assumption.
 Qed.
 
 

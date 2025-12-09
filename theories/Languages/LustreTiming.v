@@ -1,6 +1,6 @@
 Set Default Goal Selector "!".
 
-From Reactive.Props Require Import Freshness Identifier.
+From Reactive.Props Require Import Freshness Identifier Inclusion.
 From Reactive.Languages Require Lustre.
 From Reactive.Languages Require Import Semantics.
 
@@ -55,6 +55,23 @@ Inductive comb_exp : type -> Set :=
   | EIfte: forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
 .
 
+Fixpoint var_of_raw_exp_aux {ty} (e: raw_exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | Raw_EConst _ => acc
+    | Raw_EVar (name, ty) => (name, ty) :: acc
+    | Raw_EUnop _ e => var_of_raw_exp_aux e acc
+    | Raw_EBinop _ e1 e2 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
+    | Raw_EIfte e1 e2 e3 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 (var_of_raw_exp_aux e3 acc))
+    | Raw_EPre e => var_of_raw_exp_aux e acc
+    | Raw_EArrow e1 e2 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
+  end.
+
+Definition var_of_raw_exp {ty} (e: raw_exp ty): list (ident * type) :=
+  var_of_raw_exp_aux e [].
+
 Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
   | TimedConst: forall (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst c)
   | TimedVar: forall (n: nat) (b: binder), well_timed n (Raw_EVar b)
@@ -68,6 +85,9 @@ Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
 
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
+
+Definition raw_equation : Type := ident * { ty : type & raw_exp ty }.
+Definition raw_equation_dest (eq : raw_equation) : ident * type := (fst eq, projT1 (snd eq)).
 
 Lemma timed_exp {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
   Result.t type (well_timed n exp).
@@ -249,6 +269,8 @@ Proof.
       assumption.
 Defined.
 
+Definition well_timed_eq (n: nat) (eq: raw_equation) : Prop := well_timed n (projT2 (snd eq)).
+
 Record node := mk_node {
   n_loc: Result.location;
   n_name: string;
@@ -271,7 +293,27 @@ Record node := mk_node {
   n_vars_unique: NoDup (map fst n_vars);
 
   n_seed: ident;
-  n_seed_always_fresh: forall n, ~In (iter n next_ident n_seed) (map fst n_vars);
+  n_seed_always_fresh: freshness n_seed n_vars;
+}.
+
+Record raw_node := mk_raw_node {
+  rn_loc: Result.location;
+  rn_name: string;
+
+  rn_in: list binder;
+  rn_out: list binder;
+  rn_locals: list binder;
+  rn_body: list raw_equation;
+
+  rn_vars: list binder := rn_in ++ rn_out ++ rn_locals;
+  rn_assigned_vars: list binder := map raw_equation_dest rn_body;
+  rn_all_vars_exist: Forall (fun eq => incl (var_of_raw_exp (projT2 (snd eq))) rn_vars) rn_body;
+
+  rn_vars_all_assigned: Permutation rn_assigned_vars (rn_out ++ rn_locals);
+  rn_vars_unique: NoDup (map fst rn_vars);
+
+  rn_seed: ident;
+  rn_seed_always_fresh: freshness rn_seed rn_vars;
 }.
 
 
@@ -880,15 +922,86 @@ Proof.
 Qed.
 
 (* Semantics *)
-Inductive value: type -> Set :=
-  | RVConst  : forall {ty}, const ty -> value ty
-  | RVUnop   : forall {ty tout}, unop ty tout -> value ty -> value tout
-  | RVBinop  : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
-  | RVIfte   : forall {ty}, value TBool -> value ty -> value ty -> value ty
+Inductive sem_unop : forall {tyin tyout : type}, unop tyin tyout -> value tyin -> value tyout -> Prop :=
+  | SeNot (v: value TInt) : sem_unop Uop_not v (vnot v)
+  | SeNeg (v: value TInt) : sem_unop Uop_neg v (vneg v).
+
+Inductive sem_binop : forall {ty1 ty2 tyout : type}, binop ty1 ty2 tyout -> value ty1 -> value ty2 -> value tyout -> Prop :=
+  | SeAnd (v1 v2: value TBool) : sem_binop Bop_and v1 v2 (vand v1 v2)
+  | SeOr (v1 v2: value TBool) : sem_binop Bop_or v1 v2 (vor v1 v2)
+  | SeXor (v1 v2: value TBool) : sem_binop Bop_xor v1 v2 (vxor v1 v2)
+  | SePlus (v1 v2: value TInt) : sem_binop Bop_plus v1 v2 (vplus v1 v2)
+  | SeMinus (v1 v2: value TInt) : sem_binop Bop_minus v1 v2 (vminus v1 v2)
+  | SeMult (v1 v2: value TInt) : sem_binop Bop_mult v1 v2 (vmult v1 v2)
+  | SeDiv (v1 v2: value TInt) : sem_binop Bop_div v1 v2 (vdiv v1 v2)
+  | SeEq (v1 v2: value TInt) : sem_binop Bop_eq v1 v2 (veq v1 v2)
+  | SeNeq (v1 v2: value TInt) : sem_binop Bop_neq v1 v2 (vneq v1 v2)
+  | SeLe (v1 v2: value TInt) : sem_binop Bop_le v1 v2 (vle v1 v2)
+  | SeLt (v1 v2: value TInt) : sem_binop Bop_lt v1 v2 (vlt v1 v2)
+  | SeGe (v1 v2: value TInt) : sem_binop Bop_ge v1 v2 (vge v1 v2)
+  | SeGt (v1 v2: value TInt) : sem_binop Bop_gt v1 v2 (vgt v1 v2).
+
+Inductive sem_raw_exp (h: history) | : nat -> forall {ty}, raw_exp ty -> value ty -> Prop :=
+  | Raw_SeConst (t: nat) {ty} (c: const ty):
+    sem_raw_exp t (Raw_EConst c) (const_to_value c)
+  
+  | Raw_SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: raw_exp _) (vin vout: value _):
+    sem_raw_exp t e vin -> sem_unop op vin vout -> sem_raw_exp t (Raw_EUnop op e) vout
+  
+  | Raw_SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: raw_exp _) (v1 v2 vout: value _):
+    sem_raw_exp t e1 v1 -> sem_raw_exp t e2 v2 -> sem_binop op v1 v2 vout -> sem_raw_exp t (Raw_EBinop op e1 e2) vout
+
+  | Raw_SeIfte (t: nat) {ty} (e1: raw_exp TBool) (e2 e3: raw_exp ty) (v1 v2 v3: value _):
+    sem_raw_exp t e1 v1 ->
+    sem_raw_exp t e2 v2 ->
+    sem_raw_exp t e3 v3 ->
+    sem_raw_exp t (Raw_EIfte e1 e2 e3) (vifte v1 v2 v3)
+
+  | Raw_SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
+      Dict.maps_to (fst b) (existT _ _ v) h ->
+      sem_raw_exp t (Raw_EVar b) (Stream.nth t v)
+
+  | Raw_SePre {ty} (t: nat) (e: raw_exp ty) (v: value ty):
+    sem_raw_exp t e v -> sem_raw_exp (S t) (Raw_EPre e) v
+
+  | Raw_SeArrow0 {ty} (e1 e2: raw_exp ty) (v: value ty):
+    sem_raw_exp O e1 v -> sem_raw_exp O (Raw_EArrow e1 e2) v
+
+  | Raw_SeArrowS {ty} (t: nat) (e1 e2: raw_exp ty) (v: value ty):
+    sem_raw_exp (S t) e2 v -> sem_raw_exp (S t) (Raw_EArrow e1 e2) v
 .
 
-Definition history := Dict.t {ty & Stream.t (value ty)}.
-Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
-  | Some (existT _ ty' _) => ty' = ty
-  | None => False
-end.
+Inductive sem_comb_exp (h: history) | : nat -> forall {ty}, comb_exp ty -> value ty -> Prop :=
+  | SeConst (t: nat) {ty} (c: const ty):
+      sem_comb_exp t (EConst c) (const_to_value c)
+  
+  | SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: comb_exp _) (vin vout: value _):
+    sem_comb_exp t e vin -> sem_unop op vin vout -> sem_comb_exp t (EUnop op e) vout
+  
+  | SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: comb_exp _) (v1 v2 vout: value _):
+    sem_comb_exp t e1 v1 -> sem_comb_exp t e2 v2 -> sem_binop op v1 v2 vout -> sem_comb_exp t (EBinop op e1 e2) vout
+
+  | SeIfte (t: nat) {ty} (e1: comb_exp TBool) (e2 e3: comb_exp ty) (v1 v2 v3: value _):
+    sem_comb_exp t e1 v1 ->
+    sem_comb_exp t e2 v2 ->
+    sem_comb_exp t e3 v3 ->
+    sem_comb_exp t (EIfte e1 e2 e3) (vifte v1 v2 v3)
+
+  | SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
+      Dict.maps_to (fst b) (existT _ _ v) h ->
+      sem_comb_exp t (EVar b) (Stream.nth t v)
+.
+
+Definition sem_raw_eq (eq: raw_equation) (h: history) : Prop :=
+  exists (s: Stream.t (value (projT1 (snd eq)))),
+  h_maps_to (fst eq) s h /\ forall n, sem_raw_exp h n (projT2 (snd eq)) (Stream.nth n s).
+
+Definition sem_node (n: node) (h: history) : Prop :=
+  forall (i: ident) (ty: type),
+  In (i, ty) n.(n_vars) ->
+  exists (s: Stream.t (value ty)),
+  h_maps_to i s h /\
+  forall (e: comb_exp ty),
+  (In (i, existT _ _ e) n.(n_init) -> sem_comb_exp h 0 e (Stream.hd s)) /\
+  (In (i, existT _ _ e) (n.(n_step) ++ n.(n_pre)) -> forall n, sem_comb_exp h (S n) e (Stream.nth (S n) s))
+  .
