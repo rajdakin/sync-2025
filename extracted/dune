@@ -3,30 +3,40 @@
  (extracted_modules
   Ascii
   Bool
+  FMapList
   List ListDef
-  Mergesort
   Nat
+  OrderedType
   Orders
-  String
-  Identifier
-  Semantics
-  Axioms
-  Dec
-  Datatypes
-  Dict
-  Result
-  Sorted
+  OrdersTac
   Specif
-  Stream
-  LustreAst
-  Lustre
-  LustreOrdered
-  Imp
-  LustreAstToLustre
-  LustreOrdering
-  LustreOrderedToImp
-  FMapList OrderedType OrdersTac)
- (theories Stdlib Reactive Reactive.Datatypes Reactive.Translations Reactive.Props))
+  String
+  ; (root)
+   Datatypes
+    Array
+    Dict
+    Hashtable
+    Result
+    Sorted
+    Stream
+   ; Props
+    Axioms
+;    Dec  (unused)
+    Identifier
+   ; Languages
+    LustreAst
+    Lustre
+    LustreOrdered
+    LustreTiming
+    Imp
+    Semantics
+   ; Translations
+    LustreAstToLustre
+    LustreToTiming
+    LustreOrdering
+    LustreOrderedToImp
+ )
+ (theories Stdlib Reactive Reactive.Datatypes Reactive.Props Reactive.Translations))
 
 (library
  (name extracted)
@@ -35,4 +45,4 @@
 (env
  (dev
   (flags
-   (:standard -w -33-39-67))))
+   (:standard -w -20-33-39-67))))

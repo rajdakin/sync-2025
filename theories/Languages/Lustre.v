@@ -307,6 +307,20 @@ Proof.
   left; split; [exact eq_refl|exists eq_refl; exact e].
 Defined.
 
+Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ _ => acc
+    | EVar _ (name, ty) => (name, ty) :: acc
+    | EUnop _ _ e => var_of_exp_aux e acc
+    | EBinop _ _ e1 e2 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte _ e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
+  end.
+
+Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
+  var_of_exp_aux e [].
+
 Record node := mk_node {
   n_loc: Result.location;
   n_name: string;
@@ -318,6 +332,7 @@ Record node := mk_node {
 
   n_vars: list binder := n_in ++ n_out ++ n_locals;
   n_assigned_vars: list binder := map equation_dest n_body;
+  n_all_vars_exist: Forall (fun eq => incl (var_of_exp (projT2 (snd eq))) n_vars) n_body;
 
   n_vars_all_assigned: Permutation n_assigned_vars (n_out ++ n_locals);
   n_vars_unique: NoDup (map fst n_vars);
@@ -471,20 +486,6 @@ Fixpoint eval_exp (h: history) {ty} (e: exp ty): option (value ty) :=
 Definition is_evaluable (h: history) {ty} (e: exp ty): Prop :=
   exists v: value ty, eval_exp h e = Some v.
 
-
-Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
-  match e with
-    | EConst _ _ => acc
-    | EVar _ (name, ty) => (name, ty) :: acc
-    | EUnop _ _ e => var_of_exp_aux e acc
-    | EBinop _ _ e1 e2 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte _ e1 e2 e3 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
-  end.
-
-Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
-  var_of_exp_aux e [].
 
 Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with

@@ -109,81 +109,95 @@ Definition translate_binop (op: Source.binop): { tin1 & { tin2 & { tout & Target
   | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
   | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_arrow))
 end.
-Definition typecheck_exp (loc: Result.location) (e: sigT Target.exp) (t: type): Result.t type (Target.exp t) := match e, t with
-  | existT _ TVoid e, TVoid => Result.Ok e
-  | existT _ TBool e, TBool => Result.Ok e
-  | existT _ TInt e, TInt => Result.Ok e
+Definition typecheck_exp {P : forall ty, Target.exp ty -> Prop} (loc: Result.location) (e: { ty & sig (P ty) }) (t: type):
+    Result.t type (sig (P t)) := match e, t with
+  | existT _ TVoid (exist _ e H), TVoid => Result.Ok (exist _ e H)
+  | existT _ TBool (exist _ e H), TBool => Result.Ok (exist _ e H)
+  | existT _ TInt (exist _ e H), TInt => Result.Ok (exist _ e H)
   | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
 end.
 
-Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t type (sigT Target.exp).
+Fixpoint check_exp (temp: common_temp) (e: Source.exp): Result.t type
+  { ty & { exp : Target.exp ty | incl (Target.var_of_exp exp) (nvars temp) } }.
 Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
-    + exists TVoid.
-      exact (Target.EConst l CVoid).
-    + exists TBool.
-      exact (Target.EConst l (CBool b)).
-    + exists TInt.
-      exact (Target.EConst l (CInt n)).
-  - destruct (StringMap.find n (smap temp)) as [ [ i _ ] | ].
+    + exists TVoid, (Target.EConst l CVoid); intros ? [].
+    + exists TBool, (Target.EConst l (CBool b)); intros ? [].
+    + exists TInt, (Target.EConst l (CInt n)); intros ? [].
+  - destruct (StringMap.find n (smap temp)) as [ [ i dl ] | ] eqn:eqi.
     2: right; exact [(l, Result.UndeclaredVariable n)].
-    destruct (Dict.find i (env temp)) as [ ty | ].
+    destruct (Dict.find i (env temp)) as [ ty | ] eqn:eqty.
     2: right; exact [(l, Result.InternalError ("Variable " ++ n ++ " has an ID but no type"))].
     left.
-    exists ty.
-    exact (Target.EVar l (i, ty)).
+    exists ty, (Target.EVar l (i, ty)).
+    intros ? [<-|[]]; cbn.
+    apply temp.(Henv).
+    exact eqty.
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
     destruct (translate_unop op) as [ tin [ tout top ]].
     refine (Result.bind (typecheck_exp l e' tin) _).
-    intros e''.
-    exact (Result.Ok (existT _ tout (Target.EUnop l top e''))).
+    intros [ e'' He ].
+    refine (Result.Ok _); exists tout, (Target.EUnop l top e'').
+    exact He.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     destruct (translate_binop op) as [ tin1 [ tin2 [ tout top ]]].
     refine (Result.bind (typecheck_exp l e1' tin1) _).
-    intros e1''.
+    intros [ e1'' He1 ].
     refine (Result.bind (typecheck_exp l e2' tin2) _).
-    intros e2''.
-    exact (Result.Ok (existT _ tout (Target.EBinop l top e1'' e2''))).
+    intros [ e2'' He2 ].
+    refine (Result.Ok _); exists tout, (Target.EBinop l top e1'' e2'').
+    cbn; rewrite Target.var_of_exp_aux_eq.
+    apply incl_app; assumption.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (typecheck_exp l e1' TBool) _).
-    intros e1''.
+    intros [ e1'' He1 ].
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
     refine (Result.bind (check_exp temp e3) _).
     intros e3'.
-    destruct e2' as [t e2''].
+    destruct e2' as [t [e2'' He2]].
     refine (Result.bind (typecheck_exp l e3' t) _).
-    intros e3''.
-    exact (Result.Ok (existT _ t (Target.EIfte l e1'' e2'' e3''))).
+    intros [ e3'' He3 ].
+    refine (Result.Ok _); exists t, (Target.EIfte l e1'' e2'' e3'').
+    cbn; rewrite !Target.var_of_exp_aux_eq, app_nil_r.
+    repeat apply incl_app; assumption.
 Defined.
 
 Definition check_body (temp: common_temp) (entry: Source.node): Result.t type
-  { body : list Target.equation | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) }.
+  { body : list Target.equation
+  | Permutation (map Target.equation_dest body) (n_out temp ++ n_locals temp) /\
+    Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in temp ++ n_out temp ++ n_locals temp)) body }.
 Proof.
   destruct entry as [nloc n nin out loc eqs]; clear n nin out loc.
-  refine (Result.bind ((_ :
-    Result.t _
-      { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) } }
-    )) (fun res => match res with
+  refine (Result.bind _
+    (fun res : { rem & { body | Permutation (rem ++ map Target.equation_dest body) (n_out temp ++ n_locals temp) /\
+                                Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in temp ++ n_out temp ++ n_locals temp)) body } } =>
+      match res with
       | existT _ [] ret => Result.Ok ret
       | existT _ ((i, ty) :: _) _ => Result.Err [(nloc, Result.MissingAssignment "<information lost>" i ty)] end)).
   induction eqs as [ | [ l [ n e ] ] tl IH ].
-  - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))).
-    rewrite app_nil_r; exact (Permutation_refl _).
+  - refine (Result.Ok (existT _ (n_out temp ++ n_locals temp) (exist _ [] _))); split.
+    1: rewrite app_nil_r; exact (Permutation_refl _).
+    exact (Forall_nil _).
   - refine (Result.bind (Result.combine (check_exp temp e) IH) _); clear IH.
-    intros [ [ ty e' ] [ rem [ eqs IH ] ] ].
-    destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ].
-    2: exact (Result.Err [(l, Result.UndeclaredVariable n)]).
-    pose (rev_lhs := @nil (ident * type)); change rem with (rev_lhs ++ rem) in IH.
+    destruct (StringMap.find n (smap temp)) as [ [ i l' ] | ] eqn:eqni.
+    2: intros _; exact (Result.Err [(l, Result.UndeclaredVariable n)]).
+    intros [ [ ty [ e' He ] ] [ rem [ eqs [ IH1 IH2 ] ] ] ].
+    pose (rev_lhs := @nil (ident * type)); change rem with (rev_lhs ++ rem) in IH1.
     generalize dependent rev_lhs; induction rem as [ | [ i' ty' ] rem IH ]; intros rev_lhs Hperm.
-    1: exact (Result.Err [(l, Result.MultipleAssignment n i ty)]).
+    1: refine (Result.Err [(l, _)]); destruct temp as [? ? ? nin ? ? ?]; clear - n i nin.
+    1: induction nin as [|[hdn hdt] tl IH].
+    1:  exact (Result.UndeclaredVariable n).
+    1: destruct (PeanoNat.Nat.eq_dec i hdn) as [_|_].
+    1:  exact (Result.AssignToInput n i hdt).
+    1: exact IH.
     destruct (PeanoNat.Nat.eq_dec i i') as [ <- | nnei ].
     2: refine (IH ((i', ty') :: rev_lhs) (Permutation_trans (Permutation_app_tail _ _) Hperm)).
     2: rewrite (app_assoc _ [_] _ : _ ++ (i', ty') :: _ = _).
@@ -191,6 +205,7 @@ Proof.
     destruct (type_dec ty ty') as [ <- | nety ].
     2: exact (Result.Err [(l, Result.IncompatibleTypeAssignment n i ty' ty)]).
     refine (Result.Ok (existT _ (rev_append rev_lhs rem) (exist _ ((i, existT Target.exp ty e') :: eqs) _))).
+    split; [|refine (Forall_cons _ _ IH2); exact He].
     rewrite (app_assoc _ [_] _ : _ ++ map Target.equation_dest ((_, _) :: _) = (_ ++ _) ++ map _ _), rev_append_rev.
     refine (Permutation_trans (Permutation_app_tail _ _) Hperm); unfold Target.equation_dest, fst, snd, projT1.
     rewrite <-app_assoc; exact (Permutation_sym (Permutation_app (Permutation_rev _) (Permutation_cons_append _ _))).
@@ -200,15 +215,6 @@ Definition n_assigned_vars (body: list Target.equation) :=
   map Target.equation_dest body.
 
 Scheme Equality for list.
-
-Definition check_assigned_out (l: Result.location) (temp: common_temp) body: Result.t type (incl (n_out temp) (n_assigned_vars body)).
-Proof.
-  refine (Result.bind (Result.list_map _ _) (fun H => Result.Ok (proj2 (incl_Forall_in_iff _ _) H))).
-  intros b.
-  destruct (In_dec (prod_dec PeanoNat.Nat.eq_dec type_dec) b (n_assigned_vars body)) as [Hin|Hnin].
-  1: exact (Result.Ok Hin).
-  exact (Result.Err [(l, Result.MissingAssignment "<information lost>" (fst b) (snd b))]).
-Defined.
 
 (* TODO: merge with check_Henv *)
 Definition vars_unique (l: Result.location) (temp: common_temp) :
@@ -491,7 +497,7 @@ Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
     env := fold_left (fun acc '(n, t) => Dict.add n t acc) (n_in ++ n_out ++ n_loc) (Dict.empty _);
     Henv := Henv;
   |} in
-  do '(exist _ n_body vars_all_assigned, vars_unique) <-
+  do '(exist _ n_body (conj vars_all_assigned vars_exist), vars_unique) <-
     Result.combine (check_body temp entry) (vars_unique (Source.n_loc entry) temp);
   Result.Ok {|
       Target.n_loc := Source.n_loc entry;
@@ -500,6 +506,7 @@ Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
       Target.n_out := n_out;
       Target.n_locals := n_loc;
       Target.n_body := n_body;
+      Target.n_all_vars_exist := vars_exist;
       Target.n_vars_all_assigned := vars_all_assigned;
       Target.n_vars_unique := vars_unique;
       Target.n_seed := seed;
