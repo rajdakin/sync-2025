@@ -1,4 +1,19 @@
 (rule
+  (deps (source_tree examples/cyclic_test.mls))
+  (action
+    (with-accepted-exit-codes
+      (or 0 1)
+      (with-outputs-to cyclic_test.output (run ./main.exe examples/cyclic_test.mls))
+    )
+  )
+)
+
+(rule
+  (alias runtest)
+  (deps (source_tree examples/cyclic_test.expected) cyclic_test.output)
+  (action (diff examples/cyclic_test.expected cyclic_test.output))
+)
+(rule
   (deps (source_tree examples/test.mls))
   (action
     (with-accepted-exit-codes
