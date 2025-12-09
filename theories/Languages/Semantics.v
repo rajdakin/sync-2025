@@ -44,6 +44,8 @@ Defined.
 Definition sig2T_eq_type := @sig2T_eq _ type_dec.
 Arguments sig2T_eq_type {_ _ _ _}.
 
+Ltac simpl_exist_type := repeat match goal with H : @existT type _ _ _ = existT _ _ _ |- _ => apply sig2T_eq_type in H end.
+
 Lemma type_dec_same : forall ty, type_dec ty ty = left eq_refl.
 Proof using.
   intros ty.

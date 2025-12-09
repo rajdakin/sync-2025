@@ -1,6 +1,8 @@
+Test success
+
 char fun_test() {
+    char var_2 = 1;
     char var_0 = 0;
     char var_1 = var_0;
-    char var_2 = 1;
     return var_2;
 }

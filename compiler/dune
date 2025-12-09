@@ -1,6 +1,6 @@
 (executable
  (libraries extracted menhirLib)
- (modules main parser generation locationInfo lexer parserMessages)
+ (modules config main parser generation locationInfo lexer parserMessages)
  (name main)
  (public_name compiler))
 
@@ -60,5 +60,3 @@
   (deps (source_tree examples) (source_tree gen_tests.ml))
   (action (with-stdout-to dune.tests (run ./gen_tests.exe)))
 )
-
-(include dune.tests)

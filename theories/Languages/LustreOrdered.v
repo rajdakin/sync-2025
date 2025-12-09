@@ -28,9 +28,9 @@ Arguments var_of_exp_binop_eq {_ _ _} _ _ _.
 Definition var_of_exp_ifte_eq := @Lustre.var_of_exp_ifte_eq.
 Arguments var_of_exp_ifte_eq {_} _ _ _.
 Definition var_of_exp_not_in_binop := @Lustre.var_of_exp_not_in_binop.
-Arguments var_of_exp_not_in_binop {_ _ _} _ _ _ _ _.
+Arguments var_of_exp_not_in_binop _ {_ _ _} _ _ _ _ _.
 Definition var_of_exp_not_in_ifte := @Lustre.var_of_exp_not_in_ifte.
-Arguments var_of_exp_not_in_ifte {_} _ _ _ _ _.
+Arguments var_of_exp_not_in_ifte _ {_} _ _ _ _ _.
 
 Definition dag := list ((ident * type) * list (ident * type)).
 
@@ -125,43 +125,41 @@ Lemma sem_exp_with_useless_var {tys tye} (e: exp tye) (h: history) (name: ident)
 Proof.
   intros Hexp Hnin.
   revert v Hexp.
-  induction e as [ ty c | (i, t) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
+  induction e as [ loc ty c | loc (i, t) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
   - inversion Hexp.
-    apply sig2T_eq_type in H2, H3.
+    simpl_exist_type.
     subst.
     apply Lustre.SeConst.
   - inversion Hexp.
-    apply sig2T_eq_type in H4.
+    simpl_exist_type.
     subst.
     unfold var_of_exp in Hnin.
     simpl in Hnin.
-    destruct b as [j tyi]; injection H3 as H3; subst j.
+    destruct b as [j tyi]; injection H4 as H4; subst j.
     apply Lustre.SeVar.
     simpl.
     apply Dict.maps_to_add; [ assumption | ].
     intros Heq.
     exact (Hnin tyi (or_introl _ (f_equal2 _ Heq eq_refl))).
   - inversion Hexp.
-    apply sig2T_eq_type in H3, H4, H5.
-    apply sig2T_eq_type in H3.
+    simpl_exist_type.
     subst.
     apply Lustre.SeUnop.
     apply IH; assumption.
   - inversion Hexp.
     subst ty3.
-    apply sig2T_eq_type in H4, H5, H6, H7.
-    repeat apply sig2T_eq_type in H4.
+    simpl_exist_type.
     subst.
-    pose proof (var_of_exp_not_in_binop e1 e2 name op Hnin) as tmp.
+    pose proof (var_of_exp_not_in_binop _ e1 e2 name op Hnin) as tmp.
     pose proof (fun tyv => proj1 (tmp tyv)).
     pose proof (fun tyv => proj2 (tmp tyv)).
     apply Lustre.SeBinop.
     + apply IH1; assumption.
     + apply IH2; assumption.
   - inversion Hexp.
-    apply sig2T_eq_type in H0, H1, H4.
+    simpl_exist_type.
     subst.
-    pose proof (var_of_exp_not_in_ifte e1 e2 e3 name Hnin) as tmp.
+    pose proof (var_of_exp_not_in_ifte _ e1 e2 e3 name Hnin) as tmp.
     pose proof (fun tyv => proj1 (tmp tyv)).
     pose proof (fun tyv => proj1 (proj2 (tmp tyv))).
     pose proof (fun tyv => proj2 (proj2 (tmp tyv))).
@@ -175,7 +173,7 @@ Lemma var_of_last_exp_in_body {ty} (body: list equation) (name: ident) (e: exp t
   Ordered.t (equations_to_dag ((name, existT exp _ e) :: body) n_in) ->
   Forall (fun v => In v (map equation_dest body) \/ In v n_in) (var_of_exp e).
 Proof.
-  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros Hord.
+  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros Hord.
   - constructor.
   - constructor; [ | constructor ].
     simpl in Hord.

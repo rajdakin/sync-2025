@@ -15,29 +15,29 @@ Module Target := LustreTiming.
 
 Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
   match e with
-    | Source.EConst c => Target.Raw_EConst c
-    | Source.EVar v => Target.Raw_EVar v
-    | Source.EIfte e1 e2 e3 => Target.Raw_EIfte (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
-    | Source.EUnop u e => match u in Source.unop tin tout return Target.raw_exp tin -> Target.raw_exp tout with
-      | Source.Uop_neg => fun e => Target.Raw_EUnop Target.Uop_neg e
-      | Source.Uop_not => fun e => Target.Raw_EUnop Target.Uop_not e
-      | Source.Uop_pre => fun e => Target.Raw_EPre e
+    | Source.EConst l c => Target.Raw_EConst l c
+    | Source.EVar l v => Target.Raw_EVar l v
+    | Source.EIfte l e1 e2 e3 => Target.Raw_EIfte l (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
+    | Source.EUnop l u e => match u in Source.unop tin tout return Target.raw_exp tin -> Target.raw_exp tout with
+      | Source.Uop_neg => fun e => Target.Raw_EUnop l Target.Uop_neg e
+      | Source.Uop_not => fun e => Target.Raw_EUnop l Target.Uop_not e
+      | Source.Uop_pre => fun e => Target.Raw_EPre l e
       end (expr_to_raw e)
-    | Source.EBinop b e1 e2 => match b in Source.binop ty1 ty2 tout return Target.raw_exp ty1 -> Target.raw_exp ty2 -> Target.raw_exp tout with
-      | Source.Bop_and => fun e1 e2 => Target.Raw_EBinop Target.Bop_and e1 e2
-      | Source.Bop_or => fun e1 e2 => Target.Raw_EBinop Target.Bop_or e1 e2
-      | Source.Bop_xor => fun e1 e2 => Target.Raw_EBinop Target.Bop_xor e1 e2
-      | Source.Bop_plus => fun e1 e2 => Target.Raw_EBinop Target.Bop_plus e1 e2
-      | Source.Bop_minus => fun e1 e2 => Target.Raw_EBinop Target.Bop_minus e1 e2
-      | Source.Bop_mult => fun e1 e2 => Target.Raw_EBinop Target.Bop_mult e1 e2
-      | Source.Bop_div => fun e1 e2 => Target.Raw_EBinop Target.Bop_div e1 e2
-      | Source.Bop_eq => fun e1 e2 => Target.Raw_EBinop Target.Bop_eq e1 e2
-      | Source.Bop_neq => fun e1 e2 => Target.Raw_EBinop Target.Bop_neq e1 e2
-      | Source.Bop_le => fun e1 e2 => Target.Raw_EBinop Target.Bop_le e1 e2
-      | Source.Bop_lt => fun e1 e2 => Target.Raw_EBinop Target.Bop_lt e1 e2
-      | Source.Bop_ge => fun e1 e2 => Target.Raw_EBinop Target.Bop_ge e1 e2
-      | Source.Bop_gt => fun e1 e2 => Target.Raw_EBinop Target.Bop_gt e1 e2
-      | Source.Bop_arrow => fun e1 e2 => Target.Raw_EArrow e1 e2
+    | Source.EBinop l b e1 e2 => match b in Source.binop ty1 ty2 tout return Target.raw_exp ty1 -> Target.raw_exp ty2 -> Target.raw_exp tout with
+      | Source.Bop_and => fun e1 e2 => Target.Raw_EBinop l Target.Bop_and e1 e2
+      | Source.Bop_or => fun e1 e2 => Target.Raw_EBinop l Target.Bop_or e1 e2
+      | Source.Bop_xor => fun e1 e2 => Target.Raw_EBinop l Target.Bop_xor e1 e2
+      | Source.Bop_plus => fun e1 e2 => Target.Raw_EBinop l Target.Bop_plus e1 e2
+      | Source.Bop_minus => fun e1 e2 => Target.Raw_EBinop l Target.Bop_minus e1 e2
+      | Source.Bop_mult => fun e1 e2 => Target.Raw_EBinop l Target.Bop_mult e1 e2
+      | Source.Bop_div => fun e1 e2 => Target.Raw_EBinop l Target.Bop_div e1 e2
+      | Source.Bop_eq => fun e1 e2 => Target.Raw_EBinop l Target.Bop_eq e1 e2
+      | Source.Bop_neq => fun e1 e2 => Target.Raw_EBinop l Target.Bop_neq e1 e2
+      | Source.Bop_le => fun e1 e2 => Target.Raw_EBinop l Target.Bop_le e1 e2
+      | Source.Bop_lt => fun e1 e2 => Target.Raw_EBinop l Target.Bop_lt e1 e2
+      | Source.Bop_ge => fun e1 e2 => Target.Raw_EBinop l Target.Bop_ge e1 e2
+      | Source.Bop_gt => fun e1 e2 => Target.Raw_EBinop l Target.Bop_gt e1 e2
+      | Source.Bop_arrow => fun e1 e2 => Target.Raw_EArrow l e1 e2
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 

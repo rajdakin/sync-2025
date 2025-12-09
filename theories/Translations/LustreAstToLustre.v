@@ -1,6 +1,6 @@
 Set Default Goal Selector "!".
 
-From Reactive.Datatypes Require Result.
+From Reactive.Datatypes Require Hashtable Result.
 From Reactive.Languages Require LustreAst Lustre.
 From Reactive.Languages Require Import Semantics.
 From Reactive.Props Require Import Dec Forall Identifier.
@@ -123,15 +123,15 @@ Proof.
   destruct e as [ l c | l n | l op e | l op e1 e2 | l e1 e2 e3 ].
   - left.
     destruct c as [ | b | n ].
-    + exists TVoid, (Target.EConst CVoid); intros ? [].
-    + exists TBool, (Target.EConst (CBool b)); intros ? [].
-    + exists TInt, (Target.EConst (CInt n)); intros ? [].
+    + exists TVoid, (Target.EConst l CVoid); intros ? [].
+    + exists TBool, (Target.EConst l (CBool b)); intros ? [].
+    + exists TInt, (Target.EConst l (CInt n)); intros ? [].
   - destruct (StringMap.find n (smap temp)) as [ [ i dl ] | ] eqn:eqi.
     2: right; exact [(l, Result.UndeclaredVariable n)].
     destruct (Dict.find i (env temp)) as [ ty | ] eqn:eqty.
     2: right; exact [(l, Result.InternalError ("Variable " ++ n ++ " has an ID but no type"))].
     left.
-    exists ty, (Target.EVar (i, ty)).
+    exists ty, (Target.EVar l (i, ty)).
     intros ? [<-|[]]; cbn.
     apply temp.(Henv).
     exact eqty.
@@ -140,7 +140,7 @@ Proof.
     destruct (translate_unop op) as [ tin [ tout top ]].
     refine (Result.bind (typecheck_exp l e' tin) _).
     intros [ e'' He ].
-    refine (Result.Ok _); exists tout, (Target.EUnop top e'').
+    refine (Result.Ok _); exists tout, (Target.EUnop l top e'').
     exact He.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
@@ -151,7 +151,7 @@ Proof.
     intros [ e1'' He1 ].
     refine (Result.bind (typecheck_exp l e2' tin2) _).
     intros [ e2'' He2 ].
-    refine (Result.Ok _); exists tout, (Target.EBinop top e1'' e2'').
+    refine (Result.Ok _); exists tout, (Target.EBinop l top e1'' e2'').
     cbn; rewrite Target.var_of_exp_aux_eq.
     apply incl_app; assumption.
   - refine (Result.bind (check_exp temp e1) _).
@@ -165,7 +165,7 @@ Proof.
     destruct e2' as [t [e2'' He2]].
     refine (Result.bind (typecheck_exp l e3' t) _).
     intros [ e3'' He3 ].
-    refine (Result.Ok _); exists t, (Target.EIfte e1'' e2'' e3'').
+    refine (Result.Ok _); exists t, (Target.EIfte l e1'' e2'' e3'').
     cbn; rewrite !Target.var_of_exp_aux_eq, app_nil_r.
     repeat apply incl_app; assumption.
 Defined.
@@ -254,7 +254,7 @@ Proof using.
 Defined.
 
 Definition build_map (entry: Source.node) :
-  { sm & { seed & Result.t type { n_in & { n_out & { n_locals |
+  { sm & { seed & Result.t type { n_in & { n_out & { n_locals & { sm_inv : Hashtable.t ident string |
     Forall (fun v => forall ty', In (fst v, ty') n_in -> ty' = snd v) n_in /\
     Forall (fun v => forall ty', In (fst v, ty') n_out -> ty' = snd v) n_out /\
     Forall (fun v => forall ty', In (fst v, ty') n_locals -> ty' = snd v) n_locals /\
@@ -268,18 +268,20 @@ Definition build_map (entry: Source.node) :
       (map (pair Result.DeclInput) entry.(Source.n_in) ++
        map (pair Result.DeclOutput) entry.(Source.n_out) ++
        map (pair Result.DeclLocal) entry.(Source.n_locals)) /\
-    (forall n, ~ In (iter n next_ident seed) (map fst (n_in ++ n_out ++ n_locals))) } } } } }.
+    (forall n, ~ In (iter n next_ident seed) (map fst (n_in ++ n_out ++ n_locals))) /\
+    (forall x, Hashtable.InMap x sm_inv <-> In x (map fst (n_in ++ n_out ++ n_locals))) } } } } } }.
 Proof using.
   destruct entry as [l n nin out loc body]; unfold Source.n_in, Source.n_out, Source.n_locals; clear n body.
   induction nin as [ | [n ty] vars (sm & seed & IH) ].
   2:{
     destruct (StringMap.find n sm) as [ [ i dl ] | ] eqn:eqnsm.
     1: exists sm, seed;
-       refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclInput dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
+       exact (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclInput dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
     exists (StringMap.add n (seed, Result.DeclInput) sm), (next_ident seed);
-      refine (Result.bind IH _);
-      intros (IHnin & IHout & IHloc & IHii & IHoo & IHll & IHio & IHil & IHol & IH1 & IH2);
-      left; exists ((seed, ty) :: IHnin), IHout, IHloc; repeat split; try assumption.
+      refine (Result.bind IH _); clear IH;
+      intros (IHnin & IHout & IHloc & IHsm_inv & IHii & IHoo & IHll & IHio & IHil & IHol & IH1 & IH2 & IHinv);
+      left; exists ((seed, ty) :: IHnin), IHout, IHloc, (Hashtable.add IHsm_inv seed n (fun H => IH2 O (proj1 (IHinv _) H))).
+    repeat match goal with |- _ /\ _ => split end; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
       assert (Hseed : ~ In seed (map fst IHnin))
@@ -305,13 +307,18 @@ Proof using.
       assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
       induction k as [|n IH] in seed |- *; [exact (le_n _)|].
       exact (le_S _ _ (IH _)).
+    + intros x; split.
+      1: intros H; apply Hashtable.In_add_inv in H; destruct H as [->|H]; [left; exact eq_refl|right; apply IHinv; exact H].
+      1: intros [[=->]|H]; [exact (Hashtable.In_add_same _ _ _ _)|refine (Hashtable.In_add_pre _ _); apply IHinv; exact H].
   }
-  refine (match _ : { sm & { seed & Result.t _ { n_out & { n_locals |
-                      _ /\ _ /\ _ /\ Forall2 _ (n_out ++ _) (map _ out ++ _) /\ (forall n, ~ In _ (map _ (n_out ++ _)))}}}} with
-    | existT _ sm (existT _ seed (Result.Ok (existT _ n_out (exist _ n_locals (conj Hoo (conj Hll (conj Hol (conj H1 H2)))))))) =>
+  refine (match _ : { sm & { seed & Result.t _ { n_out & { n_locals & { sm_inv |
+                      _ /\ _ /\ _ /\ Forall2 _ (n_out ++ _) (map _ out ++ _) /\ (forall n, ~ In _ (map _ (n_out ++ _))) /\
+                      (forall x, _ <-> In x (map fst (n_out ++ _)))}}}}} with
+    | existT _ sm (existT _ seed (Result.Ok (existT _ n_out (existT _ n_locals
+         (exist _ sm_inv (conj Hoo (conj Hll (conj Hol (conj H1 (conj H2 H3)))))))))) =>
         existT _ sm (existT _ seed (Result.Ok (
-          existT _ [] (existT _ n_out (exist _ n_locals
-            (conj (Forall_nil _) (conj Hoo (conj Hll (conj (Forall_nil _) (conj (Forall_nil _) (conj Hol (conj H1 H2))))))))))))
+          existT _ [] (existT _ n_out (existT _ n_locals (exist _ sm_inv
+            (conj (Forall_nil _) (conj Hoo (conj Hll (conj (Forall_nil _) (conj (Forall_nil _) (conj Hol (conj H1 (conj H2 H3))))))))))))))
     | existT _ sm (existT _ seed (Result.Err e)) => existT _ sm (existT _ seed (Result.Err e)) end).
   induction out as [ | [n ty] vars (sm & seed & IH) ].
   2:{
@@ -320,8 +327,9 @@ Proof using.
        refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclOutput dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
     exists (StringMap.add n (seed, Result.DeclOutput) sm), (next_ident seed);
       refine (Result.bind IH _);
-      intros (IHout & IHloc & IHoo & IHll & IHol & IH1 & IH2);
-      left; exists ((seed, ty) :: IHout), IHloc; repeat split; try assumption.
+      intros (IHout & IHloc & IHsm_inv & IHoo & IHll & IHol & IH1 & IH2 & IHinv);
+      left; exists ((seed, ty) :: IHout), IHloc, (Hashtable.add IHsm_inv seed n (fun H => IH2 O (proj1 (IHinv _) H))).
+    repeat match goal with |- _ /\ _ => split end; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: rewrite map_app; exact (in_or_app _ _ _ (or_introl (in_map fst _ _ H))).
       assert (Hseed : ~ In seed (map fst IHout))
@@ -343,13 +351,16 @@ Proof using.
       assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
       induction k as [|n IH] in seed |- *; [exact (le_n _)|].
       exact (le_S _ _ (IH _)).
+    + intros x; split.
+      1: intros H; apply Hashtable.In_add_inv in H; destruct H as [->|H]; [left; exact eq_refl|right; apply IHinv; exact H].
+      1: intros [[=->]|H]; [exact (Hashtable.In_add_same _ _ _ _)|refine (Hashtable.In_add_pre _ _); apply IHinv; exact H].
   }
-  refine (match _ : { sm & { seed & Result.t _ { n_locals |
-                      _ /\ Forall2 _ n_locals (map _ _) /\ (forall n, ~ In _ (map _ n_locals))}}} with
-    | existT _ sm (existT _ seed (Result.Ok (exist _ n_locals (conj Hll (conj H1 H2))))) =>
+  refine (match _ : { sm & { seed & Result.t _ { n_locals & { sm_inv |
+                      _ /\ Forall2 _ n_locals (map _ _) /\ (forall n, ~ In _ (map _ n_locals)) /\ (forall x, _ <-> In _ (map _ n_locals))}}}} with
+    | existT _ sm (existT _ seed (Result.Ok (existT _ n_locals (exist _ sm_inv (conj Hll (conj H1 (conj H2 H3))))))) =>
         existT _ sm (existT _ seed (Result.Ok (
-          existT _ [] (exist _ n_locals
-            (conj (Forall_nil _) (conj Hll (conj (Forall_nil _) (conj H1 H2))))))))
+          existT _ [] (existT _ n_locals (exist _ sm_inv
+            (conj (Forall_nil _) (conj Hll (conj (Forall_nil _) (conj H1 (conj H2 H3))))))))))
     | existT _ sm (existT _ seed (Result.Err e)) => existT _ sm (existT _ seed (Result.Err e)) end).
   induction loc as [ | [n ty] vars (sm & seed & IH) ].
   2:{
@@ -358,8 +369,9 @@ Proof using.
        refine (Result.Err ((l, Result.MultipleDeclaration n i Result.DeclLocal dl) :: match IH with Result.Ok _ => [] | Result.Err es => es end)).
     exists (StringMap.add n (seed, Result.DeclLocal) sm), (next_ident seed);
       refine (Result.bind IH _);
-      intros (IHloc & IHll & IH1 & IH2);
-      left; exists ((seed, ty) :: IHloc); repeat split; try assumption.
+      intros (IHloc & IHsm_inv & IHll & IH1 & IH2 & IHinv);
+      left; exists ((seed, ty) :: IHloc), (Hashtable.add IHsm_inv seed n (fun H => IH2 O (proj1 (IHinv _) H))).
+    repeat match goal with |- _ /\ _ => split end; try assumption.
     + constructor; [intros ty' [[=<-]|H]; [exact eq_refl|exfalso; refine (IH2 O _)]|].
       1: exact (in_map fst _ _ H).
       assert (Hseed : ~ In seed (map fst IHloc))
@@ -379,8 +391,12 @@ Proof using.
       assert (tmp : seed < iter k next_ident (S seed)); [|rewrite H in tmp at 1; exact (PeanoNat.Nat.lt_irrefl _ tmp)].
       induction k as [|n IH] in seed |- *; [exact (le_n _)|].
       exact (le_S _ _ (IH _)).
+    + intros x; split.
+      1: intros H; apply Hashtable.In_add_inv in H; destruct H as [->|H]; [left; exact eq_refl|right; apply IHinv; exact H].
+      1: intros [[=->]|H]; [exact (Hashtable.In_add_same _ _ _ _)|refine (Hashtable.In_add_pre _ _); apply IHinv; exact H].
   }
-  exists (StringMap.empty _), O; left; exists []; split; [exact (Forall_nil _)|split; [exact (Forall2_nil _)|intros ? f; exact f]].
+  exists (StringMap.empty _), O; left; exists [], (Hashtable.create _ _ O); split; [exact (Forall_nil _)|split; [exact (Forall2_nil _)|]].
+  split; [intros ? f; exact f|intros x; split; [intros H; exact (Hashtable.In_create H)|intros []]].
 Defined.
 
 Lemma check_Henv {n_in n_out n_loc} :
@@ -478,10 +494,10 @@ Defined.
 
 Import Result.notations.
 
-Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
+Definition check_node_prop (entry: Source.node): Result.t type (Hashtable.t ident string * Target.node) :=
   let '(existT _ sm (existT _ seed tmp)) := build_map entry in
-  do '(existT _ n_in (existT _ n_out (exist _ n_loc
-        (conj Hii (conj Hoo (conj Hll (conj Hio (conj Hil (conj Hol (conj Hnvars Hseed)))))))))) <- tmp;
+  do '(existT _ n_in (existT _ n_out (existT _ n_loc (exist _ sm_inv
+        (conj Hii (conj Hoo (conj Hll (conj Hio (conj Hil (conj Hol (conj Hnvars (conj Hseed _)))))))))))) <- tmp;
   let Henv := check_Henv Hii Hoo Hll Hio Hil Hol in
   let temp := {|
     orig := entry;
@@ -499,7 +515,7 @@ Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
   |} in
   do '(exist _ n_body (conj vars_all_assigned vars_exist), vars_unique) <-
     Result.combine (check_body temp entry) (vars_unique (Source.n_loc entry) temp);
-  Result.Ok {|
+  Result.Ok (sm_inv, {|
       Target.n_loc := Source.n_loc entry;
       Target.n_name := Source.n_name entry;
       Target.n_in := n_in;
@@ -511,4 +527,4 @@ Definition check_node_prop (entry: Source.node): Result.t type Target.node :=
       Target.n_vars_unique := vars_unique;
       Target.n_seed := seed;
       Target.n_seed_always_fresh := Hseed;
-    |}.
+    |}).
