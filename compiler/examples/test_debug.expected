@@ -1,11 +1,15 @@
-char fun_init_test_int_cond() {
-    char var_0 = 0;
-    char var_1 = var_0;
+struct s_test_int_cond {
+    char var_0;
+};
+
+char fun_init_test_int_cond(struct s_test_int_cond *this) {
+    this->var_0 = 0;
+    char var_1 = this->var_0;
     return var_1;
 }
 
-char fun_step_test_int_cond() {
-    char var_0 = 0;
-    char var_1 = var_0;
+char fun_step_test_int_cond(struct s_test_int_cond *this) {
+    this->var_0 = 0;
+    char var_1 = this->var_0;
     return var_1;
 }

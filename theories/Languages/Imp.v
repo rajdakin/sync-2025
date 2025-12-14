@@ -231,7 +231,8 @@ Record method_pair := mk_method {
 
   m_in: list binder;
   m_out: list binder;
-  m_vars: list binder;
+  m_locals: list binder;
+  m_vars := m_in ++ m_out ++ m_locals;
   m_pre: list binder;
 
   m_init: stmt;

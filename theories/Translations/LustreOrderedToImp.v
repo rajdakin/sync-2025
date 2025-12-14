@@ -114,7 +114,7 @@ Proof.
 
     Target.m_in := n_in;
     Target.m_out := n_out;
-    Target.m_vars := n_vars;
+    Target.m_locals := n_locals;
     Target.m_pre := map fst n_pre;
 
     Target.m_init := translate_node_init n_init;

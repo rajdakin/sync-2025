@@ -94,61 +94,68 @@ let needs_paren_binary op parent_op =
 
 let needs_paren_ternary _parent_op = true
 
-let rec pp_expr parent_op fmt exp =
+let rec pp_expr parent_op (env : binder list) fmt exp =
   match exp with
   | EConst (_, c) -> fprintf fmt "%a" pp_const c
-  | EVar v -> fprintf fmt "%a" pp_var v
+  | EVar v ->
+      if List.mem v env then fprintf fmt "%a" pp_var v
+      else fprintf fmt "this->%a" pp_var v
   | EUnop (_, _, op, e) ->
       if needs_paren_unary op parent_op then
-        fprintf fmt "@[(%a%a)@]" pp_unop op (pp_expr (Some (Unary op))) e
-      else fprintf fmt "@[%a%a@]" pp_unop op (pp_expr (Some (Unary op))) e
+        fprintf fmt "@[(%a%a)@]" pp_unop op (pp_expr (Some (Unary op)) env) e
+      else fprintf fmt "@[%a%a@]" pp_unop op (pp_expr (Some (Unary op)) env) e
   | EBAnd (e1, e2) ->
       if needs_paren_binary_and parent_op then
         fprintf fmt "(@[%a &&@ %a@])"
-          (pp_expr (Some BinaryAndL)) e1
-          (pp_expr (Some BinaryAndR)) e2
+          (pp_expr (Some BinaryAndL) env) e1
+          (pp_expr (Some BinaryAndR) env) e2
       else
         fprintf fmt "@[<hv2>%a &&@ %a@]"
-          (pp_expr (Some BinaryAndL)) e1
-          (pp_expr (Some BinaryAndR)) e2
+          (pp_expr (Some BinaryAndL) env) e1
+          (pp_expr (Some BinaryAndR) env) e2
   | EBOr (e1, e2) ->
       if needs_paren_binary_or parent_op then
         fprintf fmt "(@[%a ||@ %a@])"
-          (pp_expr (Some BinaryOrL)) e1
-          (pp_expr (Some BinaryOrR)) e2
+          (pp_expr (Some BinaryOrL) env) e1
+          (pp_expr (Some BinaryOrR) env) e2
       else
         fprintf fmt "@[<hv2>%a ||@ %a@]"
-          (pp_expr (Some BinaryOrL)) e1
-          (pp_expr (Some BinaryOrR)) e2
+          (pp_expr (Some BinaryOrL) env) e1
+          (pp_expr (Some BinaryOrR) env) e2
   | EBinop (_, _, _, op, e1, e2) ->
       if needs_paren_binary op parent_op then
         fprintf fmt "(@[%a %a@ %a@])"
-          (pp_expr (Some (BinaryL op))) e1
+          (pp_expr (Some (BinaryL op)) env) e1
           pp_binop op
-          (pp_expr (Some (BinaryR op))) e2
+          (pp_expr (Some (BinaryR op)) env) e2
       else
         fprintf fmt "@[<hv2>%a %a@ %a@]"
-          (pp_expr (Some (BinaryL op))) e1
+          (pp_expr (Some (BinaryL op)) env) e1
           pp_binop op
-          (pp_expr (Some (BinaryR op))) e2
+          (pp_expr (Some (BinaryR op)) env) e2
   | EIfte (_, cond, e1, e2) ->
       if needs_paren_ternary parent_op then
-        fprintf fmt "@[<hv>(%a ?@ %a :@ %a)@]" (pp_expr (Some TernaryL)) cond
-          (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
+        fprintf fmt "@[<hv>(%a ?@ %a :@ %a)@]" (pp_expr (Some TernaryL) env) cond
+          (pp_expr (Some TernaryM) env) e1 (pp_expr (Some TernaryR) env) e2
       else
-        fprintf fmt "@[<hv>%a ?@ %a :@ %a@]" (pp_expr (Some TernaryL)) cond
-          (pp_expr (Some TernaryM)) e1 (pp_expr (Some TernaryR)) e2
+        fprintf fmt "@[<hv>%a ?@ %a :@ %a@]" (pp_expr (Some TernaryL) env) cond
+          (pp_expr (Some TernaryM) env) e1 (pp_expr (Some TernaryR) env) e2
 
 let is_empty_sassign stmt = ignore stmt; false
 
 let get_var_typ (env : binder list) var =
-  snd (List.find (fun (name, _) -> name = var) env)
+  List.find_opt (fun (name, _) -> name = var) env |> Option.map snd
 
 let rec pp_stmt env fmt stmt =
   match stmt with
-  | SAssign ((x, _), e) ->
-      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ env x) pp_ident x
-        (pp_expr None) e
+  | SAssign ((x, _), e) -> begin match get_var_typ env x with
+    | Some ty ->
+      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ ty pp_ident x
+        (pp_expr None env) e
+    | None ->
+      fprintf fmt "@[<hv2>this->%a =@ %a;@]" pp_ident x
+        (pp_expr None env) e
+    end
   | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt env fmt s2
   | SSeq (s1, s2) when is_empty_sassign s2 -> pp_stmt env fmt s1
   | SSeq (s1, s2) -> fprintf fmt "%a@\n%a" (pp_stmt env) s1 (pp_stmt env) s2
@@ -158,10 +165,14 @@ let pp_binder fmt binder = fprintf fmt "%a" pp_ident (fst binder)
 let pp_arg fmt arg = fprintf fmt "%a %a" pp_typ (snd arg) pp_binder arg
 
 let pp_args fmt (args : binder list) =
-  pp_print_list
-    ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
-    (fun fmt arg -> fprintf fmt "%a" pp_arg arg)
-    fmt args
+  match args with
+  | [] -> ()
+  | _ :: _ ->
+      fprintf fmt ", @[%a@]"
+        (pp_print_list
+          ~pp_sep:(fun fmt () -> fprintf fmt ",@ ")
+          (fun fmt arg -> fprintf fmt "%a" pp_arg arg))
+        args
 
 let pp_struct_typ fmt (args : binder list) =
   pp_print_list
@@ -176,31 +187,42 @@ let pp_struct_val sname fmt (args : binder list) =
       ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
       (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
 
-let pp_coq_method fmt (name, bin, bout, blocals, body) = match bout with
+let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
   | [] -> (* Warning, no output! *)
-      fprintf fmt "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
-        pp_fun_name name
+      fprintf fmt "@[@[<v4>void %a(struct %s *this%a) {%a@]@\n}@\n@]"
+        pp_fun_name fname
+        sname
         pp_args bin
         (pp_stmt blocals) body
   | [m_out] ->
-      fprintf fmt "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      fprintf fmt "@[@[<v4>%a %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         pp_typ (snd m_out)
-        pp_fun_name name
+        pp_fun_name fname
+        sname
         pp_args bin
         (pp_stmt blocals) body
         pp_var m_out
   | _ :: _ :: _ ->
-      let return_name = asprintf "return_%s" name in
-      fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      let return_name = asprintf "return_%s" fname in
+      fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         return_name
-        pp_struct_typ (bout)
+        pp_struct_typ bout
         return_name
-        pp_fun_name name
+        pp_fun_name fname
+        sname
         pp_args bin
         (pp_stmt blocals) body
         (pp_struct_val return_name) bout
 
 let pp_coq_method_pair fmt cm =
-  Format.fprintf fmt "@[%a@\n%a@]"
-    pp_coq_method ("init_" ^ m_name cm, m_in cm, m_out cm, m_vars cm, m_init cm)
-    pp_coq_method ("step_" ^ m_name cm, m_in cm, m_out cm, m_pre cm @ m_vars cm, m_step cm)
+  let sname = "s_" ^ m_name cm in
+  let pp_locals fmt locs =
+    pp_print_list ~pp_sep:(fun _ () -> ())
+      (fun fmt loc -> fprintf fmt "@\n%a %a;" pp_typ (snd loc) pp_ident (fst loc))
+      fmt locs in
+  let locvars = m_in cm @ m_out cm in
+  fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@\n%a@\n%a@]"
+    sname
+    pp_locals (m_locals cm)
+    pp_coq_method ("init_" ^ m_name cm, sname, m_in cm, m_out cm, locvars, m_init cm)
+    pp_coq_method ("step_" ^ m_name cm, sname, m_in cm, m_out cm, locvars @ m_pre cm, m_step cm)
