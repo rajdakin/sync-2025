@@ -114,7 +114,7 @@ var:
 const:
   | TRUE    { (CBool true, extent_of_len 4 $endpos) }
   | FALSE   { (CBool false, extent_of_len 5 $endpos) }
-  | num=NUM { (CInt num, extent_of_len (String.length (string_of_int num)) $endpos) }
+  | num=NUM { (CInt (Extracted.BinInt.Z.of_nat num), extent_of_len (String.length (string_of_int num)) $endpos) }
 
 %inline unop:
   | NOT   { (Uop_not, extent_of_len 3 $endpos) }

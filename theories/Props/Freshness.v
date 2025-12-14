@@ -2,9 +2,17 @@ Set Default Goal Selector "!".
 
 From Reactive.Props Require Import Identifier.
 From Stdlib.Arith Require Import PeanoNat.
-From Stdlib Require Import List.
+From Stdlib Require Import List Permutation.
 
-Definition freshness {A} (seed: ident) (vars: list (ident * A)) := forall n, ~In (Nat.iter n next_ident seed) (map fst vars).
+Definition freshness {A} (seed: ident) (vars: list (ident * A)) := forall n, ~ In (Nat.iter n next_ident seed) (map fst vars).
+
+Lemma freshness_permutation {A} {seed} {vars1 vars2: list (ident * A)}:
+  freshness seed vars1 -> Permutation vars1 vars2 -> freshness seed vars2.
+Proof using.
+  intros Hfresh Hperm n Hin.
+  refine (Hfresh n _).
+  exact (Permutation_in _ (Permutation_map _ (Permutation_sym Hperm)) Hin).
+Qed.
 
 Lemma freshness_fusion {A} {seed: ident} {vars1 vars2: list (ident * A)}:
   freshness seed vars1 -> freshness seed vars2 -> freshness seed (vars1 ++ vars2).

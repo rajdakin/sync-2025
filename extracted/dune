@@ -2,6 +2,9 @@
  (prelude Extractor)
  (extracted_modules
   Ascii
+  BinInt
+  BinNums
+  BinPos
   Bool
   FMapList
   List ListDef
@@ -9,6 +12,7 @@
   OrderedType
   Orders
   OrdersTac
+  PosDef
   Specif
   String
   ; (root)
@@ -20,8 +24,8 @@
     Sorted
     Stream
    ; Props
-    Axioms
-;    Dec  (unused)
+;    Axioms (unused)
+;    Dec    (unused)
     Identifier
    ; Languages
     LustreAst

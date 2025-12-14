@@ -1,6 +1,13 @@
-char fun_test() {
+char fun_init_test() {
+    char var_2 = 1;
     char var_0 = 0;
     char var_1 = var_0;
+    return var_2;
+}
+
+char fun_step_test() {
     char var_2 = 1;
+    char var_0 = 0;
+    char var_1 = var_0;
     return var_2;
 }

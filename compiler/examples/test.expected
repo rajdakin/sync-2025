@@ -1,4 +1,9 @@
-char fun_test() {
+char fun_init_test() {
+    char var_0 = 1;
+    return var_0;
+}
+
+char fun_step_test() {
     char var_0 = 1;
     return var_0;
 }

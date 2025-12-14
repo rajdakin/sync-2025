@@ -1,2 +1,2 @@
-Error when node properties have been checked:
+Error(s) while node properties are checked:
 examples/test_if.mls:6:3-35: assigned expression with type int to variable a(2) with type bool

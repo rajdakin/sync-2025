@@ -1,4 +1,9 @@
-int fun_add(int var_2, int var_1) {
+int fun_init_add(int var_2, int var_1) {
+    int var_0 = var_2 + var_1;
+    return var_0;
+}
+
+int fun_step_add(int var_2, int var_1) {
     int var_0 = var_2 + var_1;
     return var_0;
 }

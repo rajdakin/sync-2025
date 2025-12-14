@@ -55,7 +55,7 @@ let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
   | TInt -> fprintf fmt "int"
 
 let pp_error fn fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
-  fprintf fmt "%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
+  fprintf fmt "@[<hov2>%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
   | BadType ([], got) -> fprintf fmt "untypeable expression, got type %a@]" pp_type got
@@ -99,13 +99,22 @@ let () =
     match LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
-        printf "@[Error(s) when node properties have been checked:@\n%a@]@."
+        printf "@[Error(s) while node properties are checked:@\n%a@]@."
           (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file)) x;
         exit 1
   in
 
-  match LustreOrdering.translate_node checked_node with
-  | Ok m -> Generation.pp_coq_method (LustreOrderedToImp.translate_node m)
+  let timed_node =
+    match LustreToTiming.translate_node checked_node with
+    | Ok m -> m
+    | Err x ->
+        printf "@[Error(s) while node is timed:@\n%a@]@."
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file)) x;
+        exit 1
+  in
+
+  match LustreOrdering.translate_node timed_node with
+  | Ok m -> Generation.pp_coq_method_pair Format.std_formatter (LustreOrderedToImp.translate_node m)
   | Err x ->
-      printf "@[Error lustre ordering translate:@\n%a@]@."
+      printf "@[Error(s) while node is ordered:@\n%a@]@."
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error !input_file)) x

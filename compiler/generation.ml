@@ -2,7 +2,6 @@ open Extracted.Imp
 open Extracted.Semantics
 open Format
 
-let pretty_printer m = printf "Ok: %s\n" (m_name m)
 let pp_return fmt ident = fprintf fmt "ret_%i" ident
 let pp_ident fmt ident = fprintf fmt "var_%i" ident
 let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
@@ -10,8 +9,7 @@ let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
 let pp_const fmt c =
   match c with
   | CBool c -> fprintf fmt "%s" (if c then "1" else "0")
-  | CInt i -> fprintf fmt "%i" i
-  | CVoid -> fprintf fmt "void"
+  | CInt i -> fprintf fmt "%i" (Extracted.BinInt.Z.to_nat i)
 
 let pp_typ fmt typ =
   match typ with
@@ -143,13 +141,13 @@ let rec pp_expr parent_op fmt exp =
 
 let is_empty_sassign stmt = ignore stmt; false
 
-let get_var_typ var env =
-  snd (List.find (fun (name, _) -> name = var) (m_vars env))
+let get_var_typ (env : binder list) var =
+  snd (List.find (fun (name, _) -> name = var) env)
 
 let rec pp_stmt env fmt stmt =
   match stmt with
   | SAssign ((x, _), e) ->
-      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ x env) pp_ident x
+      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ (get_var_typ env x) pp_ident x
         (pp_expr None) e
   | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt env fmt s2
   | SSeq (s1, s2) when is_empty_sassign s2 -> pp_stmt env fmt s1
@@ -178,26 +176,31 @@ let pp_struct_val sname fmt (args : binder list) =
       ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
       (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
 
-let pp_coq_method cm = match m_out cm with
+let pp_coq_method fmt (name, bin, bout, blocals, body) = match bout with
   | [] -> (* Warning, no output! *)
-      printf "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
-        pp_fun_name (m_name cm)
-        pp_args (m_in cm)
-        (pp_stmt cm) (m_body cm)
+      fprintf fmt "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
+        pp_fun_name name
+        pp_args bin
+        (pp_stmt blocals) body
   | [m_out] ->
-      printf "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      fprintf fmt "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         pp_typ (snd m_out)
-        pp_fun_name (m_name cm)
-        pp_args (m_in cm)
-        (pp_stmt cm) (m_body cm)
+        pp_fun_name name
+        pp_args bin
+        (pp_stmt blocals) body
         pp_var m_out
   | _ :: _ :: _ ->
-      let return_name = asprintf "return_%s" (m_name cm) in
-      printf "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      let return_name = asprintf "return_%s" name in
+      fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         return_name
-        pp_struct_typ (m_out cm)
+        pp_struct_typ (bout)
         return_name
-        pp_fun_name (m_name cm)
-        pp_args (m_in cm)
-        (pp_stmt cm) (m_body cm)
-        (pp_struct_val return_name) (m_out cm)
+        pp_fun_name name
+        pp_args bin
+        (pp_stmt blocals) body
+        (pp_struct_val return_name) bout
+
+let pp_coq_method_pair fmt cm =
+  Format.fprintf fmt "@[%a@\n%a@]"
+    pp_coq_method ("init_" ^ m_name cm, m_in cm, m_out cm, m_vars cm, m_init cm)
+    pp_coq_method ("step_" ^ m_name cm, m_in cm, m_out cm, m_pre cm @ m_vars cm, m_step cm)

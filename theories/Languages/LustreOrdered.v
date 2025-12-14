@@ -1,7 +1,7 @@
 Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Ordered.
-From Reactive.Languages Require Lustre.
+From Reactive.Languages Require LustreTiming.
 From Reactive.Languages Require Import Semantics.
 From Reactive.Props Require Import Identifier.
 
@@ -9,24 +9,24 @@ From Stdlib Require Import List.
 
 Import ListNotations.
 
-Module Lustre := Lustre.
+Module Source := LustreTiming.
 
-Definition unop := Lustre.unop.
-Definition binop := Lustre.binop.
-Definition exp := Lustre.exp.
-Definition var_of_exp := @Lustre.var_of_exp.
+Definition unop := Source.unop.
+Definition binop := Source.binop.
+Definition exp := Source.comb_exp.
+Definition var_of_exp := @Source.var_of_exp.
 Arguments var_of_exp {_} _.
-Definition equation := Lustre.equation.
-Definition equation_dest := Lustre.equation_dest.
-Definition node := Lustre.node.
-Definition var_of_exp_binop_eq := @Lustre.var_of_exp_binop_eq.
+Definition equation := Source.equation.
+Definition equation_dest := Source.equation_dest.
+Definition node := Source.node.
+(* Definition var_of_exp_binop_eq := @Source.var_of_exp_binop_eq.
 Arguments var_of_exp_binop_eq {_ _ _} _ _ _.
-Definition var_of_exp_ifte_eq := @Lustre.var_of_exp_ifte_eq.
+Definition var_of_exp_ifte_eq := @Source.var_of_exp_ifte_eq.
 Arguments var_of_exp_ifte_eq {_} _ _ _.
-Definition var_of_exp_not_in_binop := @Lustre.var_of_exp_not_in_binop.
+Definition var_of_exp_not_in_binop := @Source.var_of_exp_not_in_binop.
 Arguments var_of_exp_not_in_binop {_ _ _} _ _ _ _ _.
-Definition var_of_exp_not_in_ifte := @Lustre.var_of_exp_not_in_ifte.
-Arguments var_of_exp_not_in_ifte {_} _ _ _ _ _.
+Definition var_of_exp_not_in_ifte := @Source.var_of_exp_not_in_ifte.
+Arguments var_of_exp_not_in_ifte {_} _ _ _ _ _. *)
 
 Definition dag := list ((ident * type) * list (ident * type)).
 
@@ -39,7 +39,9 @@ Definition equations_to_dag equations n_in: dag := equations_to_dag_aux equation
 
 Record node_ordered := mk_node_ordered {
   node_ordered_is_node :> node;
-  ordered: Ordered.t (equations_to_dag (Lustre.n_body node_ordered_is_node) (Lustre.n_in node_ordered_is_node));
+  ordered_init: Ordered.t (equations_to_dag (Source.n_init node_ordered_is_node) (Source.n_in node_ordered_is_node));
+  ordered_step: Ordered.t (equations_to_dag (Source.n_step node_ordered_is_node)
+                                            (Source.n_in node_ordered_is_node ++ map fst (Source.n_pre node_ordered_is_node)));
 }.
 
 (** Lemmas *)
@@ -114,10 +116,10 @@ Proof.
       assumption.
 Qed.
 
-Lemma sem_exp_with_useless_var {tys tye} (e: exp tye) (h: history) (name: ident) (v: value _) (s: Stream.t (value tys)):
-  Lustre.sem_exp h e v ->
+(* Lemma sem_exp_with_useless_var {tys tye} (e: exp tye) (h: history) (name: ident) (v: value _) (s: Stream.t (value tys)):
+  Source.sem_exp h e v ->
   (forall tyv, ~ In (name, tyv) (var_of_exp e)) ->
-  Lustre.sem_exp (Dict.add name (existT _ _ s) h) e v.
+  Source.sem_exp (Dict.add name (existT _ _ s) h) e v.
 Proof.
   intros Hexp Hnin.
   revert v Hexp.
@@ -125,14 +127,14 @@ Proof.
   - inversion Hexp.
     apply sig2T_eq_type in H2, H3.
     subst.
-    apply Lustre.SeConst.
+    apply Source.SeConst.
   - inversion Hexp.
     apply sig2T_eq_type in H4.
     subst.
     unfold var_of_exp in Hnin.
     simpl in Hnin.
     destruct b as [j tyi]; injection H3 as H3; subst j.
-    apply Lustre.SeVar.
+    apply Source.SeVar.
     simpl.
     apply Dict.maps_to_add; [ assumption | ].
     intros Heq.
@@ -141,7 +143,7 @@ Proof.
     apply sig2T_eq_type in H3, H4, H5.
     apply sig2T_eq_type in H3.
     subst.
-    apply Lustre.SeUnop.
+    apply Source.SeUnop.
     apply IH; assumption.
   - inversion Hexp.
     subst ty3.
@@ -151,7 +153,7 @@ Proof.
     pose proof (var_of_exp_not_in_binop e1 e2 name op Hnin) as tmp.
     pose proof (fun tyv => proj1 (tmp tyv)).
     pose proof (fun tyv => proj2 (tmp tyv)).
-    apply Lustre.SeBinop.
+    apply Source.SeBinop.
     + apply IH1; assumption.
     + apply IH2; assumption.
   - inversion Hexp.
@@ -161,13 +163,13 @@ Proof.
     pose proof (fun tyv => proj1 (tmp tyv)).
     pose proof (fun tyv => proj1 (proj2 (tmp tyv))).
     pose proof (fun tyv => proj2 (proj2 (tmp tyv))).
-    apply Lustre.SeIfte.
+    apply Source.SeIfte.
     + apply IH1; assumption.
     + apply IH2; assumption.
     + apply IH3; assumption.
-Qed.
+Qed. *)
 
-Lemma var_of_last_exp_in_body {ty} (body: list equation) (name: ident) (e: exp ty) n_in:
+(* Lemma var_of_last_exp_in_body {ty} (body: list equation) (name: ident) (e: exp ty) n_in:
   Ordered.t (equations_to_dag ((name, existT exp _ e) :: body) n_in) ->
   Forall (fun v => In v (map equation_dest body) \/ In v n_in) (var_of_exp e).
 Proof.
@@ -216,9 +218,9 @@ Proof.
       * apply IH3.
         apply Ordered.app_right_side_r in Hord.
         assumption.
-Qed.
+Qed. *)
 
-Lemma minimal_history (body: list equation) n_in h0:
+(* Lemma minimal_history (body: list equation) n_in h0:
   (forall (i: ident) ty, in_history h0 (i, ty) <-> In (i, ty) n_in) ->
   Ordered.t (equations_to_dag body n_in) ->
   exists (h: history),
@@ -226,7 +228,7 @@ Lemma minimal_history (body: list equation) n_in h0:
     (forall (i: ident) ty, in_history h (i, ty) <-> In (i, ty) (map equation_dest body ++ n_in)) /\
     (Forall (fun '(n, existT _ ty eq) =>
       exists (v': Stream.t (value ty)),
-      Dict.maps_to n (existT _ ty v') h /\ Lustre.sem_exp h eq (Stream.hd v')
+      Dict.maps_to n (existT _ ty v') h /\ Source.sem_exp h eq (Stream.hd v')
     ) body).
 Proof.
   intros Hhist0 Hord.
@@ -245,7 +247,7 @@ Proof.
         apply var_of_last_exp_in_body with (name := name).
         assumption. }
 
-    pose proof (Lustre.exp_with_evaluable_vars_is_evaluable h exp Hforall) as [ v Hv ].
+    pose proof (Source.exp_with_evaluable_vars_is_evaluable h exp Hforall) as [ v Hv ].
     
     exists (Dict.add name (existT _ _ (Stream.from v)) h).
     split; [|split].
@@ -255,7 +257,7 @@ Proof.
       cbn in Hord; refine (Ordered.vars_no_dups _ _ _ _ Hord _).
       rewrite map_app, map_map.
       refine (in_or_app _ _ _ (or_intror (in_map _ _ (_, _) (proj1 (Hhist0 i ty') _)))).
-      unfold in_history, Lustre.in_history.
+      unfold in_history, Source.in_history.
       rewrite H; exact eq_refl.
     + intros i.
       split.
@@ -263,7 +265,7 @@ Proof.
         intros [ x Hx ].
         destruct (PeanoNat.Nat.eq_dec i name).
         { left.
-          unfold equation_dest, Lustre.equation_dest; cbn; f_equal.
+          unfold equation_dest, Source.equation_dest; cbn; f_equal.
           1: symmetry; assumption.
           subst.
           match goal with Hx : Dict.find _ (Dict.add ?i ?v ?d) = _ |- _ =>
@@ -301,12 +303,12 @@ Proof.
       * exists (Stream.from v).
         split.
         { apply Dict.maps_to_last_added. }
-        apply Lustre.sem_eval_exp.
+        apply Source.sem_eval_exp.
         simpl.
-        apply Lustre.sem_eval_exp.
+        apply Source.sem_eval_exp.
         apply sem_exp_with_useless_var.
         2: now apply Ordered.var_not_need_itself with (y := ty) (l := equations_to_dag body n_in).
-        now apply Lustre.sem_eval_exp.
+        now apply Source.sem_eval_exp.
       * refine (Forall_impl_in _ _ _ _ IH3).
         intros (i, (tyi, x)) Hin ( s & Hs1 & Hs2 ).
         simpl in *.
@@ -316,7 +318,7 @@ Proof.
           subst.
           specialize (IH1 name).
           assert (in_history h (name, tyi)) as H.
-          { unfold in_history, Lustre.in_history. rewrite Hs1. reflexivity. }
+          { unfold in_history, Source.in_history. rewrite Hs1. reflexivity. }
           apply IH2 in H.
           cbn in Hord; apply Ordered.vars_no_dups in Hord.
           rewrite dag_names in H.
@@ -338,4 +340,4 @@ Proof.
         induction body as [|[n [ty e]] tl IH]; [exact Hin|].
         destruct Hin as [[=-> -> H]|H]; [apply sig2T_eq_type in H; subst; left; exact eq_refl|].
         right; exact (IH H).
-Qed.
+Qed. *)

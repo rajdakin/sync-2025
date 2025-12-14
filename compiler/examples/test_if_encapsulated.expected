@@ -1,4 +1,11 @@
-int fun_test_int_cond(int var_5, int var_4, char var_3) {
+int fun_init_test_int_cond(int var_5, int var_4, char var_3) {
+    int var_0 = ((var_5 >= var_4) ? ((var_5 <= 0) ? var_5 : 25) : var_4);
+    char var_1 = ((var_0 > 10) ? 0 : 1);
+    int var_2 = ((var_3 && var_1) ? var_0 : var_5);
+    return var_2;
+}
+
+int fun_step_test_int_cond(int var_5, int var_4, char var_3) {
     int var_0 = ((var_5 >= var_4) ? ((var_5 <= 0) ? var_5 : 25) : var_4);
     char var_1 = ((var_0 > 10) ? 0 : 1);
     int var_2 = ((var_3 && var_1) ? var_0 : var_5);
