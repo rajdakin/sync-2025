@@ -1,3 +1,5 @@
+Test success
+
 char fun_my_and(char var_2, char var_1) {
     char var_0 = var_2 && var_1;
     return var_0;

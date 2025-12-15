@@ -38,32 +38,32 @@ Inductive binop: type -> type -> type -> Set :=
 .
 
 Inductive raw_exp : type -> Set :=
-  | Raw_EConst: forall {ty}, const ty -> raw_exp ty
-  | Raw_EVar: forall (b: binder), raw_exp (binder_ty b)
-  | Raw_EUnop: forall {tin tout}, unop tin tout -> raw_exp tin -> raw_exp tout
-  | Raw_EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> raw_exp ty1 -> raw_exp ty2 -> raw_exp tout
-  | Raw_EIfte: forall {t}, raw_exp TBool -> raw_exp t -> raw_exp t -> raw_exp t
-  | Raw_EPre: forall {ty}, raw_exp ty -> raw_exp ty
-  | Raw_EArrow: forall {ty}, raw_exp ty -> raw_exp ty -> raw_exp ty
+  | Raw_EConst: Result.location -> forall {ty}, const ty -> raw_exp ty
+  | Raw_EVar: Result.location -> forall (b: binder), raw_exp (binder_ty b)
+  | Raw_EUnop: Result.location -> forall {tin tout}, unop tin tout -> raw_exp tin -> raw_exp tout
+  | Raw_EBinop: Result.location -> forall {ty1 ty2 tout}, binop ty1 ty2 tout -> raw_exp ty1 -> raw_exp ty2 -> raw_exp tout
+  | Raw_EIfte: Result.location -> forall {t}, raw_exp TBool -> raw_exp t -> raw_exp t -> raw_exp t
+  | Raw_EPre: Result.location -> forall {ty}, raw_exp ty -> raw_exp ty
+  | Raw_EArrow: Result.location -> forall {ty}, raw_exp ty -> raw_exp ty -> raw_exp ty
 .
 
 Inductive comb_exp : type -> Set :=
-  | EConst: forall {ty}, const ty -> comb_exp ty
-  | EVar: forall (b: binder), comb_exp (binder_ty b)
-  | EUnop: forall {tin tout}, unop tin tout -> comb_exp tin -> comb_exp tout
-  | EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> comb_exp ty1 -> comb_exp ty2 -> comb_exp tout
-  | EIfte: forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
+  | EConst: Result.location -> forall {ty}, const ty -> comb_exp ty
+  | EVar: Result.location -> forall (b: binder), comb_exp (binder_ty b)
+  | EUnop: Result.location -> forall {tin tout}, unop tin tout -> comb_exp tin -> comb_exp tout
+  | EBinop: Result.location -> forall {ty1 ty2 tout}, binop ty1 ty2 tout -> comb_exp ty1 -> comb_exp ty2 -> comb_exp tout
+  | EIfte: Result.location -> forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
 .
 
 Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
-  | TimedConst: forall (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst c)
-  | TimedVar: forall (n: nat) (b: binder), well_timed n (Raw_EVar b)
-  | TimedUnop: forall (n: nat) {tin tout} (u: unop tin tout) (e: raw_exp tin), well_timed n e -> well_timed n (Raw_EUnop u e)
-  | TimedBinop: forall (n: nat) {ty1 ty2 tout} (b: binop ty1 ty2 tout) (e1: raw_exp ty1) (e2: raw_exp ty2), well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EBinop b e1 e2)
-  | TimedIfte: forall (n: nat) {ty} (c: raw_exp TBool) (e1 e2: raw_exp ty), well_timed n c -> well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EIfte c e1 e2)
-  | TimedPre: forall (n: nat) {ty} (e: raw_exp ty), well_timed n e -> well_timed (S n) (Raw_EPre e)
-  | TimedArrow_O: forall {ty} (e1 e2: raw_exp ty), well_timed 0 e1 -> well_timed 0 (Raw_EArrow e1 e2)
-  | TimedArrow_S: forall (n: nat) {ty} (e1 e2: raw_exp ty), well_timed (S n) e2 -> well_timed (S n) (Raw_EArrow e1 e2)
+  | TimedConst: forall l (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst l c)
+  | TimedVar: forall l (n: nat) (b: binder), well_timed n (Raw_EVar l b)
+  | TimedUnop: forall l (n: nat) {tin tout} (u: unop tin tout) (e: raw_exp tin), well_timed n e -> well_timed n (Raw_EUnop l u e)
+  | TimedBinop: forall l (n: nat) {ty1 ty2 tout} (b: binop ty1 ty2 tout) (e1: raw_exp ty1) (e2: raw_exp ty2), well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EBinop l b e1 e2)
+  | TimedIfte: forall l (n: nat) {ty} (c: raw_exp TBool) (e1 e2: raw_exp ty), well_timed n c -> well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EIfte l c e1 e2)
+  | TimedPre: forall l (n: nat) {ty} (e: raw_exp ty), well_timed n e -> well_timed (S n) (Raw_EPre l e)
+  | TimedArrow_O: forall l {ty} (e1 e2: raw_exp ty), well_timed 0 e1 -> well_timed 0 (Raw_EArrow l e1 e2)
+  | TimedArrow_S: forall l (n: nat) {ty} (e1 e2: raw_exp ty), well_timed (S n) e2 -> well_timed (S n) (Raw_EArrow l e1 e2)
 .
 
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
@@ -72,7 +72,7 @@ Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd 
 Lemma timed_exp {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
   Result.t type (well_timed n exp).
 Proof.
-  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
   - constructor 1.
     constructor.
   - constructor 1.
@@ -149,7 +149,7 @@ Defined.
 Lemma timed_exp_gt {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
   Result.t type (forall n', n <= n' -> well_timed n' exp).
 Proof.
-  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
   - constructor 1.
     intros.
     constructor.
@@ -295,44 +295,44 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
     * (list equation) (* step_post equations *)
   ) :=
   match exp with
-    | Raw_EConst c => (EConst c, EConst c, seed, [], [], [], [])
-    | Raw_EVar v => (EVar v, EVar v, seed, [], [], [], [])
-    | Raw_EUnop u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
-      (EUnop u ei, EUnop u es, orig, binders, eqs_pre, init_post, step_post)
-    | Raw_EBinop b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+    | Raw_EConst l c => (EConst l c, EConst l c, seed, [], [], [], [])
+    | Raw_EVar l v => (EVar l v, EVar l v, seed, [], [], [], [])
+    | Raw_EUnop l u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
+      (EUnop l u ei, EUnop l u es, orig, binders, eqs_pre, init_post, step_post)
+    | Raw_EBinop l b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
-        (EBinop b ei1 e2i, EBinop b es1 e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
-    | Raw_EIfte e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+        (EBinop l b ei1 e2i, EBinop l b es1 e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
+    | Raw_EIfte l e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         let '(e3i, e3s, orig3, binders3, eqs_pre3, init_post3, step_post3) := raw_to_comb e3 orig2 in
-        (EIfte ei1 e2i e3i, EIfte es1 e2s e3s, orig3, binders1 ++ binders2 ++ binders3, eqs_pre1 ++ eqs_pre2 ++ eqs_pre3, init_post1 ++ init_post2 ++ init_post3, step_post1 ++ step_post2 ++ step_post3)
-    | @Raw_EPre t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
+        (EIfte l ei1 e2i e3i, EIfte l es1 e2s e3s, orig3, binders1 ++ binders2 ++ binders3, eqs_pre1 ++ eqs_pre2 ++ eqs_pre3, init_post1 ++ init_post2 ++ init_post3, step_post1 ++ step_post2 ++ step_post3)
+    | @Raw_EPre l t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
       let ident_eq := next_ident ident_pre in
         let next_orig := next_ident ident_eq in
           let pre_var := (ident_pre, t) in
             let eq_var := (ident_eq, t) in
               (
-                EVar pre_var,
-                EVar pre_var,
+                EVar l pre_var,
+                EVar l pre_var,
                 next_orig,
                 pre_var::eq_var::binders,
-                (ident_pre, existT comb_exp t (EVar eq_var))::eqs_pre,
+                (ident_pre, existT comb_exp t (EVar l eq_var))::eqs_pre,
                 (ident_eq, existT _ t ei)::init_post,
                 (ident_eq, existT _ t es)::step_post
               )
-    | Raw_EArrow e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+    | Raw_EArrow l e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         (ei1, e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
   end.
 
 Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
-    | EConst _ => acc
-    | EVar (name, ty) => (name, ty) :: acc
-    | EUnop _ e => var_of_exp_aux e acc
-    | EBinop _ e1 e2 =>
+    | EConst _ _ => acc
+    | EVar _ (name, ty) => (name, ty) :: acc
+    | EUnop _ _ e => var_of_exp_aux e acc
+    | EBinop _ _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte e1 e2 e3 =>
+    | EIfte _ e1 e2 e3 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
   end.
 
