@@ -9,7 +9,7 @@ let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
 let pp_const fmt c =
   match c with
   | CBool c -> fprintf fmt "%s" (if c then "1" else "0")
-  | CInt i -> fprintf fmt "%i" (Extracted.BinInt.Z.to_nat i)
+  | CInt i -> fprintf fmt "%i" i
 
 let pp_typ fmt typ =
   match typ with

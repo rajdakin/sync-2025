@@ -20,7 +20,6 @@ Extract Constant LustreOrdering.List_mem => "Stdlib.List.mem". (* Small optimiza
 Extract Constant String.compare => "StringImpl.compare".
 
 Separate Extraction
-  BinInt.Z.of_nat BinInt.Z.to_nat
   LustreAstToLustre.check_node_prop
   LustreToTiming.translate_node
   LustreOrdering.translate_node
