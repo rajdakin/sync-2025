@@ -1,4 +1,12 @@
-char fun_my_and(char var_2, char var_1) {
+struct s_my_and {
+};
+
+char fun_init_my_and(struct s_my_and *this, char var_2, char var_1) {
+    char var_0 = var_2 && var_1;
+    return var_0;
+}
+
+char fun_step_my_and(struct s_my_and *this, char var_2, char var_1) {
     char var_0 = var_2 && var_1;
     return var_0;
 }

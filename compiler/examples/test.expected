@@ -1,4 +1,12 @@
-char fun_test() {
+struct s_test {
+};
+
+char fun_init_test(struct s_test *this) {
+    char var_0 = 1;
+    return var_0;
+}
+
+char fun_step_test(struct s_test *this) {
     char var_0 = 1;
     return var_0;
 }

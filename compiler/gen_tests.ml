@@ -2,7 +2,7 @@ let generate_rules base =
   Printf.printf
 
 {|(rule
-  (deps (source_tree examples/%s.mls))
+  (deps main.exe (source_tree examples/%s.mls))
   (action
     (with-accepted-exit-codes
       (or 0 1)

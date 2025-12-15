@@ -226,16 +226,20 @@ Fixpoint is_substmt (sub s: stmt): bool :=
     | SSeq sl sr => is_substmt sub sl || is_substmt sub sr 
   end.
 
-Record method := mk_method {
+Record method_pair := mk_method {
   m_name: string;
 
   m_in: list binder;
   m_out: list binder;
-  m_vars: list binder;
+  m_locals: list binder;
+  m_vars := m_in ++ m_out ++ m_locals;
+  m_pre: list binder;
 
-  m_body: stmt;
+  m_init: stmt;
+  m_step: stmt;
 
-  m_out_assign: forall b, In b m_out -> exists (e: exp _), is_substmt (SAssign b e) m_body = true
+  m_out_assign_init: forall b, In b m_out -> exists (e: exp _), is_substmt (SAssign b e) m_init = true;
+  m_out_assign_step: forall b, In b m_out -> exists (e: exp _), is_substmt (SAssign b e) m_step = true
 }.
 
 

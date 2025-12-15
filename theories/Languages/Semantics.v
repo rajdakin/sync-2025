@@ -114,11 +114,11 @@ Qed.
 
 Inductive const : type -> Set :=
   | CBool: bool -> const TBool
-  | CInt: Z -> const TInt
+  | CInt: nat -> const TInt
 .
 Lemma const_inv {ty} (x: const ty) :
   {eq : ty = _ & {b : bool | x = eq_rect _ const (CBool b) _ (eq_sym eq)}} +
-  {eq : ty = _ & {n : Z | x = eq_rect _ const (CInt n) _ (eq_sym eq)}}.
+  {eq : ty = _ & {n : nat | x = eq_rect _ const (CInt n) _ (eq_sym eq)}}.
 Proof using.
   destruct x as [b|n]; [left|right]; exists eq_refl; [exists b|exists n]; exact eq_refl.
 Defined.
@@ -129,7 +129,7 @@ Proof.
   all: destruct (const_inv y) as [[eq' [b' ->]]|[eq' [n' ->]]].
   all: try discriminate; try solve [right; destruct H as [f _]; discriminate f].
   1: destruct (Bool.bool_dec b b') as [eq|ne]; [left|right].
-  3: destruct (Z.eq_dec n n') as [eq|ne]; [left|right].
+  3: destruct (Nat.eq_dec n n') as [eq|ne]; [left|right].
   all: rewrite !(Eqdep_dec.UIP_dec type_dec _ eq_refl); cbn; try intros [=f]; auto.
   all: exact (f_equal _ eq).
 Defined.
@@ -137,7 +137,7 @@ Defined.
 Definition const_eqb {ty1} (c1: const ty1) {ty2} (c2: const ty2): bool :=
   match c1, c2 with
     | CBool b1, CBool b2 => Bool.eqb b1 b2
-    | CInt n1, CInt n2 => Z.eqb n1 n2
+    | CInt n1, CInt n2 => Nat.eqb n1 n2
     | _, _ => false
   end.
 
@@ -147,7 +147,7 @@ Proof.
   destruct c as [ b | n ].
   - apply Bool.eqb_true_iff.
     reflexivity.
-  - apply Z.eqb_refl.
+  - apply Nat.eqb_refl.
 Qed.
 
 Inductive value : type -> Set :=
@@ -157,7 +157,7 @@ Inductive value : type -> Set :=
 Definition const_to_value {ty} (c: const ty): value ty:=
   match c with
   | CBool b => VBool b
-  | CInt z => VInt z
+  | CInt n => VInt (Z.of_nat n)
   end.
 
 Lemma value_inv {ty} (x: value ty) :

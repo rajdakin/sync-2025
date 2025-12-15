@@ -1,0 +1,3 @@
+Error(s) while node is ordered:
+examples/cyclic_test.mls:1:1-8:1: there is a cyclic dependency:
+  1 depends on 0 depends on 2 depends on 1
