@@ -356,6 +356,34 @@ Fixpoint translate_equations (eqs: list Source.equation) (seed: ident): (
             )
     end.
 
+Lemma translate_equations_app (eqs1 eqs2: list Source.equation) (seed: ident):
+  let '(init_eq2, step_eq2, seed2, pre_binders2, pre_eqs2, init_post2, step_post2) := translate_equations eqs2 seed in
+  let '(init_eq1, step_eq1, seed1, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_equations eqs1 seed2 in
+  translate_equations (eqs1 ++ eqs2) seed = (
+    init_eq1 ++ init_eq2,
+    step_eq1 ++ step_eq2,
+    seed1,
+    pre_binders1 ++ pre_binders2,
+    pre_eqs1 ++ pre_eqs2,
+    init_post1 ++ init_post2,
+    step_post1 ++ step_post2
+  ).
+Proof.
+  induction eqs1 as [|eq eqs1 IH].
+  1: simpl.
+  1: destruct (translate_equations eqs2 seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post].
+  1: reflexivity.
+  simpl.
+  destruct eq as [ident [ty exp]].
+  destruct (translate_equations eqs2 seed) as [[[[[[init_eqs2 step_eqs2] seed2] pre_binders2] pre_eqs2] init_post2] step_post2].
+  destruct (translate_equations eqs1 seed2) as [[[[[[init_eqs1 step_eqs1] seed1] pre_binders1] pre_eqs1] init_post1] step_post1].
+  rewrite IH.
+  destruct (translate_expr exp seed1) as [[[[[[ei es] seed'] pre_binders] pre_eqs] init_post] step_post].
+  repeat rewrite app_assoc.
+  reflexivity.
+Qed.
+
+
 Lemma translate_equations_nextseed (eqs: list Source.equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   exists n, seed' = iter n next_ident seed.
@@ -821,7 +849,7 @@ Proof.
   intro sem_target.
   intros idn ty expr s inbody ismapped time.
 
-  specialize (sem_target idn ty) as [sem_target sem_target_pre].
+  specialize (sem_target idn ty) as [sem_target _].
   assert (id_is_var : In (idn, ty) (n0_in ++ n0_out ++ trans_pre_binders ++ n0_locals)).
   {
    assert (id_is_var2 : In (idn, ty) (n0_out ++ n0_locals)).
@@ -839,5 +867,26 @@ Proof.
 
   specialize (sem_target id_is_var).
   destruct sem_target as [s' [ismapped' sem_target]].
+  assert (seq := h_maps_to_eq idn s' s h ismapped' ismapped).
+  subst.
+
+  destruct sem_target as [sem_init sem_step].
+
+  apply in_split in inbody.
+  destruct inbody as [body1 [body2]]; subst.
+
+  assert (translate_app := translate_equations_app body1 ((idn, existT (fun ty : type => Source.exp ty) ty expr) :: body2) n0_seed).
+
+  simpl in translate_app.
+
+  unfold Source.equation in translate_app. (* Types... *)
   
+  destruct (translate_equations body2 n0_seed) as [[[[[[init_eq2 step_eq2] seed2] pre_binders2] pre_eqs2] init_post2] step_post2].
+
+  induction expr.
+  - simpl in translate_app.
+    destruct (translate_equations body1 seed2) as [[[[[[init_eq1 step_eq1] seed1] pre_binders1] pre_eqs1] init_post1] step_post1].
+    rewrite translation in translate_app.
+    injection translate_app as -> -> -> -> -> -> ->.
+  (* I cannot find how to prove this*)
 Admitted.

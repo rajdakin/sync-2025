@@ -199,6 +199,17 @@ Definition in_history' (h : history) '((v, ty) : nat * type) := exists s, Dict.f
 
 Definition h_maps_to {ty} i (s: Stream.t (value ty)) (h: history) := Dict.maps_to i (existT _ ty s) h.
 
+Lemma h_maps_to_eq {ty} i (s s': Stream.t (value ty)) (h: history) : h_maps_to i s h -> h_maps_to i s' h -> s = s'.
+Proof.
+  unfold h_maps_to.
+  unfold Dict.maps_to.
+  intros maps maps'.
+  rewrite maps in maps'.
+  injection maps'; intro eqT.
+  apply (sig2T_eq type_dec) in eqT.
+  assumption.
+Qed.
+
 Definition eq_support (support: list nat) (h1 h2: history) := forall n, List.In n support -> Dict.find n h1 = Dict.find n h2.
 
 Lemma eq_support_app (s1 s2: list nat) (h1 h2: history) :
