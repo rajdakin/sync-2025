@@ -1277,7 +1277,7 @@ Lemma visit_node_prop : forall loc (g: graph) Hg imap Himapg cs fuel hist Himaph
      visit_node loc g Hg imap Himapg cs fuel hist Himaph cur Hcur Himapc acc = Result.Ok (cs', acc')) \/
   (exists l1 l2,
      l1 <> [] /\ map (Hashtable.find_opt imap) l1 = map Some l2 /\
-     (exists r1 r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g r1 (tl l1) r2) /\
+     (exists r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g (hd r2 l1) (tl l1) r2) /\
      visit_node loc g Hg imap Himapg cs fuel hist Himaph cur Hcur Himapc acc = Result.Err [(loc, Result.CyclicDependency l2)]).
 Proof using.
   intros loc g Hg imap Himapg cs fuel hist Himaph cur Hcur1 Himapc acc eqfuel Hcoh Hcur2 Hacc Hhist.
@@ -1302,11 +1302,15 @@ Proof using.
       generalize dependent f; intros f Hf; clear - Hf.
       induction hist as [|hd tl IH]; [exact eq_refl|cbn; refine (f_equal2 cons (Hf _ _) (IH _ (fun v Hv => Hf _ (or_intror Hv))))].
     }
-    exists (hd cur (rev hist)), cur.
+    exists cur.
     specialize (in_split _ _ (proj1 (in_rev _ _) (proj1 (proj1 (proj2 (proj2 (proj2 Hcoh))) cur Hcur1) eqcol))) as [l11 [l12 Heq]].
     exists l11, l12.
-    split; [|exact (coherent_is_witness _ _ _ Hcur2)].
-    cbn; rewrite (app_assoc _ (_ :: _) _ : _ ++ _ :: _ ++ _ = _); exact (f_equal (fun v => v ++ _) Heq).
+    split.
+    1: cbn; rewrite (app_assoc _ (_ :: _) _ : _ ++ _ :: _ ++ _ = _); exact (f_equal (fun v => v ++ _) Heq).
+    assert (tmp : hd cur (rev (cur :: hist)) = hd cur (rev hist))
+     by (cbn; destruct (rev hist); exact eq_refl).
+    rewrite tmp.
+    exact (coherent_is_witness _ _ _ Hcur2).
   }
   2: left; subst; exact (ex_intro _ _ (ex_intro _ _ (conj Hcoh (conj eqcol (conj (fun _ h => h) (conj Hacc (conj (fun _ h => h) eq_refl))))))).
   match type of eqf with _ = Result.bind (visit_node_inner _ _ _ ?cs0 _ ?P0 _) _ => remember cs0 as cs' eqn:eqcs; remember P0 as P eqn:eqP end.
@@ -1546,7 +1550,7 @@ Lemma topological_sort_inner_prop : forall loc (g: graph) Hg imap Himap cs cur H
   | Result.Err e =>
       exists l1 l2,
       l1 <> [] /\ map (Hashtable.find_opt imap) l1 = map Some l2 /\
-      (exists r1 r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g r1 (tl l1) r2) /\
+      (exists r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g (hd r2 l1) (tl l1) r2) /\
       e = [(loc, Result.CyclicDependency l2)]
   end.
 Proof using.
@@ -1596,7 +1600,7 @@ Lemma topological_sort_prop : forall loc (g: graph) Hg imap Himap,
   | Result.Err e =>
       exists l1 l2,
       l1 <> [] /\ map (Hashtable.find_opt imap) l1 = map Some l2 /\
-      (exists r1 r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g r1 (tl l1) r2) /\
+      (exists r2 l11 l12, l1 = l11 ++ r2 :: l12 ++ [r2] /\ accessibility_witness g (hd r2 l1) (tl l1) r2) /\
       e = [(loc, Result.CyclicDependency l2)]
   end.
 Proof using.
@@ -1636,6 +1640,20 @@ Proof using.
   - intros [x [[] _]].
   - intros [x [[->|Hx] Hy]]; [left; exact Hy|right; apply IH].
     exists x, Hx; exact Hy.
+Qed.
+
+Lemma map_in_inj : forall {A B} l (f: forall x : A, In x l -> B),
+  NoDup l -> (forall x Hx y Hy, x <> y -> f x Hx <> f y Hy) -> NoDup (map_in l f).
+Proof using.
+  intros A B l f Hl Hf.
+  induction Hl as [|v l Hv Hl IH].
+  1: exact (NoDup_nil _).
+  cbn; refine (NoDup_cons _ _ _).
+  - intros H.
+    apply in_map_in_iff in H; destruct H as (x & Hx & Heq).
+    refine (Hf _ _ _ _ _ Heq).
+    intros <-; exact (Hv Hx).
+  - exact (IH _ (fun x Hx y Hy => Hf _ _ _ _)).
 Qed.
 
 Lemma ident_types_samei : forall source i ty1 ty2,
@@ -1779,286 +1797,577 @@ Proof using.
   exact (map_map _ _ _).
 Qed.
 
-Definition translate_node (source: Source.node): Result.t type Target.node_ordered.
+Lemma translate_nodup_init : forall source : Source.node, NoDup (map fst (Source.n_init source)).
 Proof using.
-  unshelve refine (
-    let excl_listi := map fst source.(Source.n_in) in
-    match node_to_graph excl_listi source.(Source.n_init) with (graphi, index_tablei) => fun Heqgi =>
-    let excl_lists := excl_listi ++ map (fun eq => fst (fst eq)) source.(Source.n_pre) in
-    match node_to_graph excl_lists source.(Source.n_step) with (graphs, index_tables) => fun Heqgs =>
-    let propsi := node_to_graph_prop
+  intros source.
+  assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
+    change (map Source.equation_dest source.(Source.n_init)) with source.(Source.n_assigned_vars_init); clear - Hvars.
+  rewrite source.(Source.n_init_vars_all_assigned); unfold Source.n_vars in Hvars.
+  rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ (NoDup_app_remove_r _ _ Hvars)).
+Qed.
+
+Lemma translate_nodup_step : forall source : Source.node, NoDup (map fst (Source.n_step source)).
+Proof using.
+  intros source.
+  assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
+    change (map Source.equation_dest source.(Source.n_step)) with source.(Source.n_assigned_vars_step); clear - Hvars.
+  rewrite source.(Source.n_step_vars_all_assigned); unfold Source.n_vars in Hvars.
+  rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ (NoDup_app_remove_r _ _ Hvars)).
+Qed.
+
+Lemma translate_permutation :
+  forall body loc excl_list,
+  forall (graph : graph) (index_table : Hashtable.t vertex ident),
+  forall props : graph_imap_prop excl_list body (Datatypes.length body) graph index_table,
+  forall (ord_graph : list vertex) H3 H4
+    (eqgraph : topological_sort loc _ H3 _ H4 = Result.Ok ord_graph),
+  let new_order := map_in ord_graph (fun v Hv => Hashtable.find index_table v (ord_graph_to_order props eqgraph v Hv)) : list ident in
+  let sorted_new_order := reorder_list body new_order reorder_prop : list Source.equation in
+  NoDup (map fst body) ->
+  Permutation body sorted_new_order.
+Proof using.
+  intros body loc excl_list graph index_table props ord_graph H3 H4 eqgraph new_order sorted_new_order nodup.
+  refine (reorder_list_prop _ _ _ nodup _).
+  clear sorted_new_order.
+  match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
+    specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
+  specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
+    cbn in Hgraph; clear tmp.
+  refine (NoDup_Permutation nodup _ _); clear - props Hgraph.
+  - refine (map_in_inj _ _ (proj2 (proj1 Hgraph)) _).
+    intros x Hx0 y Hy0 xney; match goal with |- Hashtable.find _ _ ?hx <> Hashtable.find _ _ ?hy =>
+      assert (Hx := hx); assert (Hy := hy); rewrite (Hashtable.find_ext _ _ _ Hx), (Hashtable.find_ext _ _ _ Hy) end.
+    clear new_order eqgraph ord_graph Hx0 Hy0 Hgraph.
+    intros Himg.
+    exact (xney (proj1 (proj2 (proj2 props)) _ _ _ _ Himg)).
+  - intros i.
+    unfold new_order; rewrite in_map_in_iff.
+    split.
+    + rewrite in_map_iff.
+      intros [[i' [ty e]] [[=->] Hi]].
+      specialize (proj1 (proj2 (proj2 (proj2 (proj2 props)))) (i, ty) (in_map Source.equation_dest _ _ Hi)) as [v Hv]; cbn in Hv.
+      specialize (proj1 (proj1 (proj2 props) v)) as tmp; rewrite <-(proj1 props) in tmp.
+      specialize (proj1 (proj2 Hgraph v) (tmp (Hashtable.find_opt_Some_In _ _ _ Hv))) as vin; clear tmp.
+      exists v, vin.
+      refine (f_equal (fun o => match o with Some v => v | None => i end) (x := Some _) (y := Some i) _).
+      exact (eq_trans (eq_sym (Hashtable.find_opt_In _ _ _)) Hv).
+    + intros [v [Hv Hi]].
+      match type of Hi with Hashtable.find _ _ ?h = _ =>
+        specialize (proj1 (proj2 (proj2 (proj2 props))) v h) as tmp; rewrite Hi in tmp end; clear Hi.
+      exact (eq_ind _ (In _) tmp _ (map_map _ _ _)).
+Qed.
+
+Lemma translate_eq_nodetograph :
+  forall body vars excl0
+    (graph : graph) (index_table : Hashtable.t vertex ident)
+    (props : graph_imap_prop (map fst excl0) body (Datatypes.length body) graph index_table)
+    (ord_graph : list vertex)
+    Hord Hsrt
+  ,
+  let new_order := map_in ord_graph (fun v Hv => Hashtable.find index_table v (Hord v Hv)) : list ident in
+  let sorted_new_order := reorder_list body new_order Hsrt in
+  NoDup ord_graph -> correct_sort_result_fix graph ord_graph ->
+  NoDup (map fst excl0 ++ map fst body) ->
+  Forall
+    (fun eq => incl (Source.var_of_exp (projT2 (snd eq))) vars)
+    body ->
+  (forall (i : ident) (ty1 ty2 : type),
+    In (i, ty1) vars ->
+    In (i, ty2) excl0 \/ In (i, ty2) (map Source.equation_dest body) ->
+    ty1 = ty2) ->
+  NoDup (map fst body) ->
+  Ordered.t (Target.equations_to_dag sorted_new_order excl0).
+Proof using.
+  intros body vars excl0 graph index_table props ord_graph Hord Hsrt new_order sorted_new_order
+    Hg2 Hg1 nodup_excl all_exist unique_typing nodup_body.
+  rewrite (reorder_list_ext _ _ _ Hsrt : sorted_new_order = _);
+    clear sorted_new_order.
+  clear new_order.
+  induction ord_graph as [|hdv tl IH].
+  1: cbn; clear - nodup_excl; apply NoDup_app_remove_r in nodup_excl.
+  1: induction excl0 as [|[i ty] tl IH]; [exact Ordered.nil|cbn in nodup_excl; rewrite NoDup_cons_iff in nodup_excl].
+  1: refine (Ordered.append _ _ _ _ (IH (proj2 nodup_excl)) _ (Forall_nil _)).
+  1: rewrite map_map; exact (proj1 nodup_excl).
+  cbn in Hg1 |- *; destruct Hg1 as [Hhd Hg1].
+  apply NoDup_cons_iff in Hg2.
+  assert (tmp := Hsrt _ (or_introl eq_refl)); apply in_map_iff in tmp; destruct tmp as [[i [ty e]] [[=->] Hitye]].
+  rewrite (find_in_prop _ _ _ _ nodup_body Hitye); cbn.
+  refine (Ordered.append _ _ _ _ (IH _ (fun v Hv => Hsrt v (or_intror Hv)) (proj2 Hg2) Hg1) _ _).
+  - unfold Target.equations_to_dag.
+    rewrite map_app, map_map, in_app_iff; intros [H|H].
+    2: exact (Permutations.nodup_app_in_l _ _ _ nodup_excl H (in_map _ _ _ Hitye)).
+    rewrite Target.equations_to_dag_is_map, map_map in H.
+    apply in_map_iff in H; destruct H as [[j [tyj ej]] [eqj Hj]].
+    apply (in_reorder_list_iff _ _ _ _ _ nodup_body) in Hj; destruct Hj as [Hjty Hj].
+    apply in_map_in_iff in Hj; destruct Hj as [v [Hv Hj]].
+    refine (proj1 Hg2 (eq_ind _ (fun v => In v tl) Hv _ _)).
+    exact (proj1 (proj2 (proj2 props)) _ _ _ _ (eq_trans Hj eqj)).
+  - apply Forall_forall; intros [j tyj] Hjty.
+    specialize (proj1 (Forall_forall _ _) (proj2 (proj2 (proj2 (proj2 (proj2 props))))) _ Hitye _ (Hashtable.find_opt_In _ _ _))
+      as [incl1 incl2].
+    specialize (incl2 _ (in_map _ _ _ Hjty)); cbn in incl2.
+    apply in_app_or in incl2; destruct incl2 as [Hj|Hj].
+    + rewrite map_map, in_map_iff in Hj; destruct Hj as [[? ty2] [[=->] Hj]]; exists []; apply in_or_app, or_intror.
+      refine (in_map _ _ (j, tyj) (eq_ind _ (fun v => In (_, v) _) Hj _ _)).
+      assert (jinvars := proj1 (Forall_forall _ _) all_exist _ Hitye _ Hjty); clear - Hj jinvars unique_typing.
+      exact (eq_sym (unique_typing _ _ _ jinvars (or_introl Hj))).
+    + apply in_map_iff in Hj; destruct Hj as [v [eqv Hv]].
+      specialize (proj1 (proj2 (proj2 (proj2 props))) _ (Hashtable.find_opt_Some_In _ _ _ eqv)) as tmp;
+        rewrite (Hashtable.find_opt_Some_eq _ _ _ eqv), map_map in tmp.
+      cbn in tmp; apply in_map_iff in tmp; destruct tmp as [[? [tyj' ej]] [[=->] Hej]].
+      exists (Source.var_of_exp ej); apply in_or_app; left; rewrite Target.equations_to_dag_is_map.
+      refine (eq_ind _ (fun t => In (_, t, _) _) (in_map _ _ (j, existT Source.comb_exp tyj' ej) _) _ _).
+      1: refine (proj2 (in_reorder_list_iff _ _ _ _ _ nodup_body) (conj Hej _)).
+      1: apply in_map_in_iff; exists v, (proj1 (Forall_forall _ _) Hhd _ Hv).
+      1: apply Hashtable.find_opt_Some in eqv; destruct eqv as [tmp eqv]; exact (eq_trans (Hashtable.find_ext _ _ _ _) eqv).
+      assert (jinvars := proj1 (Forall_forall _ _) all_exist _ Hitye _ Hjty); clear - Hej jinvars unique_typing.
+      apply (in_map (B:=ident * type) Source.equation_dest) in Hej.
+      exact (eq_sym (unique_typing _ _ _ jinvars (or_intror Hej))).
+Qed.
+
+Lemma nodup_in_init : forall source, NoDup (map fst source.(Source.n_in) ++ map fst source.(Source.n_init)).
+Proof using.
+  intros source.
+  assert (tmp := NoDup_app_remove_r _ _ source.(Source.n_vars_unique) : NoDup (map fst (_ ++ _))).
+  rewrite <-(source.(Source.n_init_vars_all_assigned)) in tmp.
+  unfold Source.n_assigned_vars_init in tmp.
+  rewrite map_app, map_map in tmp.
+  exact tmp.
+Qed.
+
+Lemma translate_eq_nodetographi :
+  forall source
+    (graphi : graph) (index_tablei : Hashtable.t vertex ident)
+    (propsi : graph_imap_prop (map fst source.(Source.n_in)) source.(Source.n_init) (Datatypes.length source.(Source.n_init)) graphi index_tablei)
+    (ord_graphi : list vertex)
+    (eqgraphi : topological_sort (Source.n_loc source) graphi (topological_sort_prop1 propsi) index_tablei (topological_sort_prop2 propsi) = Result.Ok ord_graphi)
+  ,
+  let new_order := map_in ord_graphi (fun v Hv => Hashtable.find index_tablei v (ord_graph_to_order propsi eqgraphi v Hv)) in
+  let sorted_new_orderi := reorder_list source.(Source.n_init) new_order reorder_prop in
+  Ordered.t (Target.equations_to_dag sorted_new_orderi source.(Source.n_in)).
+Proof using.
+  intros source graphi index_tablei propsi ord_graphi eqgraphi new_order sorted_new_orderi.
+  refine ((fun H1 => translate_eq_nodetograph _ _ _ _ _ propsi _ (ord_graph_to_order propsi eqgraphi) reorder_prop
+    (proj2 H1) (proj1 H1) (nodup_in_init _) source.(Source.n_all_init_vars_exist) (ident_types_samei _) (translate_nodup_init _)) _).
+  exact (proj1 (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) (topological_sort_prop _ _ _ _ _) _ eqgraphi)).
+Qed.
+
+Lemma nodup_in_pre_step : forall source, NoDup (map fst (source.(Source.n_in) ++ map fst source.(Source.n_pre)) ++ map fst source.(Source.n_step)).
+Proof using.
+  intros source.
+  assert (tmp := source.(Source.n_vars_unique) : NoDup (map fst (_ ++ _) ++ _)).
+  rewrite <-(source.(Source.n_step_vars_all_assigned)) in tmp.
+  unfold Source.n_assigned_vars_step in tmp.
+  rewrite map_app, map_map, <-app_assoc in tmp.
+  rewrite map_app, map_map, <-app_assoc, (Permutation_app_comm (map _ _) (map _ _)).
+  exact tmp.
+Qed.
+
+Lemma translate_eq_nodetographs :
+  forall source
+    (graphs : graph) (index_tables : Hashtable.t vertex ident)
+    (propss : graph_imap_prop (map fst source.(Source.n_in) ++ map (fun eq => (fst (fst eq))) source.(Source.n_pre))
+                source.(Source.n_step) (Datatypes.length source.(Source.n_step)) graphs index_tables)
+    (ord_graphs : list vertex)
+    (eqgraphs : topological_sort (Source.n_loc source) graphs (topological_sort_prop1 propss)
+       index_tables (topological_sort_prop2 propss) = Result.Ok ord_graphs)
+  ,
+  let new_order := map_in ord_graphs (fun v Hv => Hashtable.find index_tables v (ord_graph_to_order propss eqgraphs v Hv)) in
+  let sorted_new_orders := reorder_list source.(Source.n_step) new_order reorder_prop in
+  Ordered.t (Target.equations_to_dag sorted_new_orders (source.(Source.n_in) ++ map fst source.(Source.n_pre))).
+Proof using.
+  intros source graphs index_tables propss ord_graphs eqgraphs new_order sorted_new_orders.
+  assert (propss' :=
+    eq_ind _ (fun l => graph_imap_prop l _ _ _ _) propss _
+      (eq_sym (eq_trans (map_app _ _ _) (f_equal (app _) (map_map _ _ _))))).
+  refine ((fun H1 => translate_eq_nodetograph _ _ _ _ _ propss' _ (ord_graph_to_order propss eqgraphs) reorder_prop
+   (proj2 H1) (proj1 H1) (nodup_in_pre_step _) source.(Source.n_all_step_vars_exist) (ident_types_sames _) (translate_nodup_step _)) _).
+  exact (proj1 (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) (topological_sort_prop _ _ _ _ _) _ eqgraphs)).
+Qed.
+
+Definition translate_node (source: Source.node): Result.t type Target.node_ordered :=
+  let excl_listi := map fst source.(Source.n_in) in
+  match node_to_graph excl_listi source.(Source.n_init) with (graphi, index_tablei) => fun Heqgi =>
+  let excl_lists := excl_listi ++ map (fun eq => fst (fst eq)) source.(Source.n_pre) in
+  match node_to_graph excl_lists source.(Source.n_step) with (graphs, index_tables) => fun Heqgs =>
+  let propsi := node_to_graph_prop
+    excl_listi
+    source.(Source.n_init)
+    (to_graph_prop1i source)
+    (to_graph_prop2i source)
+    graphi
+    index_tablei
+    Heqgi in
+  let propss := node_to_graph_prop
+    excl_lists
+    source.(Source.n_step)
+    (to_graph_prop1s source)
+    (to_graph_prop2s source)
+    graphs
+    index_tables
+    Heqgs in
+  do ord_graphi remember eqgraphi <-
+    topological_sort
+      source.(Source.n_loc)
+      graphi
+      (topological_sort_prop1 propsi)
+      index_tablei
+      (topological_sort_prop2 propsi);
+  do ord_graphs remember eqgraphs <-
+    topological_sort
+      source.(Source.n_loc)
+      graphs
+      (topological_sort_prop1 propss)
+      index_tables
+      (topological_sort_prop2 propss);
+  Result.Ok (
+    let new_orderi := map_in ord_graphi (fun v Hv => Hashtable.find index_tablei v (ord_graph_to_order propsi eqgraphi v Hv)) in
+    let new_orders := map_in ord_graphs (fun v Hv => Hashtable.find index_tables v (ord_graph_to_order propss eqgraphs v Hv)) in
+    let sorted_new_orderi := reorder_list source.(Source.n_init) new_orderi reorder_prop in
+    let sorted_new_orders := reorder_list source.(Source.n_step) new_orders reorder_prop in
+    let nodup_init : NoDup (map fst source.(Source.n_init)) := translate_nodup_init _ in
+    let nodup_step : NoDup (map fst source.(Source.n_step)) := translate_nodup_step _ in
+    check_order source sorted_new_orderi sorted_new_orders
+      (translate_permutation _ _ _ _ _ _ _ _ _ _ (translate_nodup_init _))
+      (translate_permutation _ _ _ _ _ _ _ _ _ _ (translate_nodup_step _))
+      (translate_eq_nodetographi _ _ _ _ _ _)
+      (translate_eq_nodetographs _ _ _ _ _ _)
+  )
+  end eq_refl end eq_refl.
+
+Lemma translate_node_correct : forall source target, translate_node source = Result.Ok target ->
+  Permutation source.(Source.n_init) target.(Target.node_ordered_is_node).(Source.n_init) /\
+  Permutation source.(Source.n_step) target.(Target.node_ordered_is_node).(Source.n_step) /\
+  source.(Source.n_pre) = target.(Target.node_ordered_is_node).(Source.n_pre).
+Proof using.
+  intros source target Htarget.
+  unfold translate_node in Htarget.
+  remember (to_graph_prop1i source) as Hprop1i eqn:a; clear a.
+  remember (to_graph_prop2i source) as Hprop2i eqn:a; clear a.
+  remember (to_graph_prop1s source) as Hprop1s eqn:a; clear a.
+  remember (to_graph_prop2s source) as Hprop2s eqn:a; clear a.
+  remember (translate_nodup_init source) as Hnodupi eqn:a; clear a.
+  remember (translate_nodup_step source) as Hnodups eqn:a; clear a.
+  remember (check_order source) as check_order eqn:eqcheckorder.
+  remember (translate_eq_nodetographi source) as Hn2gi eqn:a; clear a.
+  remember (translate_eq_nodetographs source) as Hn2gs eqn:a; clear a.
+  destruct source as [l name nin out loc pre init step ? ? ? initass stepass initex stepex preex vars_unique seed Hseed].
+  cbn in *.
+  revert Htarget.
+  
+  pose (excl_listi := map fst nin); fold excl_listi.
+  remember (eq_refl (node_to_graph excl_listi init)) as Heqgi eqn:eqHeqgi; clear eqHeqgi; revert Heqgi.
+  pose (x := node_to_graph excl_listi init).
+  refine (_ : forall Heqgi : x = node_to_graph _ _, (let (graphi, index_tablei) as y return y = node_to_graph _ _ -> _ := x in _) Heqgi = _ -> _).
+  destruct x as [graphi index_tablei]; cbn; intros Heqgi.
+  
+  pose (excl_lists := excl_listi ++ map (fun eq => fst (fst eq)) pre); fold excl_lists.
+  remember (eq_refl (node_to_graph excl_lists step)) as Heqgs eqn:eqHeqgs; clear eqHeqgs; revert Heqgs.
+  pose (x := node_to_graph excl_lists step).
+  refine (_ : forall Heqgs : x = node_to_graph _ _, (let (graphs, index_tables) as y return y = node_to_graph _ _ -> _ := x in _) Heqgs = _ -> _).
+  destruct x as [graphs index_tables]; cbn; intros Heqgs.
+  
+  remember (node_to_graph_prop
       excl_listi
-      source.(Source.n_init)
-      (to_graph_prop1i source)
-      (to_graph_prop2i source)
+      init
+      Hprop1i
+      Hprop2i
       graphi
       index_tablei
-      Heqgi in
-    let propss := node_to_graph_prop
+      Heqgi) as propsi eqn:a; clear a.
+  remember (node_to_graph_prop
       excl_lists
-      source.(Source.n_step)
-      (to_graph_prop1s source)
-      (to_graph_prop2s source)
+      step
+      Hprop1s
+      Hprop2s
       graphs
       index_tables
-      Heqgs in
-    do ord_graphi remember eqgraphi <-
-      topological_sort
-        source.(Source.n_loc)
-        graphi
-        (topological_sort_prop1 propsi)
-        index_tablei
-        (topological_sort_prop2 propsi);
-    do ord_graphs remember eqgraphs <-
-      topological_sort
-        source.(Source.n_loc)
-        graphs
-        (topological_sort_prop1 propss)
-        index_tables
-        (topological_sort_prop2 propss);
-    Result.Ok (
-      let new_orderi := map_in ord_graphi (fun v Hv => Hashtable.find index_tablei v (ord_graph_to_order propsi eqgraphi v Hv)) in
-      let new_orders := map_in ord_graphs (fun v Hv => Hashtable.find index_tables v (ord_graph_to_order propss eqgraphs v Hv)) in
-      let sorted_new_orderi := reorder_list source.(Source.n_init) new_orderi reorder_prop in
-      let sorted_new_orders := reorder_list source.(Source.n_step) new_orders reorder_prop in
-      let nodup_init : NoDup (map fst source.(Source.n_init)) := _ in
-      let nodup_step : NoDup (map fst source.(Source.n_step)) := _ in
-      check_order source sorted_new_orderi sorted_new_orders _ _ _ _
-    )
-    end eq_refl end eq_refl
+      Heqgs) as propss eqn:a; clear a.
+  pose (ordi := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propsi)
+    (Himap:=topological_sort_prop2 propsi) propsi (ord_graph:=ord_graph)).
+  pose (ords := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propss)
+    (Himap:=topological_sort_prop2 propss) propss (ord_graph:=ord_graph)).
+  pose (reordi := fun ord_graphi eqgraphi => reorder_list init (map_in _ (fun v Hv => Hashtable.find _ v (ordi ord_graphi eqgraphi v Hv)))).
+  pose (reords := fun ord_graphs eqgraphs => reorder_list step (map_in _ (fun v Hv => Hashtable.find _ v (ords ord_graphs eqgraphs v Hv)))).
+  pose (permi := fun ord_graphi eqgraphi => translate_permutation _ l _ _ _ propsi ord_graphi
+    (topological_sort_prop1 propsi) (topological_sort_prop2 propsi) eqgraphi Hnodupi).
+  pose (perms := fun ord_graphs eqgraphs => translate_permutation _ l _ _ _ propss ord_graphs
+    (topological_sort_prop1 propss) (topological_sort_prop2 propss) eqgraphs Hnodups).
+  pose (n2gi := fun ord_graphi eqgraphi => Hn2gi _ _ propsi ord_graphi eqgraphi).
+  pose (n2gs := fun ord_graphs eqgraphs => Hn2gs _ _ propss ord_graphs eqgraphs).
+  pose (reordpi := fun ord_graphi eqgraphi => @reorder_prop _ _ l _ (topological_sort_prop1 propsi) _ (topological_sort_prop2 propsi) ord_graphi propsi eqgraphi).
+  pose (reordps := fun ord_graphs eqgraphs => @reorder_prop _ _ l _ (topological_sort_prop1 propss) _ (topological_sort_prop2 propss) ord_graphs propss eqgraphs).
+  refine (_ :
+    do ord_graphi remember eqgraphi <- _;
+    do ord_graphs remember eqgraphs <- _;
+    Result.Ok (check_order
+      (reordi _ eqgraphi (reordpi _ eqgraphi)) (reords _ eqgraphs (reordps _ eqgraphs))
+      (permi _ eqgraphi) (perms _ eqgraphs)
+      (n2gi _ eqgraphi) (n2gs _ eqgraphs)
+    ) = Result.Ok target -> _
   ).
-  - assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
-      change (map Source.equation_dest source.(Source.n_init)) with source.(Source.n_assigned_vars_init); clear - Hvars.
-    rewrite source.(Source.n_init_vars_all_assigned); unfold Source.n_vars in Hvars.
-    rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ (NoDup_app_remove_r _ _ Hvars)).
-  - assert (Hvars := source.(Source.n_vars_unique)); rewrite <-(map_map Source.equation_dest fst);
-      change (map Source.equation_dest source.(Source.n_step)) with source.(Source.n_assigned_vars_step); clear - Hvars.
-    rewrite source.(Source.n_step_vars_all_assigned); unfold Source.n_vars in Hvars.
-    rewrite map_app in Hvars; exact (NoDup_app_remove_l _ _ (NoDup_app_remove_r _ _ Hvars)).
-  - clear excl_lists graphs index_tables Heqgs propss ord_graphs eqgraphs new_orders sorted_new_orders nodup_step;
-      rename excl_listi into excl_list, graphi into graph, index_tablei into index_table,
-             Heqgi into Heqg, propsi into props, ord_graphi into ord_graph,
-             eqgraphi into eqgraph, new_orderi into new_order,
-             sorted_new_orderi into sorted_new_order, nodup_init into nodup_body.
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
-      specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
-    specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
-      cbn in Hgraph; clear tmp.
-    refine (reorder_list_prop _ _ _ nodup_body _).
-    clear sorted_new_order.
-    refine (NoDup_Permutation nodup_body _ _).
-    + assert (tmp : forall A B l (f: forall x : A, In x l -> B),
-        NoDup l -> (forall x Hx y Hy, x <> y -> f x Hx <> f y Hy) -> NoDup (map_in l f)); [clear|refine (tmp _ _ _ _ _ _); clear tmp].
-      * intros A B l; induction l as [|hd tl IH]; intros f Hl Hf.
-        1: exact (NoDup_nil _).
-        refine (NoDup_cons _ _ (IH _ (proj2 (proj1 (NoDup_cons_iff _ _) Hl)) (fun x Hx y Hy => Hf x (or_intror Hx) y (or_intror Hy)))).
-        intros Hin.
-        apply in_map_in_iff in Hin; destruct Hin as [y [Hy H]].
-        refine (Hf _ _ _ _ _ H).
-        intros ->; exact (proj1 (proj1 (NoDup_cons_iff _ _) Hl) Hy).
-      * clear new_order.
-        exact (proj2 (proj1 Hgraph)).
-      * intros x Hx0 y Hy0 xney; match goal with |- Hashtable.find _ _ ?hx <> Hashtable.find _ _ ?hy =>
-          assert (Hx := hx); assert (Hy := hy); rewrite (Hashtable.find_ext _ _ _ Hx), (Hashtable.find_ext _ _ _ Hy) end.
-        clear nodup_body new_order eqgraph ord_graph Hx0 Hy0 Hgraph.
-        intros Himg.
-        exact (xney (proj1 (proj2 (proj2 props)) _ _ _ _ Himg)).
-    + intros i; split; intros Hi.
-      * apply in_map_iff in Hi; destruct Hi as [[i' [ty e]] [[=->] Hi]].
-        specialize (proj1 (proj2 (proj2 (proj2 (proj2 props)))) (i, ty) (in_map Source.equation_dest _ _ Hi)) as [v Hv]; cbn in Hv.
-        specialize (proj1 (proj1 (proj2 props) v)) as tmp; rewrite <-(proj1 props) in tmp.
-        specialize (proj1 (proj2 Hgraph v) (tmp (Hashtable.find_opt_Some_In _ _ _ Hv))) as vin; clear tmp.
-        apply in_map_in_iff; exists v, vin.
-        refine (f_equal (fun o => match o with Some v => v | None => i end) (x := Some _) (y := Some i) _).
-        exact (eq_trans (eq_sym (Hashtable.find_opt_In _ _ _)) Hv).
-      * apply in_map_in_iff in Hi; destruct Hi as [v [Hv Hi]].
-        match type of Hi with Hashtable.find _ _ ?h = _ =>
-          specialize (proj1 (proj2 (proj2 (proj2 props))) v h) as tmp; rewrite Hi in tmp end; clear Hi.
-        exact (eq_ind _ (In _) tmp _ (map_map _ _ _)).
-  - clear graphi index_tablei Heqgi propsi ord_graphi eqgraphi new_orderi sorted_new_orderi nodup_init;
-      rename excl_lists into excl_list, graphs into graph, index_tables into index_table,
-             Heqgs into Heqg, propss into props, ord_graphs into ord_graph,
-             eqgraphs into eqgraph, new_orders into new_order,
-             sorted_new_orders into sorted_new_order, nodup_step into nodup_body.
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
-      specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
-    specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
-      cbn in Hgraph; clear tmp.
-    refine (reorder_list_prop _ _ _ nodup_body _).
-    clear sorted_new_order.
-    refine (NoDup_Permutation nodup_body _ _).
-    + assert (tmp : forall A B l (f: forall x : A, In x l -> B),
-        NoDup l -> (forall x Hx y Hy, x <> y -> f x Hx <> f y Hy) -> NoDup (map_in l f)); [clear|refine (tmp _ _ _ _ _ _); clear tmp].
-      * intros A B l; induction l as [|hd tl IH]; intros f Hl Hf.
-        1: exact (NoDup_nil _).
-        refine (NoDup_cons _ _ (IH _ (proj2 (proj1 (NoDup_cons_iff _ _) Hl)) (fun x Hx y Hy => Hf x (or_intror Hx) y (or_intror Hy)))).
-        intros Hin.
-        apply in_map_in_iff in Hin; destruct Hin as [y [Hy H]].
-        refine (Hf _ _ _ _ _ H).
-        intros ->; exact (proj1 (proj1 (NoDup_cons_iff _ _) Hl) Hy).
-      * clear new_order.
-        exact (proj2 (proj1 Hgraph)).
-      * intros x Hx0 y Hy0 xney; match goal with |- Hashtable.find _ _ ?hx <> Hashtable.find _ _ ?hy =>
-          assert (Hx := hx); assert (Hy := hy); rewrite (Hashtable.find_ext _ _ _ Hx), (Hashtable.find_ext _ _ _ Hy) end.
-        clear nodup_body new_order eqgraph ord_graph Hx0 Hy0 Hgraph.
-        intros Himg.
-        exact (xney (proj1 (proj2 (proj2 props)) _ _ _ _ Himg)).
-    + intros i; split; intros Hi.
-      * apply in_map_iff in Hi; destruct Hi as [[i' [ty e]] [[=->] Hi]].
-        specialize (proj1 (proj2 (proj2 (proj2 (proj2 props)))) (i, ty) (in_map Source.equation_dest _ _ Hi)) as [v Hv]; cbn in Hv.
-        specialize (proj1 (proj1 (proj2 props) v)) as tmp; rewrite <-(proj1 props) in tmp.
-        specialize (proj1 (proj2 Hgraph v) (tmp (Hashtable.find_opt_Some_In _ _ _ Hv))) as vin; clear tmp.
-        apply in_map_in_iff; exists v, vin.
-        refine (f_equal (fun o => match o with Some v => v | None => i end) (x := Some _) (y := Some i) _).
-        exact (eq_trans (eq_sym (Hashtable.find_opt_In _ _ _)) Hv).
-      * apply in_map_in_iff in Hi; destruct Hi as [v [Hv Hi]].
-        match type of Hi with Hashtable.find _ _ ?h = _ =>
-          specialize (proj1 (proj2 (proj2 (proj2 props))) v h) as tmp; rewrite Hi in tmp end; clear Hi.
-        exact (eq_ind _ (In _) tmp _ (map_map _ _ _)).
-  - clear excl_lists graphs index_tables Heqgs propss ord_graphs eqgraphs new_orders sorted_new_orders nodup_step;
-      rename excl_listi into excl_list, graphi into graph, index_tablei into index_table,
-             Heqgi into Heqg, propsi into props, ord_graphi into ord_graph,
-             eqgraphi into eqgraph, new_orderi into new_order,
-             sorted_new_orderi into sorted_new_order, nodup_init into nodup_body.
-    cbn.
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
-      specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
-    specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
-      cbn in Hgraph; clear tmp.
-    match type of (eq_refl : sorted_new_order = reorder_list _ _ _) with _ = reorder_list _ _ ?h =>
-      assert (Hsrt := h); rewrite (reorder_list_ext _ _ _ Hsrt : sorted_new_order = _); clear sorted_new_order end.
-    pose (Hord := ord_graph_to_order props eqgraph); fold Hord in Hsrt |- *.
-    clear new_order; generalize dependent Hord; intros Hord Hsrt.
-    clear eqgraph.
-    destruct Hgraph as [[Hg1 Hg2] _].
-    induction ord_graph as [|hdv tl IH].
-    1: cbn; clear; assert (Hd := source.(Source.n_vars_unique) : NoDup (map _ (_ ++ _) ++ _)).
-    1: rewrite map_app in Hd; apply NoDup_app_remove_r, NoDup_app_remove_r in Hd; remember source.(Source.n_in) as l; clear - Hd.
-    1: induction l as [|[i ty] tl IH]; [exact Ordered.nil|cbn in Hd; apply NoDup_cons_iff in Hd].
-    1: refine (Ordered.append _ _ _ _ (IH (proj2 Hd)) _ (Forall_nil _)).
-    1: rewrite map_map; exact (proj1 Hd).
-    cbn in Hg1 |- *; destruct Hg1 as [Hhd Hg1].
-    apply NoDup_cons_iff in Hg2.
-    assert (tmp := Hsrt _ (or_introl eq_refl)); apply in_map_iff in tmp; destruct tmp as [[i [ty e]] [[=->] Hitye]].
-    rewrite (find_in_prop _ _ _ _ nodup_body Hitye); cbn.
-    refine (Ordered.append _ _ _ _ (IH Hg1 (proj2 Hg2) (fun v Hv => Hord v (or_intror Hv)) (fun v Hv => Hsrt v (or_intror Hv))) _ _).
-    + unfold Target.equations_to_dag.
-      rewrite map_app, map_map, in_app_iff; intros [H|H].
-      2:{
-        assert (tmp := NoDup_app_remove_r _ _ source.(Source.n_vars_unique) : NoDup (map fst (_ ++ _))).
-        apply (in_map fst) in Hitye; cbn in Hitye.
-        remember (Hashtable.find _ _ (Hord _ (or_introl eq_refl))) as i; clear - Hitye tmp H.
-        apply in_split in H; destruct H as [l1 [l2 H]].
-        rewrite map_app, (H : map (fst : ident * type -> _) _ = _), <-app_assoc in tmp.
-        refine (NoDup_remove_2 l1 (l2 ++ map fst _) i tmp _); clear tmp.
-        apply in_or_app, or_intror, in_or_app, or_intror; clear l1 l2 H.
-        rewrite <-(Permutation_map _ source.(Source.n_init_vars_all_assigned)),
-          (map_map _ _ _ : map (A:=binder) fst source.(Source.n_assigned_vars_init) = map fst source.(Source.n_init)).
-        exact Hitye.
-      }
-      rewrite Target.equations_to_dag_is_map, map_map in H.
-      apply in_map_iff in H; destruct H as [[j [tyj ej]] [eqj Hj]].
-      apply (in_reorder_list_iff _ _ _ _ _ nodup_body) in Hj; destruct Hj as [Hjty Hj].
-      apply in_map_in_iff in Hj; destruct Hj as [v [Hv Hj]].
-      refine (proj1 Hg2 (eq_ind _ (fun v => In v tl) Hv _ _)).
-      exact (proj1 (proj2 (proj2 props)) _ _ _ _ (eq_trans Hj eqj)).
-    + apply Forall_forall; intros [j tyj] Hjty.
-      specialize (proj1 (Forall_forall _ _) (proj2 (proj2 (proj2 (proj2 (proj2 props))))) _ Hitye _ (Hashtable.find_opt_In _ _ _))
-        as [incl1 incl2].
-      specialize (incl2 _ (in_map _ _ _ Hjty)); cbn in incl2.
-      apply in_app_or in incl2; destruct incl2 as [Hj|Hj].
-      * unfold excl_list in Hj.
-        rewrite map_map, in_map_iff in Hj; destruct Hj as [[? ty2] [[=->] Hj]]; exists []; apply in_or_app, or_intror.
-        refine (in_map _ _ (j, tyj) (eq_ind _ (fun v => In (_, v) _) Hj _ _)).
-        assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_init_vars_exist) _ Hitye _ Hjty); clear - Hj jinvars.
-        exact (eq_sym (ident_types_samei _ _ _ _ jinvars (or_introl Hj))).
-      * apply in_map_iff in Hj; destruct Hj as [v [eqv Hv]].
-        specialize (proj1 (proj2 (proj2 (proj2 props))) _ (Hashtable.find_opt_Some_In _ _ _ eqv)) as tmp;
-          rewrite (Hashtable.find_opt_Some_eq _ _ _ eqv), map_map in tmp.
-        cbn in tmp; apply in_map_iff in tmp; destruct tmp as [[? [tyj' ej]] [[=->] Hej]].
-        exists (Source.var_of_exp ej); apply in_or_app; left; rewrite Target.equations_to_dag_is_map.
-        refine (eq_ind _ (fun t => In (_, t, _) _) (in_map _ _ (j, existT Source.comb_exp tyj' ej) _) _ _).
-        1: refine (proj2 (in_reorder_list_iff _ _ _ _ _ nodup_body) (conj Hej _)).
-        1: apply in_map_in_iff; exists v, (proj1 (Forall_forall _ _) Hhd _ Hv).
-        1: apply Hashtable.find_opt_Some in eqv; destruct eqv as [tmp eqv]; exact (eq_trans (Hashtable.find_ext _ _ _ _) eqv).
-        assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_init_vars_exist) _ Hitye _ Hjty); clear - Hej jinvars.
-        apply (in_map (B:=ident * type) Source.equation_dest) in Hej;
-          fold source.(Source.n_assigned_vars_init) in Hej; unfold Source.equation_dest in Hej; cbn in Hej.
-        exact (eq_sym (ident_types_samei _ _ _ _ jinvars (or_intror Hej))).
-  - clear graphi index_tablei Heqgi propsi ord_graphi eqgraphi new_orderi sorted_new_orderi nodup_init;
-      rename excl_lists into excl_list, graphs into graph, index_tables into index_table,
-             Heqgs into Heqg, propss into props, ord_graphs into ord_graph,
-             eqgraphs into eqgraph, new_orders into new_order,
-             sorted_new_orders into sorted_new_order, nodup_step into nodup_body.
-    cbn.
-    match type of eqgraph with topological_sort ?loc ?g ?Hg ?imap ?Himap = _ =>
-      specialize (topological_sort_prop loc g Hg imap Himap) as tmp end.
-    specialize (eq_ind _ (fun v => match v with Result.Ok s => _ | Result.Err e => _ end) tmp _ eqgraph) as Hgraph;
-      cbn in Hgraph; clear tmp.
-    match type of (eq_refl : sorted_new_order = reorder_list _ _ _) with _ = reorder_list _ _ ?h =>
-      assert (Hsrt := h); rewrite (reorder_list_ext _ _ _ Hsrt : sorted_new_order = _); clear sorted_new_order end.
-    pose (Hord := ord_graph_to_order props eqgraph); fold Hord in Hsrt |- *.
-    clear new_order; generalize dependent Hord; intros Hord Hsrt.
-    clear eqgraph.
-    destruct Hgraph as [[Hg1 Hg2] _].
-    induction ord_graph as [|hdv tl IH].
-    1: cbn; clear; assert (Hd := source.(Source.n_vars_unique) : NoDup (map _ (_ ++ _) ++ _)).
-    1: rewrite Permutation_app_comm, map_app, app_assoc in Hd.
-    1: apply NoDup_app_remove_r in Hd; rewrite Permutation_app_comm, <-(map_map (A:=binder * _) fst fst), <-map_app in Hd.
-    1: remember (source.(Source.n_in) ++ map fst source.(Source.n_pre)) as l; clear - Hd.
-    1: induction l as [|[i ty] tl IH]; [exact Ordered.nil|cbn in Hd; apply NoDup_cons_iff in Hd].
-    1: refine (Ordered.append _ _ _ _ (IH (proj2 Hd)) _ (Forall_nil _)).
-    1: rewrite map_map; exact (proj1 Hd).
-    cbn in Hg1 |- *; destruct Hg1 as [Hhd Hg1].
-    apply NoDup_cons_iff in Hg2.
-    assert (tmp := Hsrt _ (or_introl eq_refl)); apply in_map_iff in tmp; destruct tmp as [[i [ty e]] [[=->] Hitye]].
-    rewrite (find_in_prop _ _ _ _ nodup_body Hitye); cbn.
-    refine (Ordered.append _ _ _ _ (IH Hg1 (proj2 Hg2) (fun v Hv => Hord v (or_intror Hv)) (fun v Hv => Hsrt v (or_intror Hv))) _ _).
-    + unfold Target.equations_to_dag.
-      rewrite map_app, map_map, in_app_iff; intros [H|H].
-      2:{
-        assert (tmp := source.(Source.n_vars_unique) : NoDup (map fst (_ ++ _) ++ _)).
-        apply (in_map fst) in Hitye; cbn in Hitye.
-        remember (Hashtable.find _ _ (Hord _ (or_introl eq_refl))) as i; clear - Hitye tmp H.
-        apply in_split in H; destruct H as [l1 [l2 H]].
-        rewrite Permutation_app_comm, map_app, app_assoc in tmp.
-        rewrite (Permutation_app_comm (map _ _) (map _ _)), <-(map_map (A:=binder * _) fst fst), <-map_app in tmp.
-        rewrite (H : map (fst : binder -> _) _ = _), <-app_assoc in tmp.
-        refine (NoDup_remove_2 l1 (l2 ++ map fst _) i tmp _); clear tmp.
-        apply in_or_app, or_intror, in_or_app, or_intror; clear l1 l2 H.
-        rewrite <-(Permutation_map _ source.(Source.n_step_vars_all_assigned)),
-          (map_map _ _ _ : map (A:=binder) fst source.(Source.n_assigned_vars_step) = map fst source.(Source.n_step)).
-        exact Hitye.
-      }
-      rewrite Target.equations_to_dag_is_map, map_map in H.
-      apply in_map_iff in H; destruct H as [[j [tyj ej]] [eqj Hj]].
-      apply (in_reorder_list_iff _ _ _ _ _ nodup_body) in Hj; destruct Hj as [Hjty Hj].
-      apply in_map_in_iff in Hj; destruct Hj as [v [Hv Hj]].
-      refine (proj1 Hg2 (eq_ind _ (fun v => In v tl) Hv _ _)).
-      exact (proj1 (proj2 (proj2 props)) _ _ _ _ (eq_trans Hj eqj)).
-    + apply Forall_forall; intros [j tyj] Hjty.
-      specialize (proj1 (Forall_forall _ _) (proj2 (proj2 (proj2 (proj2 (proj2 props))))) _ Hitye _ (Hashtable.find_opt_In _ _ _))
-        as [incl1 incl2].
-      specialize (incl2 _ (in_map _ _ _ Hjty)); cbn in incl2.
-      apply in_app_or in incl2; destruct incl2 as [Hj|Hj].
-      * unfold excl_list, excl_listi in Hj.
-        rewrite <-(map_map (A:=binder * _) fst fst), <-map_app, map_map, in_map_iff in Hj.
-        destruct Hj as [[? ty2] [[=->] Hj]].
-        exists []; apply in_or_app, or_intror.
-        refine (in_map _ _ (j, tyj) (eq_ind _ (fun v => In (_, v) _) Hj _ _)).
-        assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_step_vars_exist) _ Hitye _ Hjty); clear - Hj jinvars.
-        exact (eq_sym (ident_types_sames _ _ _ _ jinvars (or_introl Hj))).
-      * apply in_map_iff in Hj; destruct Hj as [v [eqv Hv]].
-        specialize (proj1 (proj2 (proj2 (proj2 props))) _ (Hashtable.find_opt_Some_In _ _ _ eqv)) as tmp;
-          rewrite (Hashtable.find_opt_Some_eq _ _ _ eqv), map_map in tmp.
-        cbn in tmp; apply in_map_iff in tmp; destruct tmp as [[? [tyj' ej]] [[=->] Hej]].
-        exists (Source.var_of_exp ej); apply in_or_app; left; rewrite Target.equations_to_dag_is_map.
-        refine (eq_ind _ (fun t => In (_, t, _) _) (in_map _ _ (j, existT Source.comb_exp tyj' ej) _) _ _).
-        1: refine (proj2 (in_reorder_list_iff _ _ _ _ _ nodup_body) (conj Hej _)).
-        1: apply in_map_in_iff; exists v, (proj1 (Forall_forall _ _) Hhd _ Hv).
-        1: apply Hashtable.find_opt_Some in eqv; destruct eqv as [tmp eqv]; exact (eq_trans (Hashtable.find_ext _ _ _ _) eqv).
-        assert (jinvars := proj1 (Forall_forall _ _) source.(Source.n_all_step_vars_exist) _ Hitye _ Hjty); clear - Hej jinvars.
-        apply (in_map (B:=ident * type) Source.equation_dest) in Hej;
-          fold source.(Source.n_assigned_vars_step) in Hej; unfold Source.equation_dest in Hej; cbn in Hej.
-        exact (eq_sym (ident_types_sames _ _ _ _ jinvars (or_intror Hej))).
-Defined.
+  generalize dependent n2gs; generalize dependent n2gi; generalize dependent perms; generalize dependent permi.
+  refine (_ : forall
+    (permi : forall ord_graphi eqgraphi, Permutation _ (reordi _ eqgraphi (reordpi _ eqgraphi)))
+    (perms : forall ord_graphs eqgraphs, Permutation _ (reords _ eqgraphs (reordps _ eqgraphs)))
+    (n2gi : forall ord_graphi eqgraphi, Ordered.t (Target.equations_to_dag (reordi _ eqgraphi (reordpi _ eqgraphi)) _))
+    (n2gs : forall ord_graphs eqgraphs, Ordered.t (Target.equations_to_dag (reords _ eqgraphs (reordps _ eqgraphs)) _)), _).
+  generalize dependent reordps; generalize dependent reordpi.
+  refine (_ : forall
+    (reordpi : forall ord_graphi eqgraphi, incl (map_in _ (fun v Hv => Hashtable.find _ v (ordi _ eqgraphi v Hv))) _)
+    (reordps : forall ord_graphs eqgraphs, incl (map_in _ (fun v Hv => Hashtable.find _ v (ords _ eqgraphs v Hv))) _), _).
+  generalize dependent reords; generalize dependent reordi; generalize dependent ords; generalize dependent ordi.
+  intros ordi ords reordi reords reordpi reordps permi perms n2gi n2gs.
+  
+  unfold Result.strong_bind.
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphi eqn:a; clear a; revert eqgraphi; pose (x := v) end.
+  refine (_ : forall eqgraphi : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphi = _ -> _).
+  destruct x as [x0|msg]; [intros eqgraphi|discriminate 2].
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphs eqn:a; clear a; revert eqgraphs; pose (x := v) end.
+  refine (_ : forall eqgraphs : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphs = _ -> _).
+  destruct x as [x1|msg]; [intros eqgraphs|discriminate 2].
+  
+  intros [=<-]; cbn.
+  subst check_order; cbn.
+  split; [exact (permi _ eqgraphi)|].
+  split; [exact (perms _ eqgraphs)|].
+  exact eq_refl.
+Qed.
+
+Lemma cycle_is_unorderable : forall g l1 l2 idx_table,
+  graph_imap_prop l1 l2 (List.length l2) g idx_table ->
+  has_cycle g ->
+  forall l2' l3,
+  Permutation l2 l2' ->
+  NoDup (map fst l2 ++ map fst l3) ->
+  ~ Ordered.t (Target.equations_to_dag l2' l3).
+Proof using.
+  intros g l1 l2 idx_table tmp.
+  destruct tmp as (Hlens & Hin_iff & Hinj & Hallin & Hinv & Hallincl); intros (n & v & Hv & Hc) l2' l3 Hp Hnd Ho.
+  assert (Hnotin : forall (v : vertex) (Hv : Hashtable.InMap v idx_table), ~ In (Hashtable.find idx_table v Hv) (map fst l3)).
+  1:{
+    unfold Target.equations_to_dag in Ho.
+    clear Hallincl l2' Hp Ho v Hv Hc.
+    intros v Hv; refine (Permutations.nodup_app_in_l _ _ _ Hnd _).
+    specialize (Hallin v Hv); rewrite map_map in Hallin; exact Hallin.
+  }
+  clear Hnd.
+  apply has_cycle_accessible, accessible_iff_witness in Hc; destruct Hc as (lv & Hlv & Hc).
+  rewrite <-Hlens in Hin_iff.
+  rewrite map_map in Hallin.
+  specialize (fun v H => Permutation_in _ (Permutation_map fst Hp) (Hallin v H)); clear Hallin; intros Hallin.
+  rewrite Hp in Hlens, Hallincl.
+  clear l2 Hp Hinv; rename l2' into l2.
+  apply Hin_iff in Hv.
+  assert (Hvin := Hallin _ Hv); apply in_map_iff in Hvin; destruct Hvin as [[i0 [ty0 e0]] [H1 H2]].
+  apply in_split in H2; destruct H2 as (l21 & l22 & ->).
+  unfold Target.equations_to_dag in Ho.
+  rewrite Target.equations_to_dag_is_map, map_app in Ho; cbn in Ho;
+    rewrite <-!Target.equations_to_dag_is_map, <-app_assoc in Ho; cbn in Ho.
+  assert (Ho' : Ordered.t ((i0, ty0, Target.var_of_exp e0) :: Target.equations_to_dag_aux l22 ++ map (fun ity => (ity, [])) l3)).
+  1:{
+    remember (Target.equations_to_dag_aux l21) as l.
+    remember ((i0, ty0, Target.var_of_exp e0) :: Target.equations_to_dag_aux l22 ++ map (fun ity => (ity, [])) l3) as l0.
+    clear - Ho.
+    induction l as [|hd tl IH]; [exact Ho|exact (IH (Ordered.cons _ _ Ho))].
+  }
+  clear Ho; rename Ho' into Ho.
+  assert (Hnin := Ordered.vars_no_dups _ _ _ _ Ho).
+  cbn in H1.
+  pose (vk := v).
+  pose (Hvk := Hv : Hashtable.InMap vk idx_table).
+  subst i0.
+  specialize (Hnin : ~ In (Hashtable.find idx_table vk Hvk) _).
+  specialize (Hc : accessibility_witness g v lv vk).
+  generalize dependent Hvk; intros Hvk Hnin.
+  generalize dependent vk; intros vk Hc Hvk Hnin.
+  clear Hlens.
+  apply Forall_app, proj2 in Hallincl.
+  clear Hallin Hinj.
+  apply Hnin; clear Hnin.
+  assert (Hhd := proj1 (Forall_inv Hallincl _ (Hashtable.find_opt_In _ _ _)) : forall l1, _).
+  apply Forall_inv_tail in Hallincl.
+  unfold Target.var_of_exp in *.
+  remember (Source.var_of_exp e0) as ldep0 eqn:eqdep0; clear e0 eqdep0.
+  rewrite map_app, Target.equations_to_dag_is_map, map_map; apply in_or_app, or_introl; cbn.
+  rewrite (map_ext (fun x => let '(y, _, _) := let '(name, existT _ ty e) := x in (name, _, _) in y) fst (fun '(i,existT _ ty e) => eq_refl)).
+  revert v Hv Hc ty0 ldep0 Hhd l22 Hallincl Ho n Hlv.
+  induction lv as [|v1 lv IH]; intros v0 Hv0 Hc ty0 ldep0 H0 l22 Hallincl Ho n Hlv; [discriminate Hlv|].
+  cbn in Hc; destruct Hc as [H01 Hc].
+  specialize (H0 _ (in_map _ _ _ H01)).
+  apply in_map_iff in H0; destruct H0 as ([i1 ty1] & [=Hi1] & H1).
+  assert (tmp := Hashtable.find_opt_Some idx_table v1 i1 (eq_sym Hi1)); destruct tmp as [Hv1 <-]; clear Hi1.
+  specialize (Ordered.var_cons_in_right_side _ _ _ _ _ _ Ho H1) as [ldep1 Hdep1].
+  apply in_app_or in Hdep1; destruct Hdep1 as [H1in|Hf].
+  2:{
+    apply (in_map (fun '(ity, _) => fst ity)) in Hf; rewrite map_map in Hf; cbn in Hf.
+    contradiction (Hnotin _ _ Hf).
+  }
+  rewrite Target.equations_to_dag_is_map, in_map_iff in H1in.
+  destruct H1in as [[i1 [ty1' e1]] [[=-> -> <-] H1in]].
+  destruct n as [|n]; [destruct lv; [clear Hlv|discriminate Hlv]|injection Hlv as Hlv].
+  1: cbn in Hc; subst vk; rewrite (Hashtable.find_ext _ _ _ Hv1); exact (in_map fst _ (_, _) H1in).
+  apply in_split in H1in; destruct H1in as (l221' & l222' & ->).
+  apply Forall_app, proj2 in Hallincl.
+  assert (H1incl := proj1 (Forall_inv Hallincl _ (Hashtable.find_opt_In _ _ _))).
+  apply Forall_inv_tail in Hallincl.
+  rewrite map_app; apply in_or_app, or_intror; cbn; right.
+  refine (IH _ Hv1 Hc ty1 _ H1incl _ Hallincl _ _ Hlv); clear - Ho.
+  apply Ordered.cons in Ho.
+  rewrite Target.equations_to_dag_is_map, map_app, map_cons, <-!Target.equations_to_dag_is_map, <-app_assoc in Ho.
+  cbn in Ho; unfold Target.var_of_exp in Ho.
+  match goal with |- Ordered.t ?l => remember l as lt eqn:eqlt; clear - Ho end.
+  induction (Target.equations_to_dag_aux l221') as [|hd tl IH]; [exact Ho|exact (IH (Ordered.cons _ _ Ho))].
+Qed.
+
+Lemma translate_node_complete : forall source msg, translate_node source = Result.Err msg ->
+  forall target,
+  ~ Permutation source.(Source.n_init) target.(Target.node_ordered_is_node).(Source.n_init) \/
+  ~ Permutation source.(Source.n_step) target.(Target.node_ordered_is_node).(Source.n_step).
+Proof using.
+  intros source target Htarget.
+  unfold translate_node in Htarget.
+  remember (to_graph_prop1i source) as Hprop1i eqn:a; clear a.
+  remember (to_graph_prop2i source) as Hprop2i eqn:a; clear a.
+  remember (to_graph_prop1s source) as Hprop1s eqn:a; clear a.
+  remember (to_graph_prop2s source) as Hprop2s eqn:a; clear a.
+  remember (translate_nodup_init source) as Hnodupi eqn:a; clear a.
+  remember (translate_nodup_step source) as Hnodups eqn:a; clear a.
+  remember (check_order source) as check_order eqn:eqcheckorder.
+  remember (translate_eq_nodetographi source) as Hn2gi eqn:a; clear a.
+  remember (translate_eq_nodetographs source) as Hn2gs eqn:a; clear a.
+  destruct source as [l name nin out loc pre init step ? ? ? initass stepass initex stepex preex vars_unique seed Hseed].
+  cbn in *.
+  revert Htarget.
+  
+  pose (excl_listi := map fst nin); fold excl_listi.
+  remember (eq_refl (node_to_graph excl_listi init)) as Heqgi eqn:eqHeqgi; clear eqHeqgi; revert Heqgi.
+  pose (x := node_to_graph excl_listi init).
+  refine (_ : forall Heqgi : x = node_to_graph _ _, (let (graphi, index_tablei) as y return y = node_to_graph _ _ -> _ := x in _) Heqgi = _ -> _).
+  destruct x as [graphi index_tablei]; cbn; intros Heqgi.
+  
+  pose (excl_lists := excl_listi ++ map (fun eq => fst (fst eq)) pre); fold excl_lists.
+  remember (eq_refl (node_to_graph excl_lists step)) as Heqgs eqn:eqHeqgs; clear eqHeqgs; revert Heqgs.
+  pose (x := node_to_graph excl_lists step).
+  refine (_ : forall Heqgs : x = node_to_graph _ _, (let (graphs, index_tables) as y return y = node_to_graph _ _ -> _ := x in _) Heqgs = _ -> _).
+  destruct x as [graphs index_tables]; cbn; intros Heqgs.
+  
+  remember (node_to_graph_prop
+      excl_listi
+      init
+      Hprop1i
+      Hprop2i
+      graphi
+      index_tablei
+      Heqgi) as propsi eqn:a; clear a.
+  remember (node_to_graph_prop
+      excl_lists
+      step
+      Hprop1s
+      Hprop2s
+      graphs
+      index_tables
+      Heqgs) as propss eqn:a; clear a.
+  pose (ordi := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propsi)
+    (Himap:=topological_sort_prop2 propsi) propsi (ord_graph:=ord_graph)).
+  pose (ords := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propss)
+    (Himap:=topological_sort_prop2 propss) propss (ord_graph:=ord_graph)).
+  pose (reordi := fun ord_graphi eqgraphi => reorder_list init (map_in _ (fun v Hv => Hashtable.find _ v (ordi ord_graphi eqgraphi v Hv)))).
+  pose (reords := fun ord_graphs eqgraphs => reorder_list step (map_in _ (fun v Hv => Hashtable.find _ v (ords ord_graphs eqgraphs v Hv)))).
+  pose (permi := fun ord_graphi eqgraphi => translate_permutation _ l _ _ _ propsi ord_graphi
+    (topological_sort_prop1 propsi) (topological_sort_prop2 propsi) eqgraphi Hnodupi).
+  pose (perms := fun ord_graphs eqgraphs => translate_permutation _ l _ _ _ propss ord_graphs
+    (topological_sort_prop1 propss) (topological_sort_prop2 propss) eqgraphs Hnodups).
+  pose (n2gi := fun ord_graphi eqgraphi => Hn2gi _ _ propsi ord_graphi eqgraphi).
+  pose (n2gs := fun ord_graphs eqgraphs => Hn2gs _ _ propss ord_graphs eqgraphs).
+  pose (reordpi := fun ord_graphi eqgraphi => @reorder_prop _ _ l _ (topological_sort_prop1 propsi) _ (topological_sort_prop2 propsi) ord_graphi propsi eqgraphi).
+  pose (reordps := fun ord_graphs eqgraphs => @reorder_prop _ _ l _ (topological_sort_prop1 propss) _ (topological_sort_prop2 propss) ord_graphs propss eqgraphs).
+  refine (_ :
+    do ord_graphi remember eqgraphi <- _;
+    do ord_graphs remember eqgraphs <- _;
+    Result.Ok (check_order
+      (reordi _ eqgraphi (reordpi _ eqgraphi)) (reords _ eqgraphs (reordps _ eqgraphs))
+      (permi _ eqgraphi) (perms _ eqgraphs)
+      (n2gi _ eqgraphi) (n2gs _ eqgraphs)
+    ) = _ -> _
+  ).
+  generalize dependent n2gs; generalize dependent n2gi; generalize dependent perms; generalize dependent permi.
+  refine (_ : forall
+    (permi : forall ord_graphi eqgraphi, Permutation _ (reordi _ eqgraphi (reordpi _ eqgraphi)))
+    (perms : forall ord_graphs eqgraphs, Permutation _ (reords _ eqgraphs (reordps _ eqgraphs)))
+    (n2gi : forall ord_graphi eqgraphi, Ordered.t (Target.equations_to_dag (reordi _ eqgraphi (reordpi _ eqgraphi)) _))
+    (n2gs : forall ord_graphs eqgraphs, Ordered.t (Target.equations_to_dag (reords _ eqgraphs (reordps _ eqgraphs)) _)), _).
+  generalize dependent reordps; generalize dependent reordpi.
+  refine (_ : forall
+    (reordpi : forall ord_graphi eqgraphi, incl (map_in _ (fun v Hv => Hashtable.find _ v (ordi _ eqgraphi v Hv))) _)
+    (reordps : forall ord_graphs eqgraphs, incl (map_in _ (fun v Hv => Hashtable.find _ v (ords _ eqgraphs v Hv))) _), _).
+  generalize dependent reords; generalize dependent reordi; generalize dependent ords; generalize dependent ordi.
+  intros ordi ords reordi reords reordpi reordps permi perms n2gi n2gs.
+  
+  unfold Result.strong_bind.
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphi eqn:a; clear a; revert eqgraphi; pose (x := v) end.
+  refine (_ : forall eqgraphi : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphi = _ -> _).
+  destruct x as [x0|msg]; [intros eqgraphi|].
+  2:{
+    intros Herr _; clear target; intros target; left; intros Hperm.
+    assert (Hnodup : NoDup (map fst init ++ map fst target.(Target.node_ordered_is_node).(Source.n_in))).
+    1:{
+      rewrite Hperm.
+      exact (Permutations.NoDup_app_inv _ _ (nodup_in_init target.(Target.node_ordered_is_node))).
+    }
+    clear - Hnodup Herr Hperm.
+    assert (Hord := target.(Target.ordered_init)).
+    assert (tmp := topological_sort_prop l _ (topological_sort_prop1 propsi) _ (topological_sort_prop2 propsi)).
+    rewrite Herr in tmp.
+    destruct tmp as (l01 & l3 & _ & Hl2 & (r2 & l1 & l2 & -> & Hacc0) & ->).
+    assert (Hacc : accessibility_witness graphi r2 (l2 ++ [r2]) r2).
+    1:{
+      destruct l1; [exact Hacc0|cbn in Hacc0].
+      rewrite accessibility_witness_app in Hacc0; exact (proj2 Hacc0).
+    }
+    clear Hacc0 Herr.
+    refine (cycle_is_unorderable _ _ _ _ propsi _ _ _ Hperm Hnodup Hord).
+    exists (List.length l2), r2.
+    assert (tmp : exists l3', map (Hashtable.find_opt index_tablei) (r2 :: l2 ++ [r2]) = map Some l3').
+    1:{
+      rewrite map_app in Hl2; symmetry in Hl2; apply map_eq_app in Hl2.
+      destruct Hl2 as (? & l3' & _ & _ & H); exists l3'; symmetry; exact H.
+    }
+    clear l1 Hl2 l3; destruct tmp as [[|r1 l1'] Hl1]; [discriminate Hl1|injection Hl1 as Hr Hl1'].
+    split; [rewrite (proj1 propsi), <-(proj1 (proj2 propsi)); exact (Hashtable.find_opt_Some_In _ _ _ Hr)|].
+    apply has_cycle_accessible, accessible_iff_witness.
+    exists (l2 ++ [r2]); split; [rewrite length_app, PeanoNat.Nat.add_comm; exact eq_refl|exact Hacc].
+  }
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphs eqn:a; clear a; revert eqgraphs; pose (x := v) end.
+  refine (_ : forall eqgraphs : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphs = _ -> _).
+  destruct x as [x1|msg]; [intros ?; discriminate 1|].
+  intros Herr _; clear target; intros target; right; intros Hperm.
+  assert (Hnodup : NoDup (map fst step ++ map fst (target.(Target.node_ordered_is_node).(Source.n_in)
+                                                     ++ map fst target.(Target.node_ordered_is_node).(Source.n_pre)))).
+  1:{
+    rewrite Hperm.
+    exact (Permutations.NoDup_app_inv _ _ (nodup_in_pre_step target.(Target.node_ordered_is_node))).
+  }
+  clear - Hnodup Herr Hperm.
+  assert (Hord := target.(Target.ordered_step)).
+  assert (tmp := topological_sort_prop l _ (topological_sort_prop1 propss) _ (topological_sort_prop2 propss)).
+  rewrite Herr in tmp.
+  destruct tmp as (l01 & l3 & _ & Hl2 & (r2 & l1 & l2 & -> & Hacc0) & ->).
+  assert (Hacc : accessibility_witness graphs r2 (l2 ++ [r2]) r2).
+  1:{
+    destruct l1; [exact Hacc0|cbn in Hacc0].
+    rewrite accessibility_witness_app in Hacc0; exact (proj2 Hacc0).
+  }
+  clear Hacc0 Herr.
+  refine (cycle_is_unorderable _ _ _ _ propss _ _ _ Hperm Hnodup Hord).
+  exists (List.length l2), r2.
+  assert (tmp : exists l3', map (Hashtable.find_opt index_tables) (r2 :: l2 ++ [r2]) = map Some l3').
+  1:{
+    rewrite map_app in Hl2; symmetry in Hl2; apply map_eq_app in Hl2.
+    destruct Hl2 as (? & l3' & _ & _ & H); exists l3'; symmetry; exact H.
+  }
+  clear l1 Hl2 l3; destruct tmp as [[|r1 l1'] Hl1]; [discriminate Hl1|injection Hl1 as Hr Hl1'].
+  split; [rewrite (proj1 propss), <-(proj1 (proj2 propss)); exact (Hashtable.find_opt_Some_In _ _ _ Hr)|].
+  apply has_cycle_accessible, accessible_iff_witness.
+  exists (l2 ++ [r2]); split; [rewrite length_app, PeanoNat.Nat.add_comm; exact eq_refl|exact Hacc].
+Qed.
