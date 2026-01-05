@@ -13,7 +13,6 @@ Import ListNotations.
 Module Source := LustreTiming.
 Module Target := LustreOrdered.
 
-
 Import Result.notations.
 
 Fixpoint find_in {B} (l: list (nat * B)) (x: nat): In x (map fst l) -> B.

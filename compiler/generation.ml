@@ -187,15 +187,15 @@ let pp_struct_val sname fmt (args : binder list) =
       ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
       (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
 
-let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
+type formatting = { fprintf : 'a. ('a, formatter, unit) format -> 'a }
+let pp_coq_method { fprintf } cm = match m_out cm with
   | [] -> (* Warning, no output! *)
-      fprintf fmt "@[@[<v4>void %a(struct %s *this%a) {%a@]@\n}@\n@]"
-        pp_fun_name fname
-        sname
-        pp_args bin
-        (pp_stmt blocals) body
+      fprintf "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
+        pp_fun_name (m_name cm)
+        pp_args (m_in cm)
+        (pp_stmt cm) (m_body cm)
   | [m_out] ->
-      fprintf fmt "@[@[<v4>%a %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      fprintf "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         pp_typ (snd m_out)
         pp_fun_name fname
         sname
@@ -203,8 +203,8 @@ let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
         (pp_stmt blocals) body
         pp_var m_out
   | _ :: _ :: _ ->
-      let return_name = asprintf "return_%s" fname in
-      fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      let return_name = asprintf "return_%s" (m_name cm) in
+      fprintf "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         return_name
         pp_struct_typ bout
         return_name

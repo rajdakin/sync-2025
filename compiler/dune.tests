@@ -1,150 +1,129 @@
 (rule
-  (deps main.exe (source_tree examples/cyclic_test.mls))
+  (deps (source_tree cyclic_test.mls))
+  (target cyclic_test.output)
   (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to cyclic_test.output (run ./main.exe examples/cyclic_test.mls))
-    )
+    (run ../main.exe -test-mode cyclic_test.mls)
   )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree cyclic_test.expected) cyclic_test.output)
+  (action (diff cyclic_test.expected cyclic_test.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/cyclic_test.expected) cyclic_test.output)
-  (action (diff examples/cyclic_test.expected cyclic_test.output))
+  (deps (source_tree test.mls))
+  (target test.output)
+  (action
+    (run ../main.exe -test-mode test.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test.output (run ./main.exe examples/test.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test.expected) test.output)
+  (action (diff test.expected test.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test.expected) test.output)
-  (action (diff examples/test.expected test.output))
+  (deps (source_tree test2.mls))
+  (target test2.output)
+  (action
+    (run ../main.exe -test-mode test2.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test2.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test2.output (run ./main.exe examples/test2.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test2.expected) test2.output)
+  (action (diff test2.expected test2.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test2.expected) test2.output)
-  (action (diff examples/test2.expected test2.output))
+  (deps (source_tree test2_args.mls))
+  (target test2_args.output)
+  (action
+    (run ../main.exe -test-mode test2_args.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test2_args.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test2_args.output (run ./main.exe examples/test2_args.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test2_args.expected) test2_args.output)
+  (action (diff test2_args.expected test2_args.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test2_args.expected) test2_args.output)
-  (action (diff examples/test2_args.expected test2_args.output))
+  (deps (source_tree test_args.mls))
+  (target test_args.output)
+  (action
+    (run ../main.exe -test-mode test_args.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test_args.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_args.output (run ./main.exe examples/test_args.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test_args.expected) test_args.output)
+  (action (diff test_args.expected test_args.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test_args.expected) test_args.output)
-  (action (diff examples/test_args.expected test_args.output))
+  (deps (source_tree test_debug.mls))
+  (target test_debug.output)
+  (action
+    (run ../main.exe -test-mode test_debug.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test_debug.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_debug.output (run ./main.exe examples/test_debug.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test_debug.expected) test_debug.output)
+  (action (diff test_debug.expected test_debug.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test_debug.expected) test_debug.output)
-  (action (diff examples/test_debug.expected test_debug.output))
+  (deps (source_tree test_if.mls))
+  (target test_if.output)
+  (action
+    (run ../main.exe -test-mode test_if.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test_if.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_if.output (run ./main.exe examples/test_if.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test_if.expected) test_if.output)
+  (action (diff test_if.expected test_if.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test_if.expected) test_if.output)
-  (action (diff examples/test_if.expected test_if.output))
+  (deps (source_tree test_if_encapsulated.mls))
+  (target test_if_encapsulated.output)
+  (action
+    (run ../main.exe -test-mode test_if_encapsulated.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test_if_encapsulated.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_if_encapsulated.output (run ./main.exe examples/test_if_encapsulated.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test_if_encapsulated.expected) test_if_encapsulated.output)
+  (action (diff test_if_encapsulated.expected test_if_encapsulated.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test_if_encapsulated.expected) test_if_encapsulated.output)
-  (action (diff examples/test_if_encapsulated.expected test_if_encapsulated.output))
+  (deps (source_tree test_pres.mls))
+  (target test_pres.output)
+  (action
+    (run ../main.exe -test-mode test_pres.mls)
+  )
 )
 (rule
-  (deps main.exe (source_tree examples/test_pres.mls))
-  (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_pres.output (run ./main.exe examples/test_pres.mls))
-    )
-  )
+  (alias runtest)
+  (deps (source_tree test_pres.expected) test_pres.output)
+  (action (diff test_pres.expected test_pres.output))
 )
 
 (rule
-  (alias runtest)
-  (deps (source_tree examples/test_pres.expected) test_pres.output)
-  (action (diff examples/test_pres.expected test_pres.output))
-)
-(rule
-  (deps main.exe (source_tree examples/test_timing.mls))
+  (deps (source_tree test_timing.mls))
+  (target test_timing.output)
   (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to test_timing.output (run ./main.exe examples/test_timing.mls))
-    )
+    (run ../main.exe -test-mode test_timing.mls)
   )
 )
-
 (rule
   (alias runtest)
-  (deps (source_tree examples/test_timing.expected) test_timing.output)
-  (action (diff examples/test_timing.expected test_timing.output))
+  (deps (source_tree test_timing.expected) test_timing.output)
+  (action (diff test_timing.expected test_timing.output))
 )

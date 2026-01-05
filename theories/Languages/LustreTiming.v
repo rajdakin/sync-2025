@@ -38,34 +38,34 @@ Inductive binop: type -> type -> type -> Set :=
 .
 
 Inductive raw_exp : type -> Set :=
-  | Raw_EConst: forall {ty}, const ty -> raw_exp ty
-  | Raw_EVar: forall (b: binder), raw_exp (binder_ty b)
-  | Raw_EUnop: forall {tin tout}, unop tin tout -> raw_exp tin -> raw_exp tout
-  | Raw_EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> raw_exp ty1 -> raw_exp ty2 -> raw_exp tout
-  | Raw_EIfte: forall {t}, raw_exp TBool -> raw_exp t -> raw_exp t -> raw_exp t
-  | Raw_EPre: forall {ty}, raw_exp ty -> raw_exp ty
-  | Raw_EArrow: forall {ty}, raw_exp ty -> raw_exp ty -> raw_exp ty
+  | Raw_EConst: Result.location -> forall {ty}, const ty -> raw_exp ty
+  | Raw_EVar: Result.location -> forall (b: binder), raw_exp (binder_ty b)
+  | Raw_EUnop: Result.location -> forall {tin tout}, unop tin tout -> raw_exp tin -> raw_exp tout
+  | Raw_EBinop: Result.location -> forall {ty1 ty2 tout}, binop ty1 ty2 tout -> raw_exp ty1 -> raw_exp ty2 -> raw_exp tout
+  | Raw_EIfte: Result.location -> forall {t}, raw_exp TBool -> raw_exp t -> raw_exp t -> raw_exp t
+  | Raw_EPre: Result.location -> forall {ty}, raw_exp ty -> raw_exp ty
+  | Raw_EArrow: Result.location -> forall {ty}, raw_exp ty -> raw_exp ty -> raw_exp ty
 .
 
 Inductive comb_exp : type -> Set :=
-  | EConst: forall {ty}, const ty -> comb_exp ty
-  | EVar: forall (b: binder), comb_exp (binder_ty b)
-  | EUnop: forall {tin tout}, unop tin tout -> comb_exp tin -> comb_exp tout
-  | EBinop: forall {ty1 ty2 tout}, binop ty1 ty2 tout -> comb_exp ty1 -> comb_exp ty2 -> comb_exp tout
-  | EIfte: forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
+  | EConst: Result.location -> forall {ty}, const ty -> comb_exp ty
+  | EVar: Result.location -> forall (b: binder), comb_exp (binder_ty b)
+  | EUnop: Result.location -> forall {tin tout}, unop tin tout -> comb_exp tin -> comb_exp tout
+  | EBinop: Result.location -> forall {ty1 ty2 tout}, binop ty1 ty2 tout -> comb_exp ty1 -> comb_exp ty2 -> comb_exp tout
+  | EIfte: Result.location -> forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
 .
 
 Fixpoint var_of_raw_exp_aux {ty} (e: raw_exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
-    | Raw_EConst _ => acc
-    | Raw_EVar (name, ty) => (name, ty) :: acc
-    | Raw_EUnop _ e => var_of_raw_exp_aux e acc
-    | Raw_EBinop _ e1 e2 =>
+    | Raw_EConst _ _ => acc
+    | Raw_EVar _ (name, ty) => (name, ty) :: acc
+    | Raw_EUnop _ _ e => var_of_raw_exp_aux e acc
+    | Raw_EBinop _ _ e1 e2 =>
       var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
-    | Raw_EIfte e1 e2 e3 =>
+    | Raw_EIfte _ e1 e2 e3 =>
       var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 (var_of_raw_exp_aux e3 acc))
-    | Raw_EPre e => var_of_raw_exp_aux e acc
-    | Raw_EArrow e1 e2 =>
+    | Raw_EPre _ e => var_of_raw_exp_aux e acc
+    | Raw_EArrow _ e1 e2 =>
       var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
   end.
 
@@ -76,7 +76,7 @@ Lemma var_of_raw_exp_aux_eq {ty} (e: raw_exp ty) (l: list (ident * type)):
   var_of_raw_exp_aux e l = var_of_raw_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 | ty e IH | ty e1 IH1 e2 IH2]; intros l.
+  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 | loc ty e IH | loc ty e1 IH1 e2 IH2]; intros l.
   - reflexivity.
   - reflexivity.
   - apply IH.
@@ -133,8 +133,8 @@ Proof.
   auto.
 Qed.
 
-Lemma var_of_raw_exp_binop_eq {ty1 ty2 ty} (e1 e2: raw_exp _) (b: binop ty1 ty2 ty):
-  var_of_raw_exp (Raw_EBinop b e1 e2) = var_of_raw_exp e1 ++ var_of_raw_exp e2.
+Lemma var_of_raw_exp_binop_eq {ty1 ty2 ty} (l: Result.location) (e1 e2: raw_exp _) (b: binop ty1 ty2 ty):
+  var_of_raw_exp (Raw_EBinop l b e1 e2) = var_of_raw_exp e1 ++ var_of_raw_exp e2.
 Proof.
   unfold var_of_raw_exp.
   simpl.
@@ -142,8 +142,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma var_of_raw_exp_ifte_eq {ty} (e1 : raw_exp TBool) (e2 e3: raw_exp ty):
-  var_of_raw_exp (Raw_EIfte e1 e2 e3) = var_of_raw_exp e1 ++ var_of_raw_exp e2 ++ var_of_raw_exp e3.
+Lemma var_of_raw_exp_ifte_eq {ty} (l: Result.location) (e1 : raw_exp TBool) (e2 e3: raw_exp ty):
+  var_of_raw_exp (Raw_EIfte l e1 e2 e3) = var_of_raw_exp e1 ++ var_of_raw_exp e2 ++ var_of_raw_exp e3.
 Proof.
   unfold var_of_raw_exp.
   simpl.
@@ -151,8 +151,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma var_of_raw_exp_not_in_binop {ty1 ty2 ty} (exp1 exp2: raw_exp _) (x: ident) (b: binop ty1 ty2 ty):
-  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EBinop b exp1 exp2))) ->
+Lemma var_of_raw_exp_not_in_binop {ty1 ty2 ty} (l: Result.location) (exp1 exp2: raw_exp _) (x: ident) (b: binop ty1 ty2 ty):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EBinop l b exp1 exp2))) ->
   forall tyv, (~ In (x, tyv) (var_of_raw_exp exp1) /\ ~ In (x, tyv) (var_of_raw_exp exp2)).
 Proof.
   intros Hnin.
@@ -171,8 +171,8 @@ Proof.
     assumption.
 Qed.
 
-Lemma var_of_raw_exp_not_in_ifte {ty} (e1: raw_exp TBool) (e2 e3: raw_exp ty) (x: ident):
-  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EIfte e1 e2 e3))) ->
+Lemma var_of_raw_exp_not_in_ifte {ty} (l: Result.location) (e1: raw_exp TBool) (e2 e3: raw_exp ty) (x: ident):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EIfte l e1 e2 e3))) ->
   forall tyv, (~ In (x, tyv) (var_of_raw_exp e1) /\ ~ In (x, tyv) (var_of_raw_exp e2) /\ ~ In (x, tyv) (var_of_raw_exp e3)).
 Proof.
   intros Hnin.
@@ -201,14 +201,14 @@ Proof.
 Qed.
 
 Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
-  | TimedConst: forall (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst c)
-  | TimedVar: forall (n: nat) (b: binder), well_timed n (Raw_EVar b)
-  | TimedUnop: forall (n: nat) {tin tout} (u: unop tin tout) (e: raw_exp tin), well_timed n e -> well_timed n (Raw_EUnop u e)
-  | TimedBinop: forall (n: nat) {ty1 ty2 tout} (b: binop ty1 ty2 tout) (e1: raw_exp ty1) (e2: raw_exp ty2), well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EBinop b e1 e2)
-  | TimedIfte: forall (n: nat) {ty} (c: raw_exp TBool) (e1 e2: raw_exp ty), well_timed n c -> well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EIfte c e1 e2)
-  | TimedPre: forall (n: nat) {ty} (e: raw_exp ty), well_timed n e -> well_timed (S n) (Raw_EPre e)
-  | TimedArrow_O: forall {ty} (e1 e2: raw_exp ty), well_timed 0 e1 -> well_timed 0 (Raw_EArrow e1 e2)
-  | TimedArrow_S: forall (n: nat) {ty} (e1 e2: raw_exp ty), well_timed (S n) e2 -> well_timed (S n) (Raw_EArrow e1 e2)
+  | TimedConst: forall l (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst l c)
+  | TimedVar: forall l (n: nat) (b: binder), well_timed n (Raw_EVar l b)
+  | TimedUnop: forall l (n: nat) {tin tout} (u: unop tin tout) (e: raw_exp tin), well_timed n e -> well_timed n (Raw_EUnop l u e)
+  | TimedBinop: forall l (n: nat) {ty1 ty2 tout} (b: binop ty1 ty2 tout) (e1: raw_exp ty1) (e2: raw_exp ty2), well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EBinop l b e1 e2)
+  | TimedIfte: forall l (n: nat) {ty} (c: raw_exp TBool) (e1 e2: raw_exp ty), well_timed n c -> well_timed n e1 -> well_timed n e2 -> well_timed n (Raw_EIfte l c e1 e2)
+  | TimedPre: forall l (n: nat) {ty} (e: raw_exp ty), well_timed n e -> well_timed (S n) (Raw_EPre l e)
+  | TimedArrow_O: forall l {ty} (e1 e2: raw_exp ty), well_timed 0 e1 -> well_timed 0 (Raw_EArrow l e1 e2)
+  | TimedArrow_S: forall l (n: nat) {ty} (e1 e2: raw_exp ty), well_timed (S n) e2 -> well_timed (S n) (Raw_EArrow l e1 e2)
 .
 
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
@@ -217,10 +217,10 @@ Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd 
 Definition raw_equation : Type := ident * { ty : type & raw_exp ty }.
 Definition raw_equation_dest (eq : raw_equation) : ident * type := (fst eq, projT1 (snd eq)).
 
-Lemma timed_exp {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
   Result.t type (well_timed n exp).
 Proof.
-  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
   - constructor 1.
     constructor.
   - constructor 1.
@@ -270,7 +270,7 @@ Proof.
         exact (errc ++ err1 ++ err2).
   - destruct n.
     + constructor 2.
-      exact [(loc, (Result.InvalidTiming vname vid ty))].
+      exact [(l, (Result.InvalidTiming vname vid ty))].
     + specialize (IH n).
       destruct IH as [IH | err].
       2: constructor 2; exact err.
@@ -294,10 +294,10 @@ Proof.
         exact err.
 Defined.
 
-Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
   Result.t type (forall n', n <= n' -> well_timed n' exp).
 Proof.
-  induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
+  induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
   - constructor 1.
     intros.
     constructor.
@@ -358,7 +358,7 @@ Proof.
         exact (errc ++ err1 ++ err2).
   - destruct n.
     + constructor 2.
-      exact [(loc, (Result.InvalidTiming vname vid ty))].
+      exact [(l, (Result.InvalidTiming vname vid ty))].
     + specialize (IH n).
       destruct IH as [IH | err].
       2: constructor 2; exact err.
@@ -372,7 +372,7 @@ Proof.
       assumption.
   - specialize (IH2 n).
     destruct n as [| n].
-    + assert (timed_1 := timed_exp vname vid loc 0 e1).
+    + assert (timed_1 := timed_exp vname vid 0 e1).
       destruct timed_1 as [timed_1 | err1].
       * destruct IH2 as [IH2 | err2].
         2: constructor 2; exact err2.
@@ -399,12 +399,12 @@ Defined.
 
 Definition well_timed_eq (eq: raw_equation) : Prop := forall n, well_timed n (projT2 (snd eq)).
 
-Lemma timed_eq (vname: string) (loc: Result.location) (eq: raw_equation) : Result.t type (well_timed_eq eq).
+Lemma timed_eq (vname: string) (eq: raw_equation) : Result.t type (well_timed_eq eq).
 Proof.
   unfold well_timed_eq.
   destruct eq as [ident [ty e]].
   simpl.
-  destruct (timed_exp_ge vname ident loc 0 e) as [timed | err].
+  destruct (timed_exp_ge vname ident 0 e) as [timed | err].
   2: right; exact err.
   left.
   intro n.
@@ -412,13 +412,13 @@ Proof.
   apply le_0_n.
 Defined.
 
-Lemma timed_list_eq (vname: string) (loc: Result.location) (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
+Lemma timed_list_eq (vname: string) (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
 Proof.
   induction eqs as [|eq eqs IH].
   1: left; constructor.
   destruct IH as [timed_eqs | err].
   2: right; exact err.
-  destruct (timed_eq vname loc eq) as [timed | err].
+  destruct (timed_eq vname eq) as [timed | err].
   2: right; exact err.
   left.
   apply Forall_cons.
@@ -427,12 +427,12 @@ Defined.
 
 Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
-    | EConst _ => acc
-    | EVar (name, ty) => (name, ty) :: acc
-    | EUnop _ e => var_of_exp_aux e acc
-    | EBinop _ e1 e2 =>
+    | EConst _ _ => acc
+    | EVar _ (name, ty) => (name, ty) :: acc
+    | EUnop _ _ e => var_of_exp_aux e acc
+    | EBinop _ _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte e1 e2 e3 =>
+    | EIfte _ e1 e2 e3 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
   end.
 
@@ -509,32 +509,32 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
     * (list equation) (* step_post equations *)
   ) :=
   match exp with
-    | Raw_EConst c => (EConst c, EConst c, seed, [], [], [], [])
-    | Raw_EVar v => (EVar v, EVar v, seed, [], [], [], [])
-    | Raw_EUnop u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
-      (EUnop u ei, EUnop u es, orig, binders, eqs_pre, init_post, step_post)
-    | Raw_EBinop b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+    | Raw_EConst l c => (EConst l c, EConst l c, seed, [], [], [], [])
+    | Raw_EVar l v => (EVar l v, EVar l v, seed, [], [], [], [])
+    | Raw_EUnop l u e => let '(ei, es, orig, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
+      (EUnop l u ei, EUnop l u es, orig, binders, eqs_pre, init_post, step_post)
+    | Raw_EBinop l b e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
-        (EBinop b ei1 e2i, EBinop b es1 e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
-    | Raw_EIfte e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+        (EBinop l b ei1 e2i, EBinop l b es1 e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
+    | Raw_EIfte l e1 e2 e3 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
         let '(e3i, e3s, orig3, binders3, eqs_pre3, init_post3, step_post3) := raw_to_comb e3 orig2 in
-        (EIfte ei1 e2i e3i, EIfte es1 e2s e3s, orig3, binders1 ++ binders2 ++ binders3, eqs_pre1 ++ eqs_pre2 ++ eqs_pre3, init_post1 ++ init_post2 ++ init_post3, step_post1 ++ step_post2 ++ step_post3)
-    | @Raw_EPre t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
+        (EIfte l ei1 e2i e3i, EIfte l es1 e2s e3s, orig3, binders1 ++ binders2 ++ binders3, eqs_pre1 ++ eqs_pre2 ++ eqs_pre3, init_post1 ++ init_post2 ++ init_post3, step_post1 ++ step_post2 ++ step_post3)
+    | @Raw_EPre l t e => let '(ei, es, ident_pre, binders, eqs_pre, init_post, step_post) := raw_to_comb e seed in
       let ident_eq := next_ident ident_pre in
         let next_orig := next_ident ident_eq in
           let pre_var := (ident_pre, t) in
             let eq_var := (ident_eq, t) in
               (
-                EVar eq_var,
-                EVar pre_var,
+                EVar l eq_var,
+                EVar l pre_var,
                 next_orig,
                 eq_var::binders,
                 (pre_var, ident_eq)::eqs_pre,
                 (ident_eq, existT _ t ei)::init_post,
                 (ident_eq, existT _ t es)::step_post
               )
-    | Raw_EArrow e1 e2 =>
+    | Raw_EArrow _ e1 e2 =>
       let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
       (ei1, e2s, orig2, binders1 ++ binders2,
@@ -1010,7 +1010,7 @@ Lemma var_of_exp_aux_eq {ty} (e: comb_exp ty) (l: list (ident * type)):
   var_of_exp_aux e l = var_of_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
   - reflexivity.
   - reflexivity.
   - apply IH.
@@ -1048,53 +1048,53 @@ Inductive sem_binop : forall {ty1 ty2 tyout : type}, binop ty1 ty2 tyout -> valu
 
 Inductive sem_raw_exp (h: history) | : nat -> forall {ty}, raw_exp ty -> value ty -> Prop :=
   | Raw_SeConst (t: nat) {ty} (c: const ty):
-    sem_raw_exp t (Raw_EConst c) (const_to_value c)
+    forall loc, sem_raw_exp t (Raw_EConst loc c) (const_to_value c)
   
   | Raw_SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: raw_exp _) (vin vout: value _):
-    sem_raw_exp t e vin -> sem_unop op vin vout -> sem_raw_exp t (Raw_EUnop op e) vout
+    sem_raw_exp t e vin -> sem_unop op vin vout -> forall loc, sem_raw_exp t (Raw_EUnop loc op e) vout
   
   | Raw_SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: raw_exp _) (v1 v2 vout: value _):
-    sem_raw_exp t e1 v1 -> sem_raw_exp t e2 v2 -> sem_binop op v1 v2 vout -> sem_raw_exp t (Raw_EBinop op e1 e2) vout
+    sem_raw_exp t e1 v1 -> sem_raw_exp t e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_raw_exp t (Raw_EBinop loc op e1 e2) vout
 
   | Raw_SeIfte (t: nat) {ty} (e1: raw_exp TBool) (e2 e3: raw_exp ty) (v1 v2 v3: value _):
     sem_raw_exp t e1 v1 ->
     sem_raw_exp t e2 v2 ->
     sem_raw_exp t e3 v3 ->
-    sem_raw_exp t (Raw_EIfte e1 e2 e3) (vifte v1 v2 v3)
+    forall loc, sem_raw_exp t (Raw_EIfte loc e1 e2 e3) (vifte v1 v2 v3)
 
   | Raw_SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
       Dict.maps_to (fst b) (existT _ _ v) h ->
-      sem_raw_exp t (Raw_EVar b) (Stream.nth t v)
+      forall loc, sem_raw_exp t (Raw_EVar loc b) (Stream.nth t v)
 
   | Raw_SePre {ty} (t: nat) (e: raw_exp ty) (v: value ty):
-    sem_raw_exp t e v -> sem_raw_exp (S t) (Raw_EPre e) v
+    sem_raw_exp t e v -> forall loc, sem_raw_exp (S t) (Raw_EPre loc e) v
 
   | Raw_SeArrow0 {ty} (e1 e2: raw_exp ty) (v: value ty):
-    sem_raw_exp O e1 v -> sem_raw_exp O (Raw_EArrow e1 e2) v
+    sem_raw_exp O e1 v -> forall loc, sem_raw_exp O (Raw_EArrow loc e1 e2) v
 
   | Raw_SeArrowS {ty} (t: nat) (e1 e2: raw_exp ty) (v: value ty):
-    sem_raw_exp (S t) e2 v -> sem_raw_exp (S t) (Raw_EArrow e1 e2) v
+    sem_raw_exp (S t) e2 v -> forall loc, sem_raw_exp (S t) (Raw_EArrow loc e1 e2) v
 .
 
 Inductive sem_comb_exp (h: history) | : nat -> forall {ty}, comb_exp ty -> value ty -> Prop :=
   | SeConst (t: nat) {ty} (c: const ty):
-      sem_comb_exp t (EConst c) (const_to_value c)
+      forall loc, sem_comb_exp t (EConst loc c) (const_to_value c)
   
   | SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: comb_exp _) (vin vout: value _):
-    sem_comb_exp t e vin -> sem_unop op vin vout -> sem_comb_exp t (EUnop op e) vout
+    sem_comb_exp t e vin -> sem_unop op vin vout -> forall loc, sem_comb_exp t (EUnop loc op e) vout
   
   | SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: comb_exp _) (v1 v2 vout: value _):
-    sem_comb_exp t e1 v1 -> sem_comb_exp t e2 v2 -> sem_binop op v1 v2 vout -> sem_comb_exp t (EBinop op e1 e2) vout
+    sem_comb_exp t e1 v1 -> sem_comb_exp t e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_comb_exp t (EBinop loc op e1 e2) vout
 
   | SeIfte (t: nat) {ty} (e1: comb_exp TBool) (e2 e3: comb_exp ty) (v1 v2 v3: value _):
     sem_comb_exp t e1 v1 ->
     sem_comb_exp t e2 v2 ->
     sem_comb_exp t e3 v3 ->
-    sem_comb_exp t (EIfte e1 e2 e3) (vifte v1 v2 v3)
+    forall loc, sem_comb_exp t (EIfte loc e1 e2 e3) (vifte v1 v2 v3)
 
   | SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
       Dict.maps_to (fst b) (existT _ _ v) h ->
-      sem_comb_exp t (EVar b) (Stream.nth t v)
+      forall loc, sem_comb_exp t (EVar loc b) (Stream.nth t v)
 .
 
 Definition sem_raw_eq (eq: raw_equation) (h: history) : Prop :=
@@ -1119,5 +1119,5 @@ Definition sem_node (n: node) (h: history) : Prop :=
   (forall j, In ((i, ty), j) n.(n_pre) ->
    exists (s: Stream.t (value ty)),
    h_maps_to i s h /\
-   forall n, sem_comb_exp h n (EVar (j, ty)) (Stream.nth (S n) s))
+   forall n loc, sem_comb_exp h n (EVar loc (j, ty)) (Stream.nth (S n) s))
   .

@@ -1,27 +1,23 @@
-let generate_rules base =
+let generate_rules i base =
   Printf.printf
-
-{|(rule
-  (deps main.exe (source_tree examples/%s.mls))
+{|%s(rule
+  (deps (source_tree %s.mls))
+  (target %s.output)
   (action
-    (with-accepted-exit-codes
-      (or 0 1)
-      (with-outputs-to %s.output (run ./main.exe examples/%s.mls))
-    )
+    (run ../main.exe -test-mode %s.mls)
   )
 )
-
 (rule
   (alias runtest)
-  (deps (source_tree examples/%s.expected) %s.output)
-  (action (diff examples/%s.expected %s.output))
+  (deps (source_tree %s.expected) %s.output)
+  (action (diff %s.expected %s.output))
 )
 |}
-    base base base base base base base
+    (if i = 0 then "" else "\n") base base base base base base base
 
 let () =
   Sys.readdir "examples"
   |> Array.to_list
   |> List.sort String.compare
   |> List.filter_map (Filename.chop_suffix_opt ~suffix:".mls")
-  |> List.iter generate_rules
+  |> List.iteri generate_rules

@@ -15,29 +15,29 @@ Module Target := LustreTiming.
 
 Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
   match e with
-    | Source.EConst c => Target.Raw_EConst c
-    | Source.EVar v => Target.Raw_EVar v
-    | Source.EIfte e1 e2 e3 => Target.Raw_EIfte (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
-    | Source.EUnop u e => match u in Source.unop tin tout return Target.raw_exp tin -> Target.raw_exp tout with
-      | Source.Uop_neg => fun e => Target.Raw_EUnop Target.Uop_neg e
-      | Source.Uop_not => fun e => Target.Raw_EUnop Target.Uop_not e
-      | Source.Uop_pre => fun e => Target.Raw_EPre e
+    | Source.EConst l c => Target.Raw_EConst l c
+    | Source.EVar l v => Target.Raw_EVar l v
+    | Source.EIfte l e1 e2 e3 => Target.Raw_EIfte l (expr_to_raw e1) (expr_to_raw e2) (expr_to_raw e3)
+    | Source.EUnop l u e => match u in Source.unop tin tout return Target.raw_exp tin -> Target.raw_exp tout with
+      | Source.Uop_neg => fun e => Target.Raw_EUnop l Target.Uop_neg e
+      | Source.Uop_not => fun e => Target.Raw_EUnop l Target.Uop_not e
+      | Source.Uop_pre => fun e => Target.Raw_EPre l e
       end (expr_to_raw e)
-    | Source.EBinop b e1 e2 => match b in Source.binop ty1 ty2 tout return Target.raw_exp ty1 -> Target.raw_exp ty2 -> Target.raw_exp tout with
-      | Source.Bop_and => fun e1 e2 => Target.Raw_EBinop Target.Bop_and e1 e2
-      | Source.Bop_or => fun e1 e2 => Target.Raw_EBinop Target.Bop_or e1 e2
-      | Source.Bop_xor => fun e1 e2 => Target.Raw_EBinop Target.Bop_xor e1 e2
-      | Source.Bop_plus => fun e1 e2 => Target.Raw_EBinop Target.Bop_plus e1 e2
-      | Source.Bop_minus => fun e1 e2 => Target.Raw_EBinop Target.Bop_minus e1 e2
-      | Source.Bop_mult => fun e1 e2 => Target.Raw_EBinop Target.Bop_mult e1 e2
-      | Source.Bop_div => fun e1 e2 => Target.Raw_EBinop Target.Bop_div e1 e2
-      | Source.Bop_eq => fun e1 e2 => Target.Raw_EBinop Target.Bop_eq e1 e2
-      | Source.Bop_neq => fun e1 e2 => Target.Raw_EBinop Target.Bop_neq e1 e2
-      | Source.Bop_le => fun e1 e2 => Target.Raw_EBinop Target.Bop_le e1 e2
-      | Source.Bop_lt => fun e1 e2 => Target.Raw_EBinop Target.Bop_lt e1 e2
-      | Source.Bop_ge => fun e1 e2 => Target.Raw_EBinop Target.Bop_ge e1 e2
-      | Source.Bop_gt => fun e1 e2 => Target.Raw_EBinop Target.Bop_gt e1 e2
-      | Source.Bop_arrow => fun e1 e2 => Target.Raw_EArrow e1 e2
+    | Source.EBinop l b e1 e2 => match b in Source.binop ty1 ty2 tout return Target.raw_exp ty1 -> Target.raw_exp ty2 -> Target.raw_exp tout with
+      | Source.Bop_and => fun e1 e2 => Target.Raw_EBinop l Target.Bop_and e1 e2
+      | Source.Bop_or => fun e1 e2 => Target.Raw_EBinop l Target.Bop_or e1 e2
+      | Source.Bop_xor => fun e1 e2 => Target.Raw_EBinop l Target.Bop_xor e1 e2
+      | Source.Bop_plus => fun e1 e2 => Target.Raw_EBinop l Target.Bop_plus e1 e2
+      | Source.Bop_minus => fun e1 e2 => Target.Raw_EBinop l Target.Bop_minus e1 e2
+      | Source.Bop_mult => fun e1 e2 => Target.Raw_EBinop l Target.Bop_mult e1 e2
+      | Source.Bop_div => fun e1 e2 => Target.Raw_EBinop l Target.Bop_div e1 e2
+      | Source.Bop_eq => fun e1 e2 => Target.Raw_EBinop l Target.Bop_eq e1 e2
+      | Source.Bop_neq => fun e1 e2 => Target.Raw_EBinop l Target.Bop_neq e1 e2
+      | Source.Bop_le => fun e1 e2 => Target.Raw_EBinop l Target.Bop_le e1 e2
+      | Source.Bop_lt => fun e1 e2 => Target.Raw_EBinop l Target.Bop_lt e1 e2
+      | Source.Bop_ge => fun e1 e2 => Target.Raw_EBinop l Target.Bop_ge e1 e2
+      | Source.Bop_gt => fun e1 e2 => Target.Raw_EBinop l Target.Bop_gt e1 e2
+      | Source.Bop_arrow => fun e1 e2 => Target.Raw_EArrow l e1 e2
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 
@@ -121,7 +121,7 @@ Lemma translate_expr_init_wd v {ty} {e: Target.raw_exp ty} {n_in n_out n_locals}
   let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ pre_binders ++ n_locals)) ((v, existT _ ty ei) :: init_post).
 Proof.
-  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH |ty e1 IH1 e2 IH2];
+  intros Hwd; revert seed; induction e as [loc ty c|loc [ty b]|loc ty1 ty op e IH|loc ty1 ty2 ty op e1 IH1 e2 IH2|loc ty e1 IH1 e2 IH2 e3 IH3|loc ty e IH |loc ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - intros ? [].
   - exact Hwd.
@@ -212,7 +212,7 @@ Lemma translate_expr_pre_wd {ty} {e: Target.raw_exp ty} {n_in n_out n_locals} se
   let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Forall (fun eq => In (snd eq, snd (fst eq)) (n_in ++ n_out ++ pre_binders ++ n_locals)) pre_eqs.
 Proof.
-  intros _; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH|ty e1 IH1 e2 IH2];
+  intros _; revert seed; induction e as [loc ty c|loc [ty b]|loc ty1 ty op e IH|loc ty1 ty2 ty op e1 IH1 e2 IH2|loc ty e1 IH1 e2 IH2 e3 IH3|loc ty e IH|loc ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - apply Forall_nil.
   - apply Forall_nil.
@@ -263,7 +263,7 @@ Lemma translate_expr_step_wd v {ty} {e: Target.raw_exp ty} {n_in n_out n_locals}
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) ((n_in ++ n_out ++ pre_binders ++ n_locals) ++ map fst pre_eqs))
     ((v, existT _ ty es) :: step_post).
 Proof.
-  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH|ty e1 IH1 e2 IH2];
+  intros Hwd; revert seed; induction e as [loc ty c|loc [ty b]|loc ty1 ty op e IH|loc ty1 ty2 ty op e1 IH1 e2 IH2|loc ty e1 IH1 e2 IH2 e3 IH3|loc ty e IH|loc ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - intros ? [].
   - rewrite app_nil_r; exact Hwd.
@@ -802,7 +802,7 @@ Proof.
 
   remember (eqs_to_raw n_body) as new_body eqn: translation.
 
-  destruct (Target.timed_list_eq n_name n_loc new_body) as [timed_body | err].
+  destruct (Target.timed_list_eq n_name new_body) as [timed_body | err].
   2: right; exact err.
   left.
 
@@ -840,7 +840,7 @@ Proof.
     clear IH.
     apply Forall_inv in n_all_vars_exist.
     simpl in n_all_vars_exist.
-    induction eq as [c | v | ty1 ty2 u e IH | ty1 ty2 ty3 b e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3].
+    induction eq as [loc c | loc v | loc ty1 ty2 u e IH | loc ty1 ty2 ty3 b e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3].
     + simpl.
       unfold Target.var_of_raw_exp, Target.var_of_raw_exp_aux.
       apply incl_nil_l.
@@ -959,11 +959,14 @@ Defined.
 
 
 (* Semantics preservation *)
+(* TODO *)
 Theorem semantics_preservation_inv (n: Target.node) (n0: Source.node) (h: history):
   translate_node n0 = Result.Ok n -> Target.sem_node n h -> Source.sem_node n0 h.
 Proof.
+Admitted.
+(*
   intro translated.
-  unfold translate_node in translated.
+  unfold translate_node, translate_to_raw_node in translated.
   apply Result.ok_eq in translated.
   destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
   remember (translate_init_assigned n0_seed n0_vars_all_assigned) as init_assigned eqn: tmp; clear tmp.
@@ -1000,3 +1003,4 @@ Proof.
   destruct sem_target as [s' [ismapped' sem_target]].
   
 Admitted.
+*)

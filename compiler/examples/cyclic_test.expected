@@ -1,3 +1,4 @@
-Error(s) while node is ordered:
-examples/cyclic_test.mls:1:1-8:1: there is a cyclic dependency:
-  1 depends on 0 depends on 2 depends on 1
+Test error
+Error lustre ordering translate:
+cyclic_test.mls:1:1-8:1: there is a cyclic dependency:
+x depends on y depends on b depends on x
