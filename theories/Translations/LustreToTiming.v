@@ -41,7 +41,15 @@ Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 
-Definition translate_expr {ty} (e: Source.exp ty) (seed: ident): (
+Fixpoint eqs_to_raw (eqs: list Source.equation): list Target.raw_equation :=
+  match eqs with
+  | [] => []
+  | eq::eqs => match eq with
+    | (ident, existT _ ty e) => (ident, existT _ ty (expr_to_raw e))::(eqs_to_raw eqs)
+    end
+  end.
+
+Definition translate_raw {ty} (e: Target.raw_exp ty) (seed: ident): (
     Target.comb_exp ty (* init *)
     * Target.comb_exp ty (* step *)
     * ident (* New identifier origin *)
@@ -58,107 +66,77 @@ Definition translate_expr {ty} (e: Source.exp ty) (seed: ident): (
     * list Target.equation (* init_post equations *)
     * list Target.equation (* step_post equations *)
   ) :=
-    Target.raw_to_comb (expr_to_raw e) seed.
+    Target.raw_to_comb e seed.
 
-Lemma translate_expr_nextseed {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) :=  translate_expr e seed in
+Lemma translate_raw_nextseed {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) :=  translate_raw e seed in
   exists n, seed' = iter n next_ident seed.
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.raw_to_comb_nextseed translation).
 Qed.
 
-Lemma freshness_translate_expr {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma freshness_translate_raw {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   freshness seed' (pre_binders ++ map fst pre_eqs).
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.freshness_raw_to_comb translation).
 Qed.
 
-Lemma isnext_translate_expr {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma isnext_translate_expr {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   forall x, In x (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs) -> exists n, x = iter n next_ident seed.
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.isnext_raw_to_comb translation).
 Qed.
 
-Lemma nodup_translate_expr {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma nodup_translate_expr {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   NoDup (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs).
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.nodup_raw_to_comb translation).
 Qed.
 
-Lemma translate_expr_assigned_init {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma translate_expr_assigned_init {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Permutation (map Target.equation_dest init_post) pre_binders.
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.raw_to_comb_assigned_init translation).
 Qed.
 
-Lemma translate_expr_assigned_step {ty} (e: Source.exp ty) (seed: ident):
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma translate_expr_assigned_step {ty} (e: Target.raw_exp ty) (seed: ident):
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Permutation (map Target.equation_dest step_post) pre_binders.
 Proof.
-  destruct (translate_expr e seed) as [[[[[[]]]]]] eqn: translation.
+  destruct (translate_raw e seed) as [[[[[[]]]]]] eqn: translation.
   apply (Target.raw_to_comb_assigned_step translation).
 Qed.
 
-Lemma translate_expr_init_wd v {ty} {e: Source.exp ty} {n_in n_out n_locals} seed:
-  incl (Source.var_of_exp e) (n_in ++ n_out ++ n_locals) ->
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma translate_expr_init_wd v {ty} {e: Target.raw_exp ty} {n_in n_out n_locals} seed:
+  incl (Target.var_of_raw_exp e) (n_in ++ n_out ++ n_locals) ->
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ pre_binders ++ n_locals)) ((v, existT _ ty ei) :: init_post).
 Proof.
-  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3];
+  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH |ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - intros ? [].
   - exact Hwd.
   - destruct op; cbn.
-    all: specialize (IH Hwd seed); unfold translate_expr in IH.
-    all: destruct (Target.raw_to_comb (expr_to_raw e) seed) as [[[[[[]]]]]].
-    3:{
-      constructor; [|constructor].
-      - intros ? [<-|[]]; apply in_or_app, or_intror, in_or_app, or_intror; left; exact eq_refl.
-      - refine (incl_trans _ _ _ (Forall_inv IH) _).
-        cbn.
-        apply incl_app_app; [apply incl_refl|].
-        apply incl_app_app; [apply incl_refl|].
-        intros ? h; right; exact h.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        rewrite !in_app_iff in *; cbn; tauto.
-    }
+    all: specialize (IH Hwd seed); unfold translate_raw in IH.
+    all: destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
     all: constructor; [exact (Forall_inv IH)|exact (Forall_inv_tail IH)].
-  - cbn in Hwd; rewrite Source.var_of_exp_aux_eq in Hwd.
+  - cbn in Hwd; rewrite Target.var_of_raw_exp_aux_eq in Hwd.
     specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
     specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror h)))).
-    clear Hwd; unfold translate_expr in IH1, IH2.
+    clear Hwd; unfold translate_raw in IH1, IH2.
     destruct op; cbn.
-    all: destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    all: destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     all: specialize (IH2 seed2).
-    all: destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed']]]]]; clear e2.
-    14:{
-      constructor; [|apply Forall_app; split].
-      - refine (incl_trans _ _ _ (Forall_inv IH1) _).
-        cbn.
-        apply incl_app_app; [apply incl_refl|].
-        apply incl_app_app; [apply incl_refl|].
-        apply incl_app_app; [|apply incl_refl].
-        intros ? h; apply in_or_app; left; exact h.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH1)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        cbn; rewrite !in_app_iff in *; tauto.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH2)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        cbn; rewrite !in_app_iff in *; tauto.
-    }
+    all: destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
     all: constructor; [|apply Forall_app; split; [refine (Forall_impl _ _ (Forall_inv_tail IH1))|refine (Forall_impl _ _ (Forall_inv_tail IH2))]].
     2,3,5,6,8,9,11,12,14,15,17,18,20,21,23,24,26,27,29,30,32,33,35,36,38,39: clear; intros ? Hincl ? Hin.
     2-27: specialize (Hincl _ Hin); cbn; rewrite !in_app_iff in *; tauto.
@@ -168,16 +146,16 @@ Proof.
     all: apply incl_app_app; [apply incl_refl|].
     all: apply incl_app_app; [|apply incl_refl].
     all: intros ? h; apply in_or_app; tauto.
-  - cbn in Hwd; rewrite 2!Source.var_of_exp_aux_eq in Hwd.
+  - cbn in Hwd; rewrite 2!Target.var_of_raw_exp_aux_eq in Hwd.
     specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
     specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror (in_or_app _ _ _ (or_introl h)))))).
     specialize (IH3 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror (in_or_app _ _ _ (or_intror h)))))).
-    clear Hwd; unfold translate_expr in IH1, IH2, IH3.
-    destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    clear Hwd; unfold translate_raw in IH1, IH2, IH3.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     specialize (IH2 seed2).
-    destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed3]]]]]; clear e2.
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed3]]]]]; clear e2.
     specialize (IH3 seed3).
-    destruct (Target.raw_to_comb (expr_to_raw e3) seed3) as [[[[[[] seed']]]]]; clear e3.
+    destruct (Target.raw_to_comb e3 seed3) as [[[[[[] seed']]]]]; clear e3.
     constructor; [|apply Forall_app; split; [|apply Forall_app; split]].
     2: refine (Forall_impl _ _ (Forall_inv_tail IH1)).
     3: refine (Forall_impl _ _ (Forall_inv_tail IH2)).
@@ -192,101 +170,115 @@ Proof.
     all: do 2 (apply incl_app_app; [apply incl_refl|]).
     all: apply incl_app_app; [|apply incl_refl].
     all: cbn; intros ? h; rewrite !in_app_iff; tauto.
+  - specialize (IH Hwd seed); unfold translate_raw in IH.
+    destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
+    constructor; [|constructor].
+    + intros ? [<-|[]]; apply in_or_app, or_intror, in_or_app, or_intror; left; exact eq_refl.
+    + refine (incl_trans _ _ _ (Forall_inv IH) _).
+      cbn.
+      apply incl_app_app; [apply incl_refl|].
+      apply incl_app_app; [apply incl_refl|].
+      intros ? h; right; exact h.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      rewrite !in_app_iff in *; cbn; tauto.
+  - cbn in Hwd; rewrite Target.var_of_raw_exp_aux_eq in Hwd.
+    specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
+    specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror h)))).
+    clear Hwd; unfold translate_raw in IH1, IH2.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
+    specialize (IH2 seed2).
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
+    constructor; [|apply Forall_app; split].
+    + refine (incl_trans _ _ _ (Forall_inv IH1) _).
+      cbn.
+      apply incl_app_app; [apply incl_refl|].
+      apply incl_app_app; [apply incl_refl|].
+      apply incl_app_app; [|apply incl_refl].
+      intros ? h; apply in_or_app; left; exact h.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH1)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      cbn; rewrite !in_app_iff in *; tauto.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH2)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      cbn; rewrite !in_app_iff in *; tauto.
 Qed.
 
-Lemma translate_expr_pre_wd {ty} {e: Source.exp ty} {n_in n_out n_locals} seed:
-  incl (Source.var_of_exp e) (n_in ++ n_out ++ n_locals) ->
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma translate_expr_pre_wd {ty} {e: Target.raw_exp ty} {n_in n_out n_locals} seed:
+  incl (Target.var_of_raw_exp e) (n_in ++ n_out ++ n_locals) ->
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Forall (fun eq => In (snd eq, snd (fst eq)) (n_in ++ n_out ++ pre_binders ++ n_locals)) pre_eqs.
 Proof.
-  intros _; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3];
+  intros _; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH|ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - apply Forall_nil.
   - apply Forall_nil.
   - destruct op; cbn.
-    all: specialize (IH seed); unfold translate_expr in IH.
-    all: destruct (Target.raw_to_comb (expr_to_raw e) seed) as [[[[[[]]]]]].
-    3:{
-      constructor; [|refine (Forall_impl _ _ IH)].
-      2: clear; cbn; intros ? Hin; cbn; rewrite !in_app_iff in *; cbn; rewrite in_app_iff; tauto.
-      apply in_or_app, or_intror, in_or_app, or_intror; left; exact eq_refl.
-    }
+    all: specialize (IH seed); unfold translate_raw in IH.
+    all: destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
     all: exact IH.
   - specialize (IH1 seed).
-    unfold translate_expr in IH1, IH2.
+    unfold translate_raw in IH1, IH2.
     destruct op; cbn.
-    all: destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    all: destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     all: specialize (IH2 seed2).
-    all: destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed']]]]]; clear e2.
+    all: destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
     all: apply Forall_app; split; [refine (Forall_impl _ _ IH1)|refine (Forall_impl _ _ IH2)].
     all: clear; intros ? Hin.
     all: rewrite !in_app_iff in *; tauto.
-  - unfold translate_expr in IH1, IH2, IH3.
+  - unfold translate_raw in IH1, IH2, IH3.
     specialize (IH1 seed).
-    destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     specialize (IH2 seed2).
-    destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed3]]]]]; clear e2.
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed3]]]]]; clear e2.
     specialize (IH3 seed3).
-    destruct (Target.raw_to_comb (expr_to_raw e3) seed3) as [[[[[[] seed']]]]]; clear e3.
+    destruct (Target.raw_to_comb e3 seed3) as [[[[[[] seed']]]]]; clear e3.
     apply Forall_app; split; [|apply Forall_app; split].
     1: refine (Forall_impl _ _ IH1).
     2: refine (Forall_impl _ _ IH2).
     3: refine (Forall_impl _ _ IH3).
     all: clear; intros ? Hin.
     all: rewrite !in_app_iff in *; tauto.
+  - all: specialize (IH seed); unfold translate_raw in IH.
+    all: destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
+    constructor; [|refine (Forall_impl _ _ IH)].
+    2: clear; cbn; intros ? Hin; cbn; rewrite !in_app_iff in *; cbn; rewrite in_app_iff; tauto.
+    apply in_or_app, or_intror, in_or_app, or_intror; left; exact eq_refl.
+  - specialize (IH1 seed).
+    unfold translate_raw in IH1, IH2.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
+    specialize (IH2 seed2).
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
+    apply Forall_app; split; [refine (Forall_impl _ _ IH1)|refine (Forall_impl _ _ IH2)].
+    all: clear; intros ? Hin.
+    all: rewrite !in_app_iff in *; tauto.
 Qed.
 
-Lemma translate_expr_step_wd v {ty} {e: Source.exp ty} {n_in n_out n_locals} seed:
-  incl (Source.var_of_exp e) (n_in ++ n_out ++ n_locals) ->
-  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_expr e seed in
+Lemma translate_expr_step_wd v {ty} {e: Target.raw_exp ty} {n_in n_out n_locals} seed:
+  incl (Target.var_of_raw_exp e) (n_in ++ n_out ++ n_locals) ->
+  let '(ei, es, seed', pre_binders, pre_eqs, init_post, step_post) := translate_raw e seed in
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) ((n_in ++ n_out ++ pre_binders ++ n_locals) ++ map fst pre_eqs))
     ((v, existT _ ty es) :: step_post).
 Proof.
-  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3];
+  intros Hwd; revert seed; induction e as [ty c|[ty b]|ty1 ty op e IH|ty1 ty2 ty op e1 IH1 e2 IH2|ty e1 IH1 e2 IH2 e3 IH3|ty e IH|ty e1 IH1 e2 IH2];
     intros seed; cbn; try (constructor; [|constructor]).
   - intros ? [].
   - rewrite app_nil_r; exact Hwd.
   - destruct op; cbn.
-    all: specialize (IH Hwd seed); unfold translate_expr in IH.
-    all: destruct (Target.raw_to_comb (expr_to_raw e) seed) as [[[[[[]]]]]].
-    3:{
-      constructor; [|constructor].
-      - intros ? [<-|[]]; apply in_or_app; right; left; exact eq_refl.
-      - refine (incl_trans _ _ _ (Forall_inv IH) _).
-        cbn.
-        apply incl_app_app; [|intros ? h; right; exact h].
-        do 2 (apply incl_app_app; [apply incl_refl|]).
-        intros ? h; right; exact h.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        rewrite !in_app_iff in *; cbn; tauto.
-    }
+    all: specialize (IH Hwd seed); unfold translate_raw in IH.
+    all: destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
     all: constructor; [exact (Forall_inv IH)|exact (Forall_inv_tail IH)].
-  - cbn in Hwd; rewrite Source.var_of_exp_aux_eq in Hwd.
+  - cbn in Hwd; rewrite Target.var_of_raw_exp_aux_eq in Hwd.
     specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
     specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror h)))).
-    clear Hwd; unfold translate_expr in IH1, IH2.
+    clear Hwd; unfold translate_raw in IH1, IH2.
     destruct op; cbn.
-    all: destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    all: destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     all: specialize (IH2 seed2).
-    all: destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed']]]]]; clear e2.
-    14:{
-      constructor; [|apply Forall_app; split].
-      - refine (incl_trans _ _ _ (Forall_inv IH2) _).
-        apply incl_app_app; [|intros ? h; rewrite map_app; apply in_or_app; right; exact h].
-        do 2 (apply incl_app_app; [apply incl_refl|]).
-        apply incl_app_app; [|apply incl_refl].
-        intros ? h; apply in_or_app; right; exact h.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH1)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        cbn; rewrite map_app, !in_app_iff in *; tauto.
-      - refine (Forall_impl _ _ (Forall_inv_tail IH2)).
-        clear; intros ? Hincl ? Hin.
-        specialize (Hincl _ Hin).
-        cbn; rewrite map_app, !in_app_iff in *; tauto.
-    }
+    all: destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
     all: constructor; [|apply Forall_app; split; [refine (Forall_impl _ _ (Forall_inv_tail IH1))|refine (Forall_impl _ _ (Forall_inv_tail IH2))]].
     2,3,5,6,8,9,11,12,14,15,17,18,20,21,23,24,26,27,29,30,32,33,35,36,38,39: clear; intros ? Hincl ? Hin.
     2-27: specialize (Hincl _ Hin); cbn; rewrite map_app, !in_app_iff in *; tauto.
@@ -296,16 +288,16 @@ Proof.
     all: do 2 (apply incl_app_app; [apply incl_refl|]).
     all: apply incl_app_app; [|apply incl_refl].
     all: intros ? h; apply in_or_app; tauto.
-  - cbn in Hwd; rewrite 2!Source.var_of_exp_aux_eq in Hwd.
+  - cbn in Hwd; rewrite 2!Target.var_of_raw_exp_aux_eq in Hwd.
     specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
     specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror (in_or_app _ _ _ (or_introl h)))))).
     specialize (IH3 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror (in_or_app _ _ _ (or_intror h)))))).
-    clear Hwd; unfold translate_expr in IH1, IH2, IH3.
-    destruct (Target.raw_to_comb (expr_to_raw e1) seed) as [[[[[[] seed2]]]]]; clear e1.
+    clear Hwd; unfold translate_raw in IH1, IH2, IH3.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
     specialize (IH2 seed2).
-    destruct (Target.raw_to_comb (expr_to_raw e2) seed2) as [[[[[[] seed3]]]]]; clear e2.
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed3]]]]]; clear e2.
     specialize (IH3 seed3).
-    destruct (Target.raw_to_comb (expr_to_raw e3) seed3) as [[[[[[] seed']]]]]; clear e3.
+    destruct (Target.raw_to_comb e3 seed3) as [[[[[[] seed']]]]]; clear e3.
     constructor; [|apply Forall_app; split; [|apply Forall_app; split]].
     2: refine (Forall_impl _ _ (Forall_inv_tail IH1)).
     3: refine (Forall_impl _ _ (Forall_inv_tail IH2)).
@@ -321,9 +313,43 @@ Proof.
     all: do 2 (apply incl_app_app; [apply incl_refl|]).
     all: apply incl_app_app; [|apply incl_refl].
     all: cbn; intros ? h; rewrite !in_app_iff; tauto.
+  - specialize (IH Hwd seed); unfold translate_raw in IH.
+    destruct (Target.raw_to_comb e seed) as [[[[[[]]]]]].
+    constructor; [|constructor].
+    + intros ? [<-|[]]; apply in_or_app; right; left; exact eq_refl.
+    + refine (incl_trans _ _ _ (Forall_inv IH) _).
+      cbn.
+      apply incl_app_app; [|intros ? h; right; exact h].
+      do 2 (apply incl_app_app; [apply incl_refl|]).
+      intros ? h; right; exact h.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      rewrite !in_app_iff in *; cbn; tauto.
+  - cbn in Hwd; rewrite Target.var_of_raw_exp_aux_eq in Hwd.
+    specialize (IH1 (fun _ h => Hwd _ (in_or_app _ _ _ (or_introl h))) seed).
+    specialize (IH2 (fun _ h => Hwd _ (in_or_app _ _ _ (or_intror h)))).
+    clear Hwd; unfold translate_raw in IH1, IH2.
+    destruct (Target.raw_to_comb e1 seed) as [[[[[[] seed2]]]]]; clear e1.
+    specialize (IH2 seed2).
+    destruct (Target.raw_to_comb e2 seed2) as [[[[[[] seed']]]]]; clear e2.
+    constructor; [|apply Forall_app; split].
+    + refine (incl_trans _ _ _ (Forall_inv IH2) _).
+      apply incl_app_app; [|intros ? h; rewrite map_app; apply in_or_app; right; exact h].
+      do 2 (apply incl_app_app; [apply incl_refl|]).
+      apply incl_app_app; [|apply incl_refl].
+      intros ? h; apply in_or_app; right; exact h.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH1)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      cbn; rewrite map_app, !in_app_iff in *; tauto.
+    + refine (Forall_impl _ _ (Forall_inv_tail IH2)).
+      clear; intros ? Hincl ? Hin.
+      specialize (Hincl _ Hin).
+      cbn; rewrite map_app, !in_app_iff in *; tauto.
 Qed.
 
-Fixpoint translate_equations (eqs: list Source.equation) (seed: ident): (
+Fixpoint translate_equations (eqs: list Target.raw_equation) (seed: ident): (
     list Target.equation (* init *)
     * list Target.equation (* step *)
     * ident (* New identifier origin *)
@@ -344,7 +370,7 @@ Fixpoint translate_equations (eqs: list Source.equation) (seed: ident): (
       | [] => ([], [], seed, [], [], [], [])
       | eq::eqs => let '(init_eq, step_eq, seed1, pre_binders0, pre_eqs0, init_post0, step_post0) := translate_equations eqs seed in
         let '(ident, existT _ ty e) := eq in
-          let '(ei, es, seed2, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_expr e seed1 in
+          let '(ei, es, seed2, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_raw e seed1 in
             (
               (ident, existT _ ty ei)::init_eq,
               (ident, existT _ ty es)::step_eq,
@@ -356,7 +382,7 @@ Fixpoint translate_equations (eqs: list Source.equation) (seed: ident): (
             )
     end.
 
-Lemma translate_equations_nextseed (eqs: list Source.equation) (seed: ident):
+Lemma translate_equations_nextseed (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   exists n, seed' = iter n next_ident seed.
 Proof.
@@ -368,8 +394,8 @@ Proof.
   - simpl in translation.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
-    specialize (translate_expr_nextseed expr seed0) as unfoldseed.
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    specialize (translate_raw_nextseed expr seed0) as unfoldseed.
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     destruct unfoldseed as [nexpr seedexpr].
@@ -380,7 +406,7 @@ Proof.
     assumption.
 Qed.
 
-Lemma freshness_translate_equations (eqs: list Source.equation) (seed: ident):
+Lemma freshness_translate_equations (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   freshness seed' (pre_binders ++ map fst pre_eqs).
 Proof.
@@ -392,9 +418,9 @@ Proof.
   - simpl in translation.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
-    assert (freshness_expr := freshness_translate_expr expr seed0).
-    assert (nextseed_expr := translate_expr_nextseed expr seed0).
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    assert (freshness_expr := freshness_translate_raw expr seed0).
+    assert (nextseed_expr := translate_raw_nextseed expr seed0).
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     apply (freshness_later_e nextseed_expr) in IH.
@@ -402,7 +428,7 @@ Proof.
     rewrite map_app, !app_assoc; apply Permutation_app_tail; rewrite <-!app_assoc; apply Permutation_app_head, Permutation_app_comm.
 Qed.
 
-Lemma isnext_translate_equations (eqs: list Source.equation) (seed: ident):
+Lemma isnext_translate_equations (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   forall x, In x (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs) -> exists n, x = iter n next_ident seed.
 Proof.
@@ -416,7 +442,7 @@ Proof.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
     assert (isnext_expr := isnext_translate_expr expr seed0).
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     intros x isin.
@@ -437,7 +463,7 @@ Proof.
     all: assumption.
 Qed.
 
-Lemma nodup_translate_equations (eqs: list Source.equation) (seed: ident):
+Lemma nodup_translate_equations (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   NoDup (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs).
 Proof.
@@ -451,7 +477,7 @@ Proof.
     destruct eq as [ident [ty expr]].
     assert (nodup_expr := nodup_translate_expr expr seed0).
     assert (isnext := isnext_translate_expr expr seed0).
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     cbn in *; rewrite !map_app.
@@ -465,7 +491,7 @@ Proof.
     contradiction.
 Qed.
 
-Lemma translate_equations_assigned_init (eqs: list Source.equation) (seed: ident):
+Lemma translate_equations_assigned_init (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   Permutation (map Target.equation_dest init_post) pre_binders.
 Proof.
@@ -477,13 +503,13 @@ Proof.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
     assert (perm_expr := translate_expr_assigned_init expr seed0).
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_app, IH, perm_expr; apply Permutation_refl.
 Qed.
 
-Lemma translate_equations_assigned_step (eqs: list Source.equation) (seed: ident):
+Lemma translate_equations_assigned_step (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
   Permutation (map Target.equation_dest step_post) pre_binders.
 Proof.
@@ -495,15 +521,15 @@ Proof.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
     assert (perm_expr := translate_expr_assigned_step expr seed0).
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_app, IH, perm_expr; apply Permutation_refl.
 Qed.
 
-Lemma translate_equations_conservation_init (eqs: list Source.equation) (seed: ident):
+Lemma translate_equations_conservation_init (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
-  map Source.equation_dest eqs = map Target.equation_dest init_eqs.
+  map Target.raw_equation_dest eqs = map Target.equation_dest init_eqs.
 Proof.
   destruct (translate_equations eqs seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post] eqn: translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -512,18 +538,18 @@ Proof.
   - simpl in translation.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_cons.
-    unfold Source.equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
+    unfold Target.raw_equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
     rewrite IH.
     reflexivity.
 Qed.
 
-Lemma translate_equations_conservation_step (eqs: list Source.equation) (seed: ident):
+Lemma translate_equations_conservation_step (eqs: list Target.raw_equation) (seed: ident):
   let '(init_eqs, step_eqs, seed', pre_binders, pre_eqs, init_post, step_post) := translate_equations eqs seed in
-  map Source.equation_dest eqs = map Target.equation_dest step_eqs.
+  map Target.raw_equation_dest eqs = map Target.equation_dest step_eqs.
 Proof.
   destruct (translate_equations eqs seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post] eqn: translation.
   induction eqs as [| eq eqs IH] in seed, seed', pre_binders, init_eqs, step_eqs, pre_eqs, init_post, step_post, translation |- *.
@@ -532,17 +558,17 @@ Proof.
   - simpl in translation.
     destruct (translate_equations eqs seed) as [[[[[[init_eqs0 step_eqs0] seed0] binders0] pre_eqs0] init_post0] step_post0] eqn: unfoldtrans.
     destruct eq as [ident [ty expr]].
-    destruct (translate_expr expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
+    destruct (translate_raw expr seed0) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2].
     injection translation as <- <- <- <- <- <- <-.
     specialize (IH _ _ _ _ _ _ _ _ unfoldtrans).
     rewrite !map_cons.
-    unfold Source.equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
+    unfold Target.raw_equation_dest at 1, Target.equation_dest at 1, fst, snd, projT1.
     rewrite IH.
     reflexivity.
 Qed.
 
 Lemma translate_init_assigned {n_body n_out n_locals} (n_seed: ident)
-  (n_vars_all_assigned : Permutation (map Source.equation_dest n_body) (n_out ++ n_locals)) :
+  (n_vars_all_assigned : Permutation (map Target.raw_equation_dest n_body) (n_out ++ n_locals)) :
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   Permutation (map Target.equation_dest (init_eqs ++ init_post_eqs)) (n_out ++ pre_binders ++ n_locals).
 Proof.
@@ -551,7 +577,7 @@ Proof.
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post].
   rewrite map_app.
   rewrite <- conservation_init.
-  rewrite (Permutation_app_comm (map Source.equation_dest n_body)).
+  rewrite (Permutation_app_comm (map Target.raw_equation_dest n_body)).
   rewrite !app_assoc.
   rewrite (Permutation_app_comm n_out).
   rewrite <- !app_assoc.
@@ -562,7 +588,7 @@ Proof.
 Qed.
 
 Lemma translate_step_assigned {n_body n_out n_locals} (n_seed: ident)
-  (n_vars_all_assigned : Permutation (map Source.equation_dest n_body) (n_out ++ n_locals)) :
+  (n_vars_all_assigned : Permutation (map Target.raw_equation_dest n_body) (n_out ++ n_locals)) :
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   Permutation (map Target.equation_dest (step_eqs ++ step_post_eqs)) (n_out ++ pre_binders ++ n_locals).
 Proof.
@@ -571,7 +597,7 @@ Proof.
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post].
   rewrite map_app.
   rewrite <- conservation_step.
-  rewrite (Permutation_app_comm (map Source.equation_dest n_body)).
+  rewrite (Permutation_app_comm (map Target.raw_equation_dest n_body)).
   rewrite !app_assoc.
   rewrite (Permutation_app_comm n_out).
   rewrite <- !app_assoc.
@@ -581,7 +607,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma translate_vars_unique {n_in n_out n_locals n_seed} (n_body: list Source.equation)
+Lemma translate_vars_unique {n_in n_out n_locals n_seed} (n_body: list Target.raw_equation)
   (n_vars_unique : NoDup (map fst (n_in ++ n_out ++ n_locals)))
   (n_seed_always_fresh : freshness n_seed (n_in ++ n_out ++ n_locals)) :
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
@@ -610,7 +636,7 @@ Proof.
   apply (n_seed_always_fresh n).
 Qed.
 
-Lemma translate_seed_always_fresh {n_in n_out n_locals n_seed} (n_body: list Source.equation)
+Lemma translate_seed_always_fresh {n_in n_out n_locals n_seed} (n_body: list Target.raw_equation)
   (n_seed_always_fresh : freshness n_seed (n_in ++ n_out ++ n_locals)) :
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   freshness new_seed ((n_in ++ n_out ++ pre_binders ++ n_locals) ++ map fst pre_eqs).
@@ -643,7 +669,7 @@ Lemma translation_conservation n_seed n_body eq:
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   let '(ident, existT _ ty e) := eq in
   exists seed1,
-  let '(ei, es, seed2, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_expr e seed1 in
+  let '(ei, es, seed2, pre_binders1, pre_eqs1, init_post1, step_post1) := translate_raw e seed1 in
     In (ident, existT _ ty ei) init_eqs /\
     In (ident, existT _ ty es) step_eqs.
 Proof.
@@ -653,9 +679,9 @@ Proof.
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed'] pre_binders] pre_eqs] init_post] step_post].
   intros [|isin]; subst.
   all: destruct eq as [ident [ty e]].
-  - destruct (translate_expr e seed') as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: translation.
+  - destruct (translate_raw e seed') as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: translation.
     exists seed'.
-    destruct (translate_expr e seed') as [[[[[[]]]]]].
+    destruct (translate_raw e seed') as [[[[[[]]]]]].
     injection translation as <- <- <- <- <- <- <-.
     split.
     all: constructor 1.
@@ -663,16 +689,16 @@ Proof.
   - destruct eq' as [ident' [ty' e']].
     specialize (IH isin).
     destruct IH as [seed1 IH].
-    destruct (translate_expr e' seed') as [[[[[[]]]]]].
+    destruct (translate_raw e' seed') as [[[[[[]]]]]].
     exists seed1.
-    destruct (translate_expr e seed1) as [[[[[[]]]]]].
+    destruct (translate_raw e seed1) as [[[[[[]]]]]].
     destruct IH.
     split.
     all: constructor 2; assumption.
 Qed.
 
 Lemma translate_init_wd {n_in n_out n_locals n_body} n_seed:
-  Forall (fun eq => incl (Source.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
+  Forall (fun eq => incl (Target.var_of_raw_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ pre_binders ++ n_locals)) (init_eqs ++ init_post_eqs).
 Proof.
@@ -682,9 +708,9 @@ Proof.
   simpl.
   specialize (IH (Forall_inv_tail n_all_vars_exist)).
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed1] pre_binders] pre_eqs] init_post] step_post].
-  assert (Hexpr := translate_expr_init_wd eqid seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_expr.
+  assert (Hexpr := translate_expr_init_wd eqid seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_raw.
   clear - IH Hexpr.
-  destruct (Target.raw_to_comb (expr_to_raw eqeq) seed1) as [[[[[[]]]]]]; cbn in *.
+  destruct (Target.raw_to_comb eqeq seed1) as [[[[[[]]]]]]; cbn in *.
   apply Forall_app in IH.
   apply Forall_cons; [refine (incl_trans _ _ _ (Forall_inv Hexpr) _)|apply Forall_app; split; [|apply Forall_app; split]].
   2: refine (Forall_impl _ _ (proj1 IH)).
@@ -696,7 +722,7 @@ Proof.
 Qed.
 
 Lemma translate_pre_wd {n_in n_out n_locals n_body} n_seed:
-  Forall (fun eq => incl (Source.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
+  Forall (fun eq => incl (Target.var_of_raw_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   Forall (fun eq => In (snd eq, snd (fst eq)) (n_in ++ n_out ++ pre_binders ++ n_locals)) pre_eqs.
 Proof.
@@ -706,9 +732,9 @@ Proof.
   simpl.
   specialize (IH (Forall_inv_tail n_all_vars_exist)).
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed1] pre_binders] pre_eqs] init_post] step_post].
-  assert (Hexpr := translate_expr_pre_wd seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_expr.
+  assert (Hexpr := translate_expr_pre_wd seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_raw.
   clear - IH Hexpr.
-  destruct (Target.raw_to_comb (expr_to_raw eqeq) seed1) as [[[[[[]]]]]]; cbn in *.
+  destruct (Target.raw_to_comb eqeq seed1) as [[[[[[]]]]]]; cbn in *.
   apply Forall_app; split.
   1: refine (Forall_impl _ _ Hexpr).
   2: refine (Forall_impl _ _ IH).
@@ -717,7 +743,7 @@ Proof.
 Qed.
 
 Lemma translate_step_wd {n_in n_out n_locals n_body} n_seed:
-  Forall (fun eq => incl (Source.var_of_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
+  Forall (fun eq => incl (Target.var_of_raw_exp (projT2 (snd eq))) (n_in ++ n_out ++ n_locals)) n_body ->
   let '(init_eqs, step_eqs, new_seed, pre_binders, pre_eqs, init_post_eqs, step_post_eqs) := translate_equations n_body n_seed in
   Forall (fun eq => incl (Target.var_of_exp (projT2 (snd eq))) ((n_in ++ n_out ++ pre_binders ++ n_locals) ++ map fst pre_eqs)) (step_eqs ++ step_post_eqs).
 Proof.
@@ -727,9 +753,9 @@ Proof.
   simpl.
   specialize (IH (Forall_inv_tail n_all_vars_exist)).
   destruct (translate_equations n_body n_seed) as [[[[[[init_eqs step_eqs] seed1] pre_binders] pre_eqs] init_post] step_post].
-  assert (Hexpr := translate_expr_step_wd eqid seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_expr.
+  assert (Hexpr := translate_expr_step_wd eqid seed1 (Forall_inv n_all_vars_exist)); cbn in Hexpr; unfold translate_raw.
   clear - IH Hexpr.
-  destruct (Target.raw_to_comb (expr_to_raw eqeq) seed1) as [[[[[[]]]]]]; cbn in *.
+  destruct (Target.raw_to_comb eqeq seed1) as [[[[[[]]]]]]; cbn in *.
   apply Forall_app in IH.
   apply Forall_cons; [refine (incl_trans _ _ _ (Forall_inv Hexpr) _)|apply Forall_app; split; [|apply Forall_app; split]].
   2: refine (Forall_impl _ _ (proj1 IH)).
@@ -740,10 +766,135 @@ Proof.
   all: rewrite ?map_app, !in_app_iff in *; tauto.
 Qed.
 
-
-Definition translate_node (node: Source.node) : Result.t type Target.node.
+Lemma equation_dest_conservation (body: list Source.equation) :
+  map Source.equation_dest body = map Target.raw_equation_dest (eqs_to_raw body).
 Proof.
-  left. (* FIXME: check the timing before returning the node *)
+  induction body as [|[ident [ty eq]] body IH].
+  1: reflexivity.
+  simpl.
+  rewrite IH.
+  unfold Source.equation_dest, Target.raw_equation_dest at 2.
+  simpl.
+  reflexivity.
+Qed.
+
+Definition translate_to_raw_node (node: Source.node) : Result.t type Target.raw_node.
+Proof.
+  destruct node as [
+    n_loc
+    n_name
+
+    n_in
+    n_out
+    n_locals
+    n_body
+    
+    n_vars
+    n_assigned_vars
+    
+    n_all_vars_exist
+    n_vars_all_assigned
+    n_vars_unique
+    
+    n_seed
+    n_seed_always_fresh
+  ].
+
+  remember (eqs_to_raw n_body) as new_body eqn: translation.
+
+  destruct (Target.timed_list_eq n_name n_loc new_body) as [timed_body | err].
+  2: right; exact err.
+  left.
+
+  refine {|
+    Target.rn_loc := n_loc;
+    Target.rn_name := n_name;
+
+    Target.rn_in := n_in;
+    Target.rn_out := n_out;
+    Target.rn_locals := n_locals;
+    Target.rn_body := new_body;
+    
+    Target.rn_vars_unique := n_vars_unique;
+
+    Target.rn_seed := n_seed;
+    Target.rn_seed_always_fresh := n_seed_always_fresh;
+
+    Target.rn_well_timed := timed_body;
+  |}.
+
+  all: clear -n_all_vars_exist n_vars_all_assigned translation.
+
+  - clear n_vars_all_assigned.
+    induction n_body as [| [ident [ty eq]] n_body IH] in new_body, translation, n_assigned_vars, n_all_vars_exist |- *.
+    1: simpl in translation; subst; constructor.
+    simpl in translation.
+    subst.
+    constructor.
+    2: {
+      apply IH.
+      2: reflexivity.
+      apply Forall_inv_tail in n_all_vars_exist.
+      assumption.
+    }
+    clear IH.
+    apply Forall_inv in n_all_vars_exist.
+    simpl in n_all_vars_exist.
+    induction eq as [c | v | ty1 ty2 u e IH | ty1 ty2 ty3 b e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3].
+    + simpl.
+      unfold Target.var_of_raw_exp, Target.var_of_raw_exp_aux.
+      apply incl_nil_l.
+    + simpl.
+      unfold Target.var_of_raw_exp, Target.var_of_raw_exp_aux.
+      unfold Source.var_of_exp in n_all_vars_exist.
+      simpl in n_all_vars_exist.
+      assumption.
+    + simpl.
+      unfold Source.var_of_exp in n_all_vars_exist.
+      simpl in n_all_vars_exist.
+      rewrite Source.var_of_exp_aux_eq, app_nil_r in n_all_vars_exist.
+      apply IH in n_all_vars_exist.
+      clear IH.
+      simpl in n_all_vars_exist.
+      destruct u.
+      all: unfold Target.var_of_raw_exp; simpl.
+      all: rewrite Target.var_of_raw_exp_aux_eq, app_nil_r.
+      all: assumption.
+    + unfold Source.var_of_exp in n_all_vars_exist.
+      simpl in IH1, IH2, n_all_vars_exist.
+      rewrite 2!Source.var_of_exp_aux_eq, app_nil_r in n_all_vars_exist.
+      apply incl_app_inv in n_all_vars_exist.
+      destruct n_all_vars_exist as [vars1_exist vars2_exist].
+      apply IH1 in vars1_exist.
+      apply IH2 in vars2_exist.
+      clear IH1 IH2.
+      destruct b.
+      all: unfold Target.var_of_raw_exp; simpl.
+      all: rewrite 2!Target.var_of_raw_exp_aux_eq, app_nil_r.
+      all: apply incl_app.
+      all: assumption.
+    + unfold Source.var_of_exp in n_all_vars_exist.
+      simpl in IH1, IH2, IH3, n_all_vars_exist.
+      rewrite 3!Source.var_of_exp_aux_eq, app_nil_r in n_all_vars_exist.
+      apply incl_app_inv in n_all_vars_exist.
+      destruct n_all_vars_exist as [vars1_exist tmp].
+      apply incl_app_inv in tmp.
+      destruct tmp as [vars2_exist vars3_exist].
+      apply IH1 in vars1_exist.
+      apply IH2 in vars2_exist.
+      apply IH3 in vars3_exist.
+      clear IH1 IH2 IH3.
+      unfold Target.var_of_raw_exp; simpl.
+      rewrite 3!Target.var_of_raw_exp_aux_eq, app_nil_r.
+      apply incl_app; [ | apply incl_app].
+      all: assumption.
+  - rewrite translation, <- equation_dest_conservation.
+    assumption.
+Defined.
+
+
+Definition translate_raw_to_node (node: Target.raw_node) : Target.node.
+Proof.
 
   destruct node as [
     n_loc
@@ -796,6 +947,14 @@ Proof.
     Target.n_seed := new_seed;
   |}.
   all: assumption.
+Defined.
+
+Definition translate_node (node: Source.node) : Result.t type Target.node.
+Proof.
+  destruct (translate_to_raw_node node) as [raw_node | err].
+  2: right; exact err.
+  left.
+  exact (translate_raw_to_node raw_node).
 Defined.
 
 

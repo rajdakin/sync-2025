@@ -72,6 +72,134 @@ Fixpoint var_of_raw_exp_aux {ty} (e: raw_exp ty) (acc: list (ident * type)): lis
 Definition var_of_raw_exp {ty} (e: raw_exp ty): list (ident * type) :=
   var_of_raw_exp_aux e [].
 
+Lemma var_of_raw_exp_aux_eq {ty} (e: raw_exp ty) (l: list (ident * type)):
+  var_of_raw_exp_aux e l = var_of_raw_exp e ++ l.
+Proof.
+  revert l.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 | ty e IH | ty e1 IH1 e2 IH2]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - apply IH.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
+  - apply IH.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_aux_empty {ty} (e: raw_exp ty) (l: list (ident * type)):
+  var_of_raw_exp_aux e l = [] -> l = [].
+Proof.
+  intros H.
+  rewrite var_of_raw_exp_aux_eq in H.
+  apply app_eq_nil in H as [ _ H ].
+  assumption.
+Qed.
+
+Lemma var_of_raw_exp_aux_incl {ty} (e: raw_exp ty) (l1 l2: list (ident * type)):
+  incl l1 l2 -> incl (var_of_raw_exp_aux e l1) (var_of_raw_exp_aux e l2).
+Proof.
+  intros H i Hi.
+  rewrite var_of_raw_exp_aux_eq in Hi |- *.
+  apply in_or_app.
+  apply in_app_or in Hi as [ Hin | Hin ]; auto.
+Qed.
+
+Lemma var_of_raw_exp_aux_in_exp {ty tyv} (e: raw_exp ty) (l: list (ident * type)) (x: ident):
+  In (x, tyv) (var_of_raw_exp e) -> In (x, tyv) (var_of_raw_exp_aux e l).
+Proof.
+  apply var_of_raw_exp_aux_incl with (l1 := []).
+  intros a Hin.
+  destruct Hin.
+Qed.
+
+Lemma var_of_raw_exp_aux_in_acc {ty tyv} (e: raw_exp ty) (l: list (ident * type)) (x: ident):
+  In (x, tyv) l -> In (x, tyv) (var_of_raw_exp_aux e l).
+Proof.
+  intros H.
+  rewrite var_of_raw_exp_aux_eq.
+  apply in_or_app.
+  auto.
+Qed.
+
+Lemma var_of_raw_exp_binop_eq {ty1 ty2 ty} (e1 e2: raw_exp _) (b: binop ty1 ty2 ty):
+  var_of_raw_exp (Raw_EBinop b e1 e2) = var_of_raw_exp e1 ++ var_of_raw_exp e2.
+Proof.
+  unfold var_of_raw_exp.
+  simpl.
+  rewrite var_of_raw_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_ifte_eq {ty} (e1 : raw_exp TBool) (e2 e3: raw_exp ty):
+  var_of_raw_exp (Raw_EIfte e1 e2 e3) = var_of_raw_exp e1 ++ var_of_raw_exp e2 ++ var_of_raw_exp e3.
+Proof.
+  unfold var_of_raw_exp.
+  simpl.
+  do 2 rewrite var_of_raw_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_not_in_binop {ty1 ty2 ty} (exp1 exp2: raw_exp _) (x: ident) (b: binop ty1 ty2 ty):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EBinop b exp1 exp2))) ->
+  forall tyv, (~ In (x, tyv) (var_of_raw_exp exp1) /\ ~ In (x, tyv) (var_of_raw_exp exp2)).
+Proof.
+  intros Hnin.
+  split.
+  - intros Hin1.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_exp.
+    assumption.
+  - intros Hin1.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_acc.
+    assumption.
+Qed.
+
+Lemma var_of_raw_exp_not_in_ifte {ty} (e1: raw_exp TBool) (e2 e3: raw_exp ty) (x: ident):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EIfte e1 e2 e3))) ->
+  forall tyv, (~ In (x, tyv) (var_of_raw_exp e1) /\ ~ In (x, tyv) (var_of_raw_exp e2) /\ ~ In (x, tyv) (var_of_raw_exp e3)).
+Proof.
+  intros Hnin.
+  split.
+  - intros Hin.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_exp.
+    assumption.
+  - split.
+    + intros Hin.
+      apply (Hnin tyv).
+      unfold var_of_raw_exp.
+      simpl.
+      apply var_of_raw_exp_aux_in_acc.
+      apply var_of_raw_exp_aux_in_exp.
+      assumption.
+    + intros Hin.
+      apply (Hnin tyv).
+      unfold var_of_raw_exp.
+      simpl.
+      apply var_of_raw_exp_aux_in_acc.
+      apply var_of_raw_exp_aux_in_acc.
+      assumption.
+Qed.
+
 Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
   | TimedConst: forall (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst c)
   | TimedVar: forall (n: nat) (b: binder), well_timed n (Raw_EVar b)
@@ -166,7 +294,7 @@ Proof.
         exact err.
 Defined.
 
-Lemma timed_exp_gt {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
   Result.t type (forall n', n <= n' -> well_timed n' exp).
 Proof.
   induction exp as [| | tin tout u exp IH | ty1 ty2 tout b e1 IH1 e2 IH2 | t ec IHc e1 IH1 e2 IH2 | ty exp IH | ty e1 IH1 e2 IH2] in n |- *.
@@ -269,7 +397,33 @@ Proof.
       assumption.
 Defined.
 
-Definition well_timed_eq (n: nat) (eq: raw_equation) : Prop := well_timed n (projT2 (snd eq)).
+Definition well_timed_eq (eq: raw_equation) : Prop := forall n, well_timed n (projT2 (snd eq)).
+
+Lemma timed_eq (vname: string) (loc: Result.location) (eq: raw_equation) : Result.t type (well_timed_eq eq).
+Proof.
+  unfold well_timed_eq.
+  destruct eq as [ident [ty e]].
+  simpl.
+  destruct (timed_exp_ge vname ident loc 0 e) as [timed | err].
+  2: right; exact err.
+  left.
+  intro n.
+  apply (timed n).
+  apply le_0_n.
+Defined.
+
+Lemma timed_list_eq (vname: string) (loc: Result.location) (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
+Proof.
+  induction eqs as [|eq eqs IH].
+  1: left; constructor.
+  destruct IH as [timed_eqs | err].
+  2: right; exact err.
+  destruct (timed_eq vname loc eq) as [timed | err].
+  2: right; exact err.
+  left.
+  apply Forall_cons.
+  all: assumption.
+Defined.
 
 Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
   match e with
@@ -330,6 +484,8 @@ Record raw_node := mk_raw_node {
 
   rn_seed: ident;
   rn_seed_always_fresh: freshness rn_seed rn_vars;
+
+  rn_well_timed: Forall well_timed_eq rn_body;
 }.
 
 
@@ -850,7 +1006,6 @@ Proof.
     apply Permutation_refl.
 Qed.
 
-
 Lemma var_of_exp_aux_eq {ty} (e: comb_exp ty) (l: list (ident * type)):
   var_of_exp_aux e l = var_of_exp e ++ l.
 Proof.
@@ -945,6 +1100,14 @@ Inductive sem_comb_exp (h: history) | : nat -> forall {ty}, comb_exp ty -> value
 Definition sem_raw_eq (eq: raw_equation) (h: history) : Prop :=
   exists (s: Stream.t (value (projT1 (snd eq)))),
   h_maps_to (fst eq) s h /\ forall n, sem_raw_exp h n (projT2 (snd eq)) (Stream.nth n s).
+
+Definition sem_raw_node (n: raw_node) (h: history) : Prop :=
+  forall (i: ident) (ty: type),
+  In (i, ty) n.(rn_vars) ->
+   exists (s: Stream.t (value ty)),
+   h_maps_to i s h /\
+   (forall (e: raw_exp ty), In (i, existT _ _ e) n.(rn_body) -> forall n, sem_raw_exp h n e (Stream.nth n s))
+  .
 
 Definition sem_node (n: node) (h: history) : Prop :=
   forall (i: ident) (ty: type),
