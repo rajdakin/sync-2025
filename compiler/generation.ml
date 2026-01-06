@@ -187,15 +187,15 @@ let pp_struct_val sname fmt (args : binder list) =
       ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
       (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
 
-type formatting = { fprintf : 'a. ('a, formatter, unit) format -> 'a }
-let pp_coq_method { fprintf } cm = match m_out cm with
+let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
   | [] -> (* Warning, no output! *)
-      fprintf "@[@[<v4>void %a(@[%a@]) {%a@]@\n}@\n@]"
-        pp_fun_name (m_name cm)
-        pp_args (m_in cm)
-        (pp_stmt cm) (m_body cm)
+      fprintf fmt "@[@[<v4>void %a(struct %s *this%a) {%a@]@\n}@\n@]"
+        pp_fun_name fname
+        sname
+        pp_args bin
+        (pp_stmt blocals) body
   | [m_out] ->
-      fprintf "@[@[<v4>%a %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      fprintf fmt "@[@[<v4>%a %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         pp_typ (snd m_out)
         pp_fun_name fname
         sname
@@ -203,8 +203,8 @@ let pp_coq_method { fprintf } cm = match m_out cm with
         (pp_stmt blocals) body
         pp_var m_out
   | _ :: _ :: _ ->
-      let return_name = asprintf "return_%s" (m_name cm) in
-      fprintf "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(@[%a@]) {%a@\nreturn @[%a@];@]@\n}@\n@]"
+      let return_name = asprintf "return_%s" fname in
+      fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@[<v4>%s %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
         return_name
         pp_struct_typ bout
         return_name
@@ -214,14 +214,15 @@ let pp_coq_method { fprintf } cm = match m_out cm with
         (pp_stmt blocals) body
         (pp_struct_val return_name) bout
 
-let pp_coq_method_pair fmt cm =
+type formatting = { fprintf : 'a. ('a, formatter, unit) format -> 'a }
+let pp_coq_method_pair {fprintf} cm =
   let sname = "s_" ^ m_name cm in
   let pp_locals fmt locs =
     pp_print_list ~pp_sep:(fun _ () -> ())
-      (fun fmt loc -> fprintf fmt "@\n%a %a;" pp_typ (snd loc) pp_ident (fst loc))
+      (fun fmt loc -> Format.fprintf fmt "@\n%a %a;" pp_typ (snd loc) pp_ident (fst loc))
       fmt locs in
   let locvars = m_in cm @ m_out cm in
-  fprintf fmt "@[@[<v4>struct %s {%a@]@\n};@\n@\n%a@\n%a@]"
+  fprintf "@[@[<v4>struct %s {%a@]@\n};@\n@\n%a@\n%a@]"
     sname
     pp_locals (m_locals cm)
     pp_coq_method ("init_" ^ m_name cm, sname, m_in cm, m_out cm, locvars, m_init cm)

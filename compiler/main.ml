@@ -137,10 +137,20 @@ let () =
         exit 1
   in
 
-  match Extracted.LustreOrdering.translate_node checked_node with
+  let timed_node =
+    match Extracted.LustreToTiming.translate_node checked_node with
+    | Ok m -> m
+    | Err x ->
+        output output_err "@[Error%s when node is timed:@\n%a@]@."
+          (match x with [] | [_] -> "" | _ :: _ :: _ -> "s")
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename (Hashtbl.create 0))) x;
+        exit 1
+  in
+
+  match Extracted.LustreOrdering.translate_node timed_node with
   | Ok m ->
       let output f = output output_out f in
-      Generation.pp_coq_method Generation.{fprintf = output} (Extracted.LustreOrderedToImp.translate_node m)
+      Generation.pp_coq_method_pair Generation.{fprintf = output} (Extracted.LustreOrderedToImp.translate_node m)
   | Err x ->
       output output_err "@[Error lustre ordering translate:@\n%a@]@."
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename var_names)) x
