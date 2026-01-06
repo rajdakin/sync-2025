@@ -127,3 +127,16 @@
   (deps (source_tree test_timing.expected) test_timing.output)
   (action (diff test_timing.expected test_timing.output))
 )
+
+(rule
+  (deps (source_tree test_wrong_timing.mls))
+  (target test_wrong_timing.output)
+  (action
+    (run ../main.exe -test-mode test_wrong_timing.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree test_wrong_timing.expected) test_wrong_timing.output)
+  (action (diff test_wrong_timing.expected test_wrong_timing.output))
+)

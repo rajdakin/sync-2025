@@ -1,0 +1,6 @@
+node test(a: int, b: bool) returns (c: int)
+var d: bool;
+let
+    d = b;
+    c = if d then (0 -> ~pre a) else pre (a -> pre a);
+tel
