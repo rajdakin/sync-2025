@@ -12,6 +12,19 @@
 )
 
 (rule
+  (deps (source_tree fby_test.mls))
+  (target fby_test.output)
+  (action
+    (run ../main.exe -test-mode fby_test.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree fby_test.expected) fby_test.output)
+  (action (diff fby_test.expected fby_test.output))
+)
+
+(rule
   (deps (source_tree test.mls))
   (target test.output)
   (action

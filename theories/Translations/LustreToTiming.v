@@ -1020,9 +1020,9 @@ Proof.
     1-2: econstructor.
     1,3: apply IH.
     1-2: constructor.
-    + apply sig2T_eq_type in H1, H2; subst.
+    + apply sig2T_eq_type in H3, H4; subst.
       constructor.
-      specialize (IH _ _ H3).
+      specialize (IH _ _ H2).
       assumption.
   - destruct b.
     all: inversion sem_source; subst.
@@ -1037,7 +1037,7 @@ Proof.
     all: try apply IH1.
     all: try apply IH2.
     all: try constructor.
-    all: apply sig2T_eq_type in H1, H3, H4; subst.
+    all: apply sig2T_eq_type in H3, H4, H5; subst.
     + specialize (IH1 _ _ H2).
       assumption.
     + specialize (IH2 _ _ H2).

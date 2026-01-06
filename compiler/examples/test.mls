@@ -2,4 +2,3 @@ node test() returns (a: bool)
 let
   a = true;
 tel
-
