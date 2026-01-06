@@ -22,7 +22,7 @@
 %token TRUE FALSE
 %token SEMI_COLON COLON COMMA
 %token NODE RETURNS VAR
-%token BOOL INT VOID
+%token BOOL INT
 %token LET TEL EOF
 %token IF THEN ELSE
 %token PRE ARROW FBY
@@ -59,7 +59,6 @@ file:
 typ:
   | BOOL { (TBool, (extent_of_len 4 $endpos)) }
   | INT  { (TInt, (extent_of_len 3 $endpos)) }
-  | VOID { (TVoid, (extent_of_len 4 $endpos)) }
 
 local_vars:
   | id=ident COLON typ=typ SEMI_COLON

@@ -13,7 +13,6 @@ let pp_const fmt c =
 
 let pp_typ fmt typ =
   match typ with
-  | TVoid -> fprintf fmt "void"
   | TBool -> fprintf fmt "char"
   | TInt -> fprintf fmt "int"
 

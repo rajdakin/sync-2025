@@ -6,7 +6,6 @@ From Reactive.Datatypes Require Dict Stream.
 From Reactive.Props Require Import Identifier Sigma.
 
 Inductive type : Set :=
-  | TVoid
   | TBool
   | TInt
 .
@@ -60,7 +59,6 @@ Qed.
 Lemma forall_type_dec : forall (P : type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
 Proof using.
   intros P dec.
-  destruct (dec TVoid) as [Pvoid | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
   destruct (dec TBool) as [Pbool | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
   destruct (dec TInt)  as [Pint  | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
   left; intros []; assumption.
@@ -68,7 +66,6 @@ Defined.
 
 Definition type_eqb (x y: type): bool :=
   match x, y with
-    | TVoid, TVoid => true
     | TBool, TBool => true
     | TInt, TInt => true
     | _, _ => false

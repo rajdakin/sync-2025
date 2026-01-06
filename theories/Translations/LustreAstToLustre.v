@@ -112,7 +112,6 @@ end.
 
 Definition typecheck_exp {P : forall ty, Target.exp ty -> Prop} (loc: Result.location) (e: { ty & sig (P ty) }) (t: type):
     Result.t type (sig (P t)) := match e, t with
-  | existT _ TVoid (exist _ e H), TVoid => Result.Ok (exist _ e H)
   | existT _ TBool (exist _ e H), TBool => Result.Ok (exist _ e H)
   | existT _ TInt (exist _ e H), TInt => Result.Ok (exist _ e H)
   | existT _ ety _, _ => Result.Err [(loc, Result.BadType [t] ety)]
