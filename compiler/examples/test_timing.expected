@@ -1,3 +1,5 @@
+Test success
+
 struct s_add {
     int var_3;
 };

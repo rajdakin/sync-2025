@@ -370,30 +370,24 @@ Proof.
       constructor.
       apply IH.
       assumption.
-  - specialize (IH2 n).
-    destruct n as [| n].
-    + assert (timed_1 := timed_exp vname vid 0 e1).
-      destruct timed_1 as [timed_1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        2: constructor 2; exact err2.
-        constructor 1.
-        intros n' isless.
-        specialize (IH2 _ isless).
-        destruct n' as [| n'].
-        all: constructor.
-        all: assumption.
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact err1.
-        exact (err1 ++ err2).
-    + destruct IH2 as [IH2 | err2].
+  - destruct n as [| n].
+    + refine (Result.bind (Result.combine_prop (timed_exp vname vid 0 e1) (IH2 (S O))) _); clear IH1 IH2.
+      intros [timed_1 IH2].
+      constructor 1.
+      intros n' isless.
+      destruct n' as [| n'].
+      2: specialize (IH2 (S n') (le_n_S _ _ (le_0_n _))).
+      all: constructor.
+      all: assumption.
+    + specialize (IH2 n).
+      destruct IH2 as [IH2 | err2].
       2: constructor 2; exact err2.
       constructor 1.
       intros n' isless.
       destruct n' as [|n'].
       1: inversion isless.
       constructor.
-      apply IH2.
+      apply IH2, le_S, le_S_n.
       assumption.
 Defined.
 
