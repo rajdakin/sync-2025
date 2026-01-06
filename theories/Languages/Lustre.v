@@ -400,7 +400,11 @@ Inductive sem_exp (h: history) | : nat -> forall {ty}, exp ty -> value ty -> Pro
 .
 
 Definition sem_node (n: node) (h: history) : Prop :=
-  forall (i: ident) (ty: type) (e: exp ty) (s: Stream.t (value ty)), In (i, existT _ _ e) n.(n_body) -> h_maps_to i s h -> forall n, sem_exp h n e (Stream.nth n s).
+  forall (i: ident) (ty: type),
+  In (i, ty) n.(n_vars) ->
+    exists (s: Stream.t (value ty)),
+    h_maps_to i s h /\
+    (forall (e: exp ty), In (i, existT _ _ e) n.(n_body) -> forall n, sem_exp h n e (Stream.nth n s)).
 
 
 (** ** Properties *)

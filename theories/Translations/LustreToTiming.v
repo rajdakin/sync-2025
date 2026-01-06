@@ -44,10 +44,47 @@ Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
 Fixpoint eqs_to_raw (eqs: list Source.equation): list Target.raw_equation :=
   match eqs with
   | [] => []
-  | eq::eqs => match eq with
-    | (ident, existT _ ty e) => (ident, existT _ ty (expr_to_raw e))::(eqs_to_raw eqs)
-    end
+  | eq::eqs => (match eq with
+    | (ident, existT _ ty e) => (ident, existT _ ty (expr_to_raw e))
+    end)::(eqs_to_raw eqs)
   end.
+
+Lemma equation_conservation {ty} (i: ident) (e: Source.exp ty) (body: list Source.equation) :
+  In (i, existT _ ty e) body -> In (i, existT _ ty (expr_to_raw e)) (eqs_to_raw body).
+Proof.
+  intro inbody.
+  induction body as [| eq body IH].
+  1: inversion inbody.
+  simpl in inbody.
+  destruct inbody as [iseq | inbody].
+  2: specialize (IH inbody).
+  2: right; assumption.
+  clear IH.
+  rewrite iseq.
+  simpl.
+  left.
+  reflexivity.
+Defined.
+
+Lemma equation_conservation_inv {ty} (i: ident) (raw_e: Target.raw_exp ty) (body: list Source.equation) :
+  In (i, existT _ ty raw_e) (eqs_to_raw body) -> exists e, In (i, existT _ ty e) body /\ raw_e = expr_to_raw e.
+Proof.
+  intro inraw.
+  induction body as [| eq body IH].
+  1: inversion inraw.
+  simpl in inraw.
+  destruct inraw as [iseq | inraw].
+  2: specialize (IH inraw).
+  2: destruct IH as [e [inbody israw]].
+  2: exists e; split; [right|]; assumption.
+  clear IH.
+  destruct eq as [i' [ty' e]].
+  injection iseq as -> -> iseq.
+  apply sig2T_eq_type in iseq.
+  subst.
+  exists e.
+  split; [left|]; reflexivity.
+Defined.
 
 Definition translate_raw {ty} (e: Target.raw_exp ty) (seed: ident): (
     Target.comb_exp ty (* init *)
@@ -957,6 +994,175 @@ Proof.
   exact (translate_raw_to_node raw_node).
 Defined.
 
+Property raw_expr_complete {ty} (h: history) (t: nat) (e: Source.exp ty) (v: value ty):
+  Source.sem_exp h t e v -> Target.sem_raw_exp h t (expr_to_raw e) v.
+Proof.
+  generalize dependent t.
+  induction e as [loc ty c|loc b | loc tyin tyout u e IH | loc ty1 ty2 tyout b e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3].
+  all: intros t sem_source; simpl.
+  - inversion sem_source; subst.
+    apply sig2T_eq_type in H3; subst.
+    apply sig2T_eq_type in H4.
+    rewrite <- H4.
+    constructor.
+  - inversion sem_source; subst.
+    apply sig2T_eq_type in H5; subst.
+    constructor.
+    assumption.
+  - destruct u.
+    all: inversion sem_source; subst.
+    1-3: do 2 apply sig2T_eq_type in H4.
+    1-3: apply sig2T_eq_type in H5, H6.
+    1-3: subst.
+    1-3: inversion H7.
+    1-2: apply sig2T_eq_type in H, H0; subst.
+    1-2: specialize (IH vin _ H3).
+    1-2: econstructor.
+    1,3: apply IH.
+    1-2: constructor.
+    + apply sig2T_eq_type in H1, H2; subst.
+      constructor.
+      specialize (IH _ _ H3).
+      assumption.
+  - destruct b.
+    all: inversion sem_source; subst.
+    1-14: do 3 apply sig2T_eq_type in H5.
+    1-14: apply sig2T_eq_type in H6, H7, H8.
+    1-14: subst.
+    1-14: inversion H10.
+    1-13: apply sig2T_eq_type in H, H0, H1; subst.
+    1-13: specialize (IH1 _ _ H4).
+    1-13: specialize (IH2 _ _ H9).
+    1-13: econstructor.
+    all: try apply IH1.
+    all: try apply IH2.
+    all: try constructor.
+    all: apply sig2T_eq_type in H1, H3, H4; subst.
+    + specialize (IH1 _ _ H2).
+      assumption.
+    + specialize (IH2 _ _ H2).
+      assumption.
+  - inversion sem_source.
+    apply sig2T_eq_type in H1, H5, H6; subst.
+    specialize (IH1 _ _ H4).
+    specialize (IH2 _ _ H7).
+    specialize (IH3 _ _ H8).
+    constructor; assumption.
+Qed.
+
+Property raw_expr_correct {ty} (h: history) (t: nat) (e: Source.exp ty) (v: value ty):
+  Target.sem_raw_exp h t (expr_to_raw e) v -> Source.sem_exp h t e v.
+Proof.
+  generalize dependent t.
+  induction e as [loc ty c|loc b | loc tyin tyout u e IH | loc ty1 ty2 tyout b e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3].
+  all: intros t sem_target; simpl.
+  - inversion sem_target; subst.
+    apply sig2T_eq_type in H3, H4; subst.
+    constructor.
+  - inversion sem_target; subst.
+    apply sig2T_eq_type in H5; subst.
+    constructor.
+    assumption.
+  - destruct u.
+    all: inversion sem_target; subst.
+    1-2: do 2 apply sig2T_eq_type in H4.
+    1-2: apply sig2T_eq_type in H5, H6.
+    1-2: subst.
+    1-2: specialize (IH _ _ H3).
+    1-2: inversion H7.
+    1-2: apply sig2T_eq_type in H, H0; subst.
+    1-2: econstructor.
+    1,3: apply IH.
+    1,2: constructor.
+
+    apply sig2T_eq_type in H3, H4; subst.
+    specialize (IH _ _ H2).
+    constructor.
+    assumption.
+  - destruct b.
+    all: inversion sem_target; subst.
+    1-13: do 3 apply sig2T_eq_type in H5.
+    1-13: apply sig2T_eq_type in H6, H7, H8.
+    1-13: subst.
+    1-13: specialize (IH1 _ _ H4).
+    1-13: specialize (IH2 _ _ H9).
+    1-13: inversion H10.
+    1-13: apply sig2T_eq_type in H, H0, H1; subst.
+    1-13: econstructor.
+    all: try apply IH1.
+    all: try apply IH2.
+    all: try constructor.
+    all: apply sig2T_eq_type in H3, H4, H5; subst.
+    + apply IH1.
+      assumption.
+    + apply IH2.
+      assumption.
+  - inversion sem_target.
+    apply sig2T_eq_type in H1, H5, H6.
+    subst.
+    specialize (IH1 _ _ H4).
+    specialize (IH2 _ _ H7).
+    specialize (IH3 _ _ H8).
+    constructor; assumption.
+Qed.
+
+Theorem raw_translation_complete (n: Target.raw_node) (n0: Source.node) (h: history):
+  translate_to_raw_node n0 = Result.Ok n -> Source.sem_node n0 h -> Target.sem_raw_node n h.
+Proof.
+  intro translated.
+  unfold translate_to_raw_node in translated.
+  destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
+  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  2: inversion translated.
+  apply Result.ok_eq in translated.
+  rewrite <- translated.
+  clear translated.
+  unfold Source.sem_node, Source.n_vars, Source.n_in, Source.n_out, Source.n_locals, Source.n_body, Target.sem_raw_node, Target.rn_vars, Target.rn_in, Target.rn_out, Target.rn_locals, Target.rn_body.
+
+  intro sem_source.
+  intros ident ty is_var.
+  specialize (sem_source ident ty is_var).
+  destruct sem_source as [s [mapped sem_source]].
+  exists s.
+  split.
+  1: exact mapped.
+  intros raw_e is_eq t.
+
+  assert (in_body := equation_conservation_inv ident raw_e n0_body is_eq).
+  destruct in_body as [e [in_body israw]].
+  specialize (sem_source e in_body t).
+  rewrite israw.
+  apply raw_expr_complete.
+  assumption.
+Qed.
+
+Theorem raw_translation_correct (n: Target.raw_node) (n0: Source.node) (h: history):
+  translate_to_raw_node n0 = Result.Ok n -> Target.sem_raw_node n h -> Source.sem_node n0 h.
+Proof.
+  intro translated.
+  unfold translate_to_raw_node in translated.
+  destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
+  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  2: inversion translated.
+  apply Result.ok_eq in translated.
+  rewrite <- translated.
+  clear translated.
+  unfold Source.sem_node, Source.n_vars, Source.n_in, Source.n_out, Source.n_locals, Source.n_body, Target.sem_raw_node, Target.rn_vars, Target.rn_in, Target.rn_out, Target.rn_locals, Target.rn_body.
+
+  intro sem_target.
+  intros ident ty is_var.
+  specialize (sem_target ident ty is_var).
+  destruct sem_target as [s [mapped sem_target]].
+  exists s.
+  split.
+  1: exact mapped.
+  intros e is_eq t.
+
+  assert (in_body := equation_conservation ident e n0_body is_eq).
+  specialize (sem_target (expr_to_raw e) in_body t).
+  apply raw_expr_correct.
+  assumption.
+Qed.
 
 (* Semantics preservation *)
 (* TODO *)
