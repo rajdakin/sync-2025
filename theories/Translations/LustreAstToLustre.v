@@ -87,15 +87,13 @@ Record common_temp : Type := {
   Henv: forall x t, Dict.maps_to x t env <-> In (x, t) (n_in ++ n_out ++ n_locals);
 }.
 
-Definition translate_unop {P : forall ty, Target.exp ty -> Prop} (op: Source.unop) (e: { ty & sig (P ty)}): { tin & { tout & Target.unop tin tout } } := match op with
+Definition translate_unop (op: Source.unop) (ty: type): { tin & { tout & Target.unop tin tout } } := match op with
   | Source.Uop_neg => existT _ _ (existT _ _ Target.Uop_neg)
   | Source.Uop_not => existT _ _ (existT _ _ Target.Uop_not)
-  | Source.Uop_pre => match e with
-    | existT _ ty _ =>  existT _ _ (existT _ _ (@Target.Uop_pre ty))
-  end
+  | Source.Uop_pre => existT _ _ (existT _ _ (@Target.Uop_pre ty))
 end.
 
-Definition translate_binop {P : forall ty, Target.exp ty -> Prop} (op: Source.binop) (e: { ty & sig (P ty)}): { tin1 & { tin2 & { tout & Target.binop tin1 tin2 tout } } } := match op with
+Definition translate_binop (op: Source.binop) (ty: type): { tin1 & { tin2 & { tout & Target.binop tin1 tin2 tout } } } := match op with
   | Source.Bop_and => existT _ _ (existT _ _ (existT _ _ Target.Bop_and))
   | Source.Bop_or => existT _ _ (existT _ _ (existT _ _ Target.Bop_or))
   | Source.Bop_xor => existT _ _ (existT _ _ (existT _ _ Target.Bop_xor))
@@ -109,11 +107,7 @@ Definition translate_binop {P : forall ty, Target.exp ty -> Prop} (op: Source.bi
   | Source.Bop_lt => existT _ _ (existT _ _ (existT _ _ Target.Bop_lt))
   | Source.Bop_ge => existT _ _ (existT _ _ (existT _ _ Target.Bop_ge))
   | Source.Bop_gt => existT _ _ (existT _ _ (existT _ _ Target.Bop_gt))
-  | Source.Bop_arrow => match e with
-    | existT _ ty _ => existT _ _ (existT _ _ (existT _ _ (@Target.Bop_arrow ty)))
-  end
-  (* Handled separately, this is a placeholder *)
-  | Source.Bop_fby => existT _ _ (existT _ _ (existT _ _ Target.Bop_and))
+  | Source.Bop_arrow => existT _ _ (existT _ _ (existT _ _ (@Target.Bop_arrow ty)))
 end.
 
 Definition typecheck_exp {P : forall ty, Target.exp ty -> Prop} (loc: Result.location) (e: { ty & sig (P ty) }) (t: type):
@@ -143,7 +137,7 @@ Proof.
     exact eqty.
   - refine (Result.bind (check_exp temp e) _).
     intros e'.
-    destruct (translate_unop op e') as [ tin [ tout top ]].
+    destruct (translate_unop op (projT1 e')) as [ tin [ tout top ]].
     refine (Result.bind (typecheck_exp l e' tin) _).
     intros [ e'' He ].
     refine (Result.Ok _); exists tout, (Target.EUnop l top e'').
@@ -152,25 +146,14 @@ Proof.
     intros e1'.
     refine (Result.bind (check_exp temp e2) _).
     intros e2'.
-    destruct op eqn: eqop.
-    15: {
-      destruct (translate_binop Source.Bop_arrow e1') as [ tin1 [ tin2 [ tout arrow ]]].
-      refine (Result.bind (typecheck_exp l e1' tin1) _).
-      intros [ e1'' He1 ].
-      refine (Result.bind (typecheck_exp l e2' tin2) _).
-      intros [ e2'' He2 ].
-      refine (Result.Ok _); exists tout, (Target.EBinop l arrow e1'' (Target.EUnop l Target.Uop_pre e2'')).
-      cbn; rewrite Target.var_of_exp_aux_eq.
-      apply incl_app; assumption.
-    }
-    all: destruct (translate_binop op e1') as [ tin1 [ tin2 [ tout top ]]].
-    all: refine (Result.bind (typecheck_exp l e1' tin1) _).
-    all: intros [ e1'' He1 ].
-    all: refine (Result.bind (typecheck_exp l e2' tin2) _).
-    all: intros [ e2'' He2 ].
-    all: refine (Result.Ok _); exists tout, (Target.EBinop l top e1'' e2'').
-    all: cbn; rewrite Target.var_of_exp_aux_eq.
-    all: apply incl_app; assumption.
+    destruct (translate_binop op (projT1 e1')) as [ tin1 [ tin2 [ tout top ]]].
+    refine (Result.bind (typecheck_exp l e1' tin1) _).
+    intros [ e1'' He1 ].
+    refine (Result.bind (typecheck_exp l e2' tin2) _).
+    intros [ e2'' He2 ].
+    refine (Result.Ok _); exists tout, (Target.EBinop l top e1'' e2'').
+    cbn; rewrite Target.var_of_exp_aux_eq.
+    apply incl_app; assumption.
   - refine (Result.bind (check_exp temp e1) _).
     intros e1'.
     refine (Result.bind (typecheck_exp l e1' TBool) _).
