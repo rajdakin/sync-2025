@@ -2371,3 +2371,164 @@ Proof using.
   apply has_cycle_accessible, accessible_iff_witness.
   exists (l2 ++ [r2]); split; [rewrite length_app, PeanoNat.Nat.add_comm; exact eq_refl|exact Hacc].
 Qed.
+
+Lemma translate_node_same_vars (source: Source.node) (target: Target.node_ordered):
+  translate_node source = Result.Ok target -> Source.n_vars source = Source.n_vars (Target.node_ordered_is_node target).
+Proof using.
+  intro Htarget.
+  unfold translate_node in Htarget.
+
+  remember (to_graph_prop1i source) as Hprop1i eqn:a; clear a.
+  remember (to_graph_prop2i source) as Hprop2i eqn:a; clear a.
+  remember (to_graph_prop1s source) as Hprop1s eqn:a; clear a.
+  remember (to_graph_prop2s source) as Hprop2s eqn:a; clear a.
+  remember (translate_nodup_init source) as Hnodupi eqn:a; clear a.
+  remember (translate_nodup_step source) as Hnodups eqn:a; clear a.
+  remember (check_order source) as check_order eqn:eqcheckorder.
+  remember (translate_eq_nodetographi source) as Hn2gi eqn:a; clear a.
+  remember (translate_eq_nodetographs source) as Hn2gs eqn:a; clear a.
+
+  destruct source as [l name nin out loc pre init step ? ? ? initass stepass initex stepex preex vars_unique seed Hseed].
+  cbn in *.
+  revert Htarget.
+  
+  pose (excl_listi := map fst nin); fold excl_listi.
+  remember (eq_refl (node_to_graph excl_listi init)) as Heqgi eqn:eqHeqgi; clear eqHeqgi; revert Heqgi.
+  pose (x := node_to_graph excl_listi init).
+  refine (_ : forall Heqgi : x = node_to_graph _ _, (let (graphi, index_tablei) as y return y = node_to_graph _ _ -> _ := x in _) Heqgi = _ -> _).
+  destruct x as [graphi index_tablei]; cbn; intros Heqgi.
+  
+  pose (excl_lists := excl_listi ++ map (fun eq => fst (fst eq)) pre); fold excl_lists.
+  remember (eq_refl (node_to_graph excl_lists step)) as Heqgs eqn:eqHeqgs; clear eqHeqgs; revert Heqgs.
+  pose (x := node_to_graph excl_lists step).
+  refine (_ : forall Heqgs : x = node_to_graph _ _, (let (graphs, index_tables) as y return y = node_to_graph _ _ -> _ := x in _) Heqgs = _ -> _).
+  destruct x as [graphs index_tables]; cbn; intros Heqgs.
+  
+  remember (node_to_graph_prop
+      excl_listi
+      init
+      Hprop1i
+      Hprop2i
+      graphi
+      index_tablei
+      Heqgi) as propsi eqn:a; clear a.
+  remember (node_to_graph_prop
+      excl_lists
+      step
+      Hprop1s
+      Hprop2s
+      graphs
+      index_tables
+      Heqgs) as propss eqn:a; clear a.
+  pose (ordi := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propsi)
+    (Himap:=topological_sort_prop2 propsi) propsi (ord_graph:=ord_graph)).
+  pose (ords := fun ord_graph => ord_graph_to_order (loc:=l) (Hg:=topological_sort_prop1 propss)
+    (Himap:=topological_sort_prop2 propss) propss (ord_graph:=ord_graph)).
+  pose (reordi := fun ord_graphi eqgraphi => reorder_list init (map_in _ (fun v Hv => Hashtable.find _ v (ordi ord_graphi eqgraphi v Hv)))).
+  pose (reords := fun ord_graphs eqgraphs => reorder_list step (map_in _ (fun v Hv => Hashtable.find _ v (ords ord_graphs eqgraphs v Hv)))).
+  pose (permi := fun ord_graphi eqgraphi => translate_permutation _ l _ _ _ propsi ord_graphi
+    (topological_sort_prop1 propsi) (topological_sort_prop2 propsi) eqgraphi Hnodupi).
+  pose (perms := fun ord_graphs eqgraphs => translate_permutation _ l _ _ _ propss ord_graphs
+    (topological_sort_prop1 propss) (topological_sort_prop2 propss) eqgraphs Hnodups).
+  pose (n2gi := fun ord_graphi eqgraphi => Hn2gi _ _ propsi ord_graphi eqgraphi).
+  pose (n2gs := fun ord_graphs eqgraphs => Hn2gs _ _ propss ord_graphs eqgraphs).
+  pose (reordpi := fun ord_graphi eqgraphi => @reorder_prop _ _ l _ (topological_sort_prop1 propsi) _ (topological_sort_prop2 propsi) ord_graphi propsi eqgraphi).
+  pose (reordps := fun ord_graphs eqgraphs => @reorder_prop _ _ l _ (topological_sort_prop1 propss) _ (topological_sort_prop2 propss) ord_graphs propss eqgraphs).
+  refine (_ :
+    do ord_graphi remember eqgraphi <- _;
+    do ord_graphs remember eqgraphs <- _;
+    Result.Ok (check_order
+      (reordi _ eqgraphi (reordpi _ eqgraphi)) (reords _ eqgraphs (reordps _ eqgraphs))
+      (permi _ eqgraphi) (perms _ eqgraphs)
+      (n2gi _ eqgraphi) (n2gs _ eqgraphs)
+    ) = Result.Ok target -> _
+  ).
+  generalize dependent n2gs; generalize dependent n2gi; generalize dependent perms; generalize dependent permi.
+  refine (_ : forall
+    (permi : forall ord_graphi eqgraphi, Permutation _ (reordi _ eqgraphi (reordpi _ eqgraphi)))
+    (perms : forall ord_graphs eqgraphs, Permutation _ (reords _ eqgraphs (reordps _ eqgraphs)))
+    (n2gi : forall ord_graphi eqgraphi, Ordered.t (Target.equations_to_dag (reordi _ eqgraphi (reordpi _ eqgraphi)) _))
+    (n2gs : forall ord_graphs eqgraphs, Ordered.t (Target.equations_to_dag (reords _ eqgraphs (reordps _ eqgraphs)) _)), _).
+  generalize dependent reordps; generalize dependent reordpi.
+  refine (_ : forall
+    (reordpi : forall ord_graphi eqgraphi, incl (map_in _ (fun v Hv => Hashtable.find _ v (ordi _ eqgraphi v Hv))) _)
+    (reordps : forall ord_graphs eqgraphs, incl (map_in _ (fun v Hv => Hashtable.find _ v (ords _ eqgraphs v Hv))) _), _).
+  generalize dependent reords; generalize dependent reordi; generalize dependent ords; generalize dependent ordi.
+  intros ordi ords reordi reords reordpi reordps permi perms n2gi n2gs.
+  
+  unfold Result.strong_bind.
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphi eqn:a; clear a; revert eqgraphi; pose (x := v) end.
+  refine (_ : forall eqgraphi : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphi = _ -> _).
+  destruct x as [x0|msg]; [intros eqgraphi|discriminate 2].
+  match goal with |- match ?v with _ => _ end ?e = _ -> _ => remember e as eqgraphs eqn:a; clear a; revert eqgraphs; pose (x := v) end.
+  refine (_ : forall eqgraphs : topological_sort _ _ _ _ _ = x, match x as y return topological_sort _ _ _ _ _ = y -> _ with Result.Ok x => _ | Result.Err e => _ end eqgraphs = _ -> _).
+  destruct x as [x1|msg]; [intros eqgraphs|discriminate 2].
+  
+  intros [=<-]; cbn.
+  subst check_order; cbn.
+  reflexivity.
+Qed.
+
+Theorem sem_node_complete (source: Source.node) (ordered: Target.node_ordered) (h: history):
+  translate_node source = Result.Ok ordered -> Source.sem_node source h -> Source.sem_node ordered.(Target.node_ordered_is_node) h.
+Proof.
+  unfold Source.sem_node.
+  intro translated.
+  destruct (translate_node_correct _ _ translated) as [permutation_init [permutation_step same_pre]].
+  intros sem_source i ty.
+  specialize (sem_source i ty).
+  destruct sem_source as [sem_source sem_pre].
+  rewrite <- (translate_node_same_vars _ _ translated).
+  split.
+  - intro invar.
+    specialize (sem_source invar).
+    destruct sem_source as [s [ismapped [sem0 semSn]]].
+    exists s.
+    split.
+    1: assumption.
+    split.
+    all: intros e isin.
+    1: rewrite <- permutation_init in isin.
+    2: rewrite <- permutation_step in isin.
+    1: specialize (sem0 _ isin).
+    2: specialize (semSn _ isin).
+    all: assumption.
+  - rewrite <- same_pre.
+    intros j inpre.
+    specialize (sem_pre _ inpre).
+    destruct sem_pre as [s [ismapped sem_pre]].
+    exists s.
+    split; assumption.
+Qed.
+
+Theorem sem_node_correct (source: Source.node) (ordered: Target.node_ordered) (h: history):
+  translate_node source = Result.Ok ordered -> Source.sem_node ordered.(Target.node_ordered_is_node) h -> Source.sem_node source h.
+Proof.
+  unfold Source.sem_node.
+  intro translated.
+  destruct (translate_node_correct _ _ translated) as [permutation_init [permutation_step same_pre]].
+  intros sem_target i ty.
+  specialize (sem_target i ty).
+  destruct sem_target as [sem_target sem_pre].
+  rewrite <- (translate_node_same_vars _ _ translated) in sem_target.
+  split.
+  - intro invar.
+    specialize (sem_target invar).
+    destruct sem_target as [s [ismapped [sem0 semSn]]].
+    exists s.
+    split.
+    1: assumption.
+    split.
+    all: intros e isin.
+    1: rewrite permutation_init in isin.
+    2: rewrite permutation_step in isin.
+    1: specialize (sem0 _ isin).
+    2: specialize (semSn _ isin).
+    all: assumption.
+  - rewrite same_pre.
+    intros j inpre.
+    specialize (sem_pre _ inpre).
+    destruct sem_pre as [s [ismapped sem_pre]].
+    exists s.
+    split; assumption.
+Qed.
