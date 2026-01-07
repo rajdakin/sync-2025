@@ -25,6 +25,19 @@
 )
 
 (rule
+  (deps (source_tree negative_test.mls))
+  (target negative_test.output)
+  (action
+    (run ../main.exe -test-mode negative_test.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree negative_test.expected) negative_test.output)
+  (action (diff negative_test.expected negative_test.output))
+)
+
+(rule
   (deps (source_tree test.mls))
   (target test.output)
   (action

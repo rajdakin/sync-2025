@@ -1,0 +1,4 @@
+node t() returns (x: int)
+let
+  x = -5 fby -6;
+tel
