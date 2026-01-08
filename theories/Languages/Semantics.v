@@ -189,6 +189,22 @@ Proof.
   all: intro; contradiction.
 Defined.
 
+Lemma vbool_dec (v: value TBool) : {v = VBool true} + {v = VBool false}.
+Proof.
+  destruct (value_inv v) as [[b eqt] | [z eqt]].
+  - destruct b.
+    1: left.
+    2: right.
+    all: destruct eqt as [eqt eqq].
+    all: rewrite eqq.
+    all: subst.
+    all: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl).
+    all: reflexivity.
+  - exfalso.
+    destruct eqt.
+    discriminate.
+Defined.
+
 Definition history := Dict.t {ty & Stream.t (value ty)}.
 Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
   | Some (existT _ ty' _) => ty' = ty
@@ -267,6 +283,35 @@ Proof.
   rewrite <- (Dict.equivalence_is_eq h1 h2).
   unfold Dict.equivalence.
   split; assumption.
+Qed.
+
+(* Imp semantics *)
+
+Definition stack := Dict.t (sigT value).
+
+Definition project_time (h: history) (t: nat) : stack :=
+  Dict.map (
+    fun s => match s with
+    | existT _ _ s => existT _ _ (Stream.nth t s)
+    end
+  ) h.
+
+Lemma maps_proj {ty} (i: ident) (t: nat) (h: history) (v: value ty):
+  Dict.maps_to i (existT _ _ v) (project_time h t) ->
+  exists s, Dict.maps_to i (existT _ _ s) h /\ Stream.nth t s = v.
+Proof.
+  unfold Dict.maps_to.
+  unfold project_time.
+  rewrite <- Dict.find_map.
+  unfold option_map.
+  destruct (Dict.find i h) as [[ty' s]|].
+  2: discriminate.
+  intros [= -> H].
+  apply sig2T_eq_type in H.
+  exists s.
+  split.
+  1: reflexivity.
+  assumption.
 Qed.
 
 

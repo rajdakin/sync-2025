@@ -38,6 +38,17 @@ Definition remove {A: Type} (i: nat) (d: t A): t A := {|
   d_sorted := Sorted.remove_sorted i d.(d_elements) d.(d_sorted);
 |}.
 
+Definition fold {A B: Type} (f: t A -> (nat * B) -> t A) (d1: t A) (d2: t B): t A :=
+  List.fold_left f d2.(d_elements) d1.
+
+Definition union {A} (d1 d2: t A): t A :=
+  fold (fun d '(i, v) => add i v d) d1 d2.
+
+Definition filter {A: Type} (elems: list nat) (d: t A): t A := {|
+  d_elements := Sorted.filter elems d.(d_elements);
+  d_sorted := Sorted.filter_sorted elems d.(d_elements) d.(d_sorted);
+|}.
+
 
 (** ** Properties *)
 
@@ -143,6 +154,22 @@ Proof.
   now apply Sorted.cons in Hsort.
 Qed.
 
+Lemma find_map {A B: Type} (f: A -> B) (i: nat) (d: t A):
+  option_map f (find i d) = find i (map f d).
+Proof.
+  unfold find.
+  destruct d as [elems sorted].
+  simpl.
+  induction elems as [|[j v] elems IH].
+  1: reflexivity.
+  simpl.
+  destruct (i =? j).
+  1: reflexivity.
+  apply IH.
+  apply Sorted.cons in sorted.
+  exact sorted.
+Qed.
+
 (** *** Remove *)
 
 Lemma removed_element_not_in {A: Type} (i: nat) (d: t A):
@@ -233,7 +260,7 @@ Proof.
       assumption.
 Qed.
 
-(** *** No dupliacte *)
+(** *** No duplicate *)
 
 Theorem no_dup_left_handside {A: Type} (d: t A):
   NoDup (List.map fst d.(d_elements)).
@@ -482,4 +509,45 @@ Proof.
   split.
   - now apply incl_add_remove_l.
   - now apply incl_add_remove_r.
+Qed.
+
+
+(* Union *)
+Lemma union_maps_d2 {A} (i: nat) (v: A) (d1 d2: t A):
+  maps_to i v d2 -> maps_to i v (union d1 d2).
+Proof.
+  destruct d2 as [elems sorted_elems].
+  unfold union, fold.
+  simpl.
+  unfold maps_to at 1.
+  unfold find.
+  simpl.
+  induction elems as [| (j, vv) elems IH] in d1, sorted_elems |- *.
+  1: inversion 1.
+  simpl.
+  destruct (i =? j) eqn: eqq.
+  - injection 1.
+    intros <-.
+    apply PeanoNat.Nat.eqb_eq in eqq.
+    subst.
+    clear IH H.
+    apply Sorted.not_twice in sorted_elems.
+    remember (add j vv d1) as d2 eqn:eqd.
+    assert (vd2 : maps_to j vv d2) by (subst; apply maps_to_last_added).
+    clear - vd2 sorted_elems.
+    revert d2 vd2.
+    induction elems as [|(k, b) elems IH].
+    all: intros d2 vd2.
+    1: apply vd2.
+    simpl.
+    simpl in sorted_elems.
+    apply Decidable.not_or in sorted_elems.
+    destruct sorted_elems as [diff sorted_elems].
+    specialize (IH sorted_elems).
+    apply IH.
+    apply maps_to_add.
+    1: assumption.
+    congruence.
+  - intro found.
+    apply (IH (add j vv d1) (Sorted.cons _ _ sorted_elems) found).
 Qed.

@@ -56,6 +56,18 @@ Fixpoint remove {A: Type} (i: nat) (l: list (nat * A)): list (nat * A) :=
       else (j, x) :: remove i p
   end.
 
+Fixpoint index_inb (i: nat) (l: list nat): bool :=
+  match l with
+  | [] => false
+  | j :: p =>
+    if i =? j then true else index_inb i p
+  end.
+
+Fixpoint filter {A: Type} (elems: list nat) (l: list (nat * A)): list (nat * A) :=
+  match l with
+  | [] => []
+  | (j, x) :: p => if index_inb j elems then (j, x) :: (filter elems p) else filter elems p
+  end.
 
 (** ** Proofs *)
 
@@ -339,6 +351,62 @@ Proof.
   - constructor; [ assumption |].
     now apply fst_smaller_than_snd in H.
 Defined.
+
+(** *** Filter *)
+Lemma in_filter {A: Type} (elems: list nat) (l: list (nat * A)) (v: nat * A):
+  In v (filter elems l) -> In v l.
+Proof.
+  revert v elems.
+  induction l as [| (j, a) l IH].
+  all: intros v elem.
+  1: tauto.
+  simpl.
+  destruct (index_inb j elem).
+  1: simpl.
+  1: destruct 1 as [|].
+  1: left; assumption.
+  1: right; apply (IH v elem H).
+  intro inv.
+  right.
+  apply (IH v elem inv).
+Qed.
+
+Lemma filter_sorted {A: Type} (elems: list nat) (l: list (nat * A)):
+  t l -> t (filter elems l).
+Proof.
+  intros H.
+
+  induction l as [| (j, x) l IH].
+  1: constructor.
+
+  apply cons in H as Hinner; simpl.
+  specialize (IH Hinner).
+
+  destruct (index_inb j elems).
+  2: assumption.
+  destruct (filter elems l) eqn: eqfilt.
+  1: constructor.
+  constructor.
+  1: assumption.
+  destruct p as [jj].
+  assert (isinl : In (jj, a) l).
+  {
+    apply (in_filter elems).
+    rewrite eqfilt.
+    left.
+    reflexivity.
+  }
+  clear - H isinl.
+  induction l.
+  1: contradiction.
+  specialize (IHl (cons_cons _ _ _ H)).
+  simpl in isinl.
+  destruct isinl as [iseq | isinl].
+  2: apply (IHl isinl).
+  inversion H; subst.
+  assumption.
+Qed.
+
 
 (** *** Map *)
 

@@ -18,7 +18,9 @@ Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop ty to
   end.
 
 Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
-    match op with Source.Source.Bop_and | Source.Source.Bop_or => False | _ => True end ->
+    match op with
+    | Source.Source.Bop_and | Source.Source.Bop_or => False
+    | _ => True end ->
     Target.binop ty1 ty2 tout :=
   match op with
   | Source.Source.Bop_and => fun f => False_rect _ f
@@ -42,7 +44,9 @@ Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp ty :=
   | Source.Source.EVar _ b => Target.EVar b
   | Source.Source.EUnop _ op e => Target.EUnop (translate_unop op) (translate_exp e)
   | Source.Source.EBinop _ op e1 e2 =>
-      (match op in Source.Source.binop ty1 ty2 tout return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout with
+      (match op in Source.Source.binop ty1 ty2 tout
+      return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout
+      with
       | Source.Source.Bop_and => fun e1 e2 => Target.EBAnd (translate_exp e1) (translate_exp e2)
       | Source.Source.Bop_or => fun e1 e2 => Target.EBOr (translate_exp e1) (translate_exp e2)
       | op => fun e1 e2 => Target.EBinop (translate_binop op I) (translate_exp e1) (translate_exp e2)
@@ -57,8 +61,9 @@ Definition translate_node_body (stmt: Target.stmt) (body: list Source.equation):
   fold_right (fun x acc => Target.SSeq acc (translate_equation x)) stmt body.
 
 Definition translate_node_init (init: list Source.equation): Target.stmt := translate_node_body Target.SNop init.
-Definition translate_node_step (pre: list (binder * ident)) (init: list Source.equation): Target.stmt :=
-  translate_node_body (fold_right (fun x acc => Target.SSeq acc (Target.SAssign (fst x) (Target.EVar (snd x, snd (fst x))))) Target.SNop pre) init.
+
+Definition translate_node_step (pre: list (binder * ident)) (step: list Source.equation): Target.stmt :=
+  translate_node_body (fold_right (fun x acc => Target.SSeq acc (Target.SAssign (fst x) (Target.EVar (snd x, snd (fst x))))) Target.SNop pre) step.
 
 Lemma lustre_assignment_is_substmt (name: ident) (ty: type) (exp: Source.exp ty):
   forall stmt body,
@@ -138,118 +143,53 @@ Defined.
 
 (** Lemmas *)
 
-(* Lemma correctness_exp (h: history) {ty} (e: Source.exp ty) (out: value ty):
-  Source.Source.sem_exp h e out ->
-    Target.sem_exp h (translate_exp e) out.
+Lemma correctness_exp (h: history) (t: nat) {ty} (e: Source.exp ty) (out: value ty):
+  Source.sem_exp h t e out -> Target.sem_exp (project_time h t) (translate_exp e) out.
 Proof.
-  induction 1 as [| | |h loc ty1 ty2 tout op e1 e2 v1 v2 H1 IH1 H2 IH2|].
+  induction 1 as [ty c loc|tyin tyout op e vin vout sem_e sem_target_e sem_op loc | ty1 ty2 tyout op e1 e2 v1 v2 vout sem_e1 sem_target_e1 sem_e2 sem_target_e2 sem_op loc | ty e1 e2 e3 vb v1 v2 sem_e1 target_sem_e1 sem_e2 target_sem_e2 sem_e3 target_sem_e3|].
 
   - (* EConst *)
     apply Target.SeConst.
+  
+  - (* EUnop *)
+    simpl.
+    apply (Target.SeUnop _ _ _ _ _ sem_target_e).
+    destruct op.
+    all: simpl; inversion sem_op.
+    all: apply sig2T_eq_type in H, H0; subst.
+    all: constructor.
+  
+  - (* EBinop *)
+    destruct op.
+    all: simpl.
+    3-13: apply (Target.SeBinop _ _ _ _ _ _ _ sem_target_e1 sem_target_e2).
+    3-13: inversion sem_op.
+    3-13: apply sig2T_eq_type in H, H0, H1; subst.
+    3-13: constructor.
+    1-2: destruct (vbool_dec v1), (vbool_dec v2); subst.
+    all: inversion sem_op.
+    all: apply sig2T_eq_type in H, H0, H1; subst.
+    all: simpl in sem_op.
+    all: simpl.
+    1-2: apply (Target.SeBAndConstT _ _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBAndConstF _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBOrConstT _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBOrConstF _ _ _ _ sem_target_e1).
+    all: assumption.
+
+  - (* EIfte*)
+    simpl.
+    constructor.
+    all: assumption.
 
   - (* EVar *)
     apply Target.SeVar with (b := b); simpl.
 
     exact (Dict.maps_to_map _ _ _ _ H).
+Qed.
 
-  - (* EUnop *)
-    simpl.
-    apply Target.SeUnop.
-    assumption.
-
-  - (* EBinop *)
-    simpl.
-
-    destruct op; try solve [apply Target.SeBinop; assumption].
-    all: clear H1 H2.
-    all: remember (translate_history h) as th eqn:eqh.
-    all: remember (translate_exp e1) as te1 eqn:eqe1.
-    all: remember (translate_exp e2) as te2 eqn:eqe2.
-    all: remember (translate_value v1) as tv1 eqn:eqv1.
-    all: remember (translate_value v2) as tv2 eqn:eqv2.
-    all: clear h e1 e2 v1 v2 eqh eqe1 eqe2 eqv1 eqv2.
-    1,2: destruct (Target.value_inv tv1) as [ [ [ [ [
-      (c' & ->) | (tin & op & v1' & ->) ] | (e & v1' & v2' & ->) ] | (e & v1' & v2' & ->) ] |
-      (ty1 & ty2 & op & v1' & v2' & ->) ] | (eb & et & ef & ->) ].
-    3,4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    2-6: apply Target.SeBAndDefer; try assumption; discriminate.
-    4,5: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    3-7: apply Target.SeBOrDefer; try assumption; discriminate.
-    1,2: destruct (const_inv c') as [ [ (e & [|] & ->) | (f & _) ] | (f & _) ]; try discriminate f.
-    1-4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    1: apply Target.SeBAndConstT; assumption.
-    1: apply Target.SeBAndConstF; assumption.
-    1: apply Target.SeBOrConstT; assumption.
-    1: apply Target.SeBOrConstF; assumption.
-
-  - (* EIfte *)
-    simpl.
-    apply Target.SeIfte; assumption.
-Qed. *)
-
-(* Lemma sem_exp_without_useless_var (h: history) (name: ident) {ty} (e: Source.exp ty) (v: value ty):
-  Source.Source.sem_exp h e v ->
-  (forall tyv, ~ In (name, tyv) (Source.var_of_exp e)) ->
-    Source.Source.sem_exp (Dict.remove name h) e v.
-Proof.
-  intros Hexp Hnin.
-  revert v Hexp.
-  induction e as [ loc ty c | loc (i, t) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    apply Source.Source.SeConst.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    unfold Source.var_of_exp in Hnin.
-    simpl in Hnin.
-    destruct b.
-    injection H3 as ->.
-    apply Source.Source.SeVar.
-    simpl.
-    apply Dict.maps_to_not_removed; [ assumption | ].
-    intros Heq.
-    apply (Hnin t).
-    left.
-    f_equal.
-    assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    apply Source.Source.SeUnop.
-    apply IH; assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    pose proof (Source.var_of_exp_not_in_binop loc e1 e2 name op) as tmp.
-    pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
-    pose proof (fun ty => proj2 (tmp Hnin ty)) as H2'.
-    clear tmp.
-    apply Source.Source.SeBinop.
-    + apply IH1; assumption.
-    + apply IH2; assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    pose proof (Source.var_of_exp_not_in_ifte loc e1 e2 e3 name) as tmp.
-    pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
-    pose proof (fun ty => proj1 (proj2 (tmp Hnin ty))) as H2'.
-    pose proof (fun ty => proj2 (proj2 (tmp Hnin ty))) as H3'.
-    clear tmp.
-    apply Source.Source.SeIfte.
-    + apply IH1; assumption.
-    + apply IH2; assumption.
-    + apply IH3; assumption.
-Qed. *)
-
-Definition evaluable_equations (s: Target.stack) (l: list Source.equation): Prop :=
-  Forall (fun '(name, existT _ ty eq) => exists v: Target.value _, Target.sem_exp s (translate_exp eq) v) l.
+Definition evaluable_equations (s: stack) (l: list Source.equation): Prop :=
+  Forall (fun '(name, existT _ ty eq) => exists v: value _, Target.sem_exp s (translate_exp eq) v) l.
 
 (* Lemma ordered_equations_are_evaluable (h: history) (l: list Source.equation) n_in:
   (Forall (fun '(name, existT _ ty eq) =>

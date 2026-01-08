@@ -19,14 +19,13 @@ Arguments var_of_exp {_} _.
 Definition equation := Source.equation.
 Definition equation_dest := Source.equation_dest.
 Definition node := Source.node.
-(* Definition var_of_exp_binop_eq := @Source.var_of_exp_binop_eq.
-Arguments var_of_exp_binop_eq {_ _ _} _ _ _.
-Definition var_of_exp_ifte_eq := @Source.var_of_exp_ifte_eq.
-Arguments var_of_exp_ifte_eq {_} _ _ _.
-Definition var_of_exp_not_in_binop := @Source.var_of_exp_not_in_binop.
-Arguments var_of_exp_not_in_binop {_ _ _} _ _ _ _ _.
-Definition var_of_exp_not_in_ifte := @Source.var_of_exp_not_in_ifte.
-Arguments var_of_exp_not_in_ifte {_} _ _ _ _ _. *)
+Definition sem_unop := @Source.sem_unop.
+Arguments sem_unop {_} {_} _ _ _.
+Definition sem_binop := @Source.sem_binop.
+Arguments sem_binop {_} {_} {_} _ _ _ _.
+Definition sem_exp := @Source.sem_comb_exp.
+Arguments sem_exp _ _ {_} _ _.
+Definition sem_node := Source.sem_node.
 
 Definition dag := list ((ident * type) * list (ident * type)).
 
