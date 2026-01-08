@@ -41,13 +41,8 @@ Fixpoint expr_to_raw {ty} (e: Source.exp ty): Target.raw_exp ty :=
       end (expr_to_raw e1) (expr_to_raw e2)
   end.
 
-Fixpoint eqs_to_raw (eqs: list Source.equation): list Target.raw_equation :=
-  match eqs with
-  | [] => []
-  | eq::eqs => (match eq with
-    | (ident, existT _ ty e) => (ident, existT _ ty (expr_to_raw e))
-    end)::(eqs_to_raw eqs)
-  end.
+Definition eq_to_raw '((ident, existT _ ty e): Source.equation): Target.raw_equation := (ident, existT _ ty (expr_to_raw e)).
+Definition eqs_to_raw: list Source.equation -> list Target.raw_equation := List.map eq_to_raw.
 
 Lemma equation_conservation {ty} (i: ident) (e: Source.exp ty) (body: list Source.equation) :
   In (i, existT _ ty e) body -> In (i, existT _ ty (expr_to_raw e)) (eqs_to_raw body).
@@ -848,7 +843,7 @@ Proof.
 
   remember (eqs_to_raw n_body) as new_body eqn: translation.
 
-  destruct (Target.timed_list_eq n_name new_body) as [timed_body | err].
+  destruct (Target.timed_list_eq new_body) as [timed_body | err].
   2: right; exact err.
   left.
 
@@ -1121,7 +1116,7 @@ Proof.
   intro translated.
   unfold translate_to_raw_node in translated.
   destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
-  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  destruct (Target.timed_list_eq (eqs_to_raw n0_body)) as [timed_body | err].
   2: inversion translated.
   apply Result.ok_eq in translated.
   rewrite <- translated.
@@ -1151,7 +1146,7 @@ Proof.
   intro translated.
   unfold translate_to_raw_node in translated.
   destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
-  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  destruct (Target.timed_list_eq (eqs_to_raw n0_body)) as [timed_body | err].
   2: inversion translated.
   apply Result.ok_eq in translated.
   rewrite <- translated.
@@ -1677,7 +1672,7 @@ forall n : nat, Target.sem_comb_exp h2 (S n) e (Stream.nth n (Stream.tl s))))).
   
   
   
-  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  destruct (Target.timed_list_eq (eqs_to_raw n0_body)) as [timed_body | err].
   2: inversion translated.
   apply Result.ok_eq in translated.
   rewrite <- translated.
@@ -1707,7 +1702,7 @@ Proof.
   intro translated.
   unfold translate_raw_to_node in translated.
   destruct n0 as [n0_loc n0_name n0_in n0_out n0_locals n0_body n0_vars n0_assigned_vars n0_all_vars_exist n0_vars_all_assigned n0_vars_unique n0_seed n0_seed_always_fresh].
-  destruct (Target.timed_list_eq n0_name (eqs_to_raw n0_body)) as [timed_body | err].
+  destruct (Target.timed_list_eq (eqs_to_raw n0_body)) as [timed_body | err].
   2: inversion translated.
   apply Result.ok_eq in translated.
   rewrite <- translated.
@@ -1744,7 +1739,7 @@ Proof using.
   refine (next_translation_complete _ _ _ eqt2 H2 _).
   refine (eq_ind _ (fun s => forall n, ~ Dict.is_in (iter n _ s) h) H3 _ _).
   clear - eqt1; destruct n0, n1; cbn in *.
-  destruct (Target.timed_list_eq n_name (eqs_to_raw n_body)); [injection eqt1 as ?; assumption|discriminate eqt1].
+  destruct (Target.timed_list_eq (eqs_to_raw n_body)); [injection eqt1 as ?; assumption|discriminate eqt1].
 Qed.
 
 Lemma semantics_preservation_inv (n: Target.node) (n0: Source.node) (h: history):
@@ -1756,4 +1751,76 @@ Proof using.
   refine (raw_translation_correct _ _ _ eqt1 _).
   refine (next_translation_correct _ _ _ eqt2 _).
   exact H2.
+Qed.
+
+(* FIXME: add a well_timed semantic for Source.exp as well *)
+Lemma translation_complete (n: Source.node) es:
+  translate_node n = Result.Err es ->
+  exists eqs, incl eqs n.(Source.n_body) /\
+  Forall (fun eq => In eq eqs <-> exists n, ~ Target.well_timed n (expr_to_raw (projT2 (snd eq)))) n.(Source.n_body) /\
+  exists aux,
+  es = List.map (fun '((vid, vty), (l, vname)) => (l, Result.InvalidTiming vname vid vty))
+         (List.combine (List.map Source.equation_dest eqs) aux).
+Proof using.
+  unfold translate_node.
+  intros H.
+  destruct (translate_to_raw_node n) as [?|es'] eqn:H2; [discriminate H|injection H as ->].
+  destruct n as [nl nn nin out loc eqs vars assvars ave vaa vun seed Hseed]; unfold Source.n_body.
+  unfold translate_to_raw_node in H2.
+  assert (tmp := Target.timed_list_eq_complete (eqs_to_raw eqs)).
+  destruct (Target.timed_list_eq (eqs_to_raw eqs)) as [?|es'] eqn:H; [discriminate H2|injection H2 as ->].
+  clear - tmp.
+  specialize (tmp _ eq_refl) as (eqs0 & H1 & H2).
+  assert (tmp : exists eqs1, incl eqs1 eqs /\ eqs0 = map (fun eq => (fst eq, existT Target.raw_exp (projT1 (snd eq)) (expr_to_raw (projT2 (snd eq))))) eqs1).
+  1:{
+    clear - H1.
+    induction eqs0 as [|[i [ty e2]] eqs2 IH].
+    1: exists []; exact (conj (fun _ => False_ind _) eq_refl).
+    specialize (equation_conservation_inv _ _ _ (H1 _ (or_introl eq_refl))) as [e1 [He eqeq]].
+    specialize (IH (fun _ h => H1 _ (or_intror h))) as [eqs1 [Heqs1 eqeqs]].
+    exists ((i, existT Source.exp ty e1) :: eqs1).
+    split; [intros ? [<-|h]; [exact He|exact (Heqs1 _ h)]|].
+    exact (f_equal2 (fun e es => (_, existT _ _ e) :: es) eqeq eqeqs).
+  }
+  destruct tmp as [eqs1 [Hi ->]].
+  exists eqs1; split; [exact Hi|].
+  rewrite map_map in H2; refine (conj _ (proj2 H2)).
+  apply proj1 in H2; clear - H2.
+  unfold eqs_to_raw in H2; rewrite Forall_map in H2.
+  refine (Forall_impl _ _ H2); clear.
+  intros [i [ty e]] H; rewrite <-H; clear H.
+  cbn.
+  split; [exact (in_map _ _ _)|].
+  intros H.
+  apply in_map_iff in H; destruct H as [[i2 [ty2 e2]] [[=-> -> eq2] H]].
+  simpl_exist_type; refine (eq_ind _ (fun e => In (_, existT _ _ e) _) H _ _); clear - eq2.
+  revert e eq2; induction e2 as [l ty c|l [i ty]|l tin tout [] e IH|l ty1 ty2 ty [] e1 IH1 e2 IH2|l ty ec IHc e1 IH1 e2 IH2];
+    intros e' Heq; specialize (Source.exp_inv e') as [l' Heqe];
+    destruct Heqe as [[[[(c' & ->)|([i' ty'] & tmp & ->)]
+      |(tin' & op' & e1' & ->)]|(ty1' & ty2' & op' & e1' & e2' & ->)]|(ec' & e1' & e2' & ->)]; try discriminate Heq.
+  2,8,11,14,17,20,23,26,29,32,35,38,41,44,47,50,53,56,59: cbn in tmp; subst ty'; discriminate Heq.
+  4: cbn in tmp; subst ty'; cbn in *.
+  1: injection Heq as <- eqc; simpl_exist_type; subst; exact eq_refl.
+  1,2,4,5: cbn in op'; destruct op'; discriminate Heq.
+  1: injection Heq as <- eqi; exact (f_equal (fun i => Source.EVar _ (i, _) : Source.exp ty) eqi).
+  2,4,6: specialize (Source.binop_inv op') as tmp;
+     repeat match type of tmp with _ + { _ } => destruct tmp as [tmp|tmp] | { _ } + { _ } => destruct tmp as [tmp|tmp] end;
+     repeat match type of tmp with ex _ => destruct tmp as [? tmp] end; subst; try discriminate;
+     repeat match goal with h : TInt = TInt |- _ => assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst end; discriminate.
+  1,2,3: specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & h & ->)];
+         assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst; try discriminate Heq; cbn in *;
+         injection Heq as <- H; simpl_exist_type; apply IH in H; congruence.
+  1,3,5,7,9,11,13,15,17,19,21,23,25,27,29:
+    specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & h & ->)];
+    try assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst; discriminate.
+  1-15: specialize (Source.binop_inv op') as tmp;
+     repeat match type of tmp with _ + { _ } => destruct tmp as [tmp|tmp] | { _ } + { _ } => destruct tmp as [tmp|tmp] end;
+     repeat match type of tmp with ex _ => destruct tmp as [? tmp] end; subst; try discriminate;
+     repeat match goal with
+     | h : TInt = TInt |- _ => assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst
+     | h : TBool = TBool |- _ => assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst
+     end;
+     try discriminate;
+     injection Heq as <- H1 H2; simpl_exist_type; apply IH1 in H1; apply IH2 in H2; cbn; congruence.
+  injection Heq as <- Hc H1 H2; simpl_exist_type; apply IHc in Hc; apply IH1 in H1; apply IH2 in H2; cbn; congruence.
 Qed.
