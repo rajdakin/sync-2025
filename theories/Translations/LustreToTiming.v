@@ -1024,9 +1024,9 @@ Proof.
     1-2: econstructor.
     1,3: apply IH.
     1-2: constructor.
-    + apply sig2T_eq_type in H1, H2; subst.
+    + apply sig2T_eq_type in H3, H4; subst.
       constructor.
-      specialize (IH _ _ H3).
+      specialize (IH _ _ H2).
       assumption.
   - destruct b.
     all: inversion sem_source; subst.
@@ -1041,7 +1041,7 @@ Proof.
     all: try apply IH1.
     all: try apply IH2.
     all: try constructor.
-    all: apply sig2T_eq_type in H1, H3, H4; subst.
+    all: apply sig2T_eq_type in H3, H4, H5; subst.
     + specialize (IH1 _ _ H2).
       assumption.
     + specialize (IH2 _ _ H2).
@@ -1314,17 +1314,17 @@ Proof.
       assert (Hs0s1 : Stream.nth n (Stream.tl s0) = Stream.nth n s1).
       1:{
         inversion Hs0v; simpl_exist_type; subst.
-        cbn in H3.
-        clear - H3 H6 Hs1h.
-        unfold Dict.maps_to in Hs1h, H3; rewrite H3 in Hs1h.
+        cbn in H1.
+        clear - H1 H5 Hs1h.
+        unfold Dict.maps_to in Hs1h, H1; rewrite H1 in Hs1h.
         injection Hs1h as H0; simpl_exist_type; subst.
-        exact (eq_sym H6).
+        exact (eq_sym H5).
       }
       rewrite <-Hs0s1.
       clear - H2 Hs0h.
       inversion H2; simpl_exist_type; subst.
-      cbn in H3.
-      unfold Dict.maps_to in Hs0h, H3; rewrite H3 in Hs0h.
+      cbn in H1.
+      unfold Dict.maps_to in Hs0h, H1; rewrite H1 in Hs0h.
       injection Hs0h as H0; simpl_exist_type; subst.
       exact eq_refl.
     }
@@ -1807,11 +1807,11 @@ Proof using.
      repeat match type of tmp with _ + { _ } => destruct tmp as [tmp|tmp] | { _ } + { _ } => destruct tmp as [tmp|tmp] end;
      repeat match type of tmp with ex _ => destruct tmp as [? tmp] end; subst; try discriminate;
      repeat match goal with h : TInt = TInt |- _ => assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst end; discriminate.
-  1,2,3: specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & h & ->)];
-         assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst; try discriminate Heq; cbn in *;
+  1,2,3: specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & ->)];
+         try assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst; try discriminate Heq; cbn in *;
          injection Heq as <- H; simpl_exist_type; apply IH in H; congruence.
   1,3,5,7,9,11,13,15,17,19,21,23,25,27,29:
-    specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & h & ->)];
+    specialize (Source.unop_inv op') as [[(-> & h & ->)|(-> & h & ->)]|(-> & ->)];
     try assert (tmp := Eqdep_dec.UIP_dec type_dec h eq_refl); subst; discriminate.
   1-15: specialize (Source.binop_inv op') as tmp;
      repeat match type of tmp with _ + { _ } => destruct tmp as [tmp|tmp] | { _ } + { _ } => destruct tmp as [tmp|tmp] end;

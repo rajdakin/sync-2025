@@ -12,6 +12,32 @@
 )
 
 (rule
+  (deps (source_tree fby_test.mls))
+  (target fby_test.output)
+  (action
+    (run ../main.exe -test-mode fby_test.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree fby_test.expected) fby_test.output)
+  (action (diff fby_test.expected fby_test.output))
+)
+
+(rule
+  (deps (source_tree negative_test.mls))
+  (target negative_test.output)
+  (action
+    (run ../main.exe -test-mode negative_test.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree negative_test.expected) negative_test.output)
+  (action (diff negative_test.expected negative_test.output))
+)
+
+(rule
   (deps (source_tree test.mls))
   (target test.output)
   (action
@@ -126,4 +152,17 @@
   (alias runtest)
   (deps (source_tree test_timing.expected) test_timing.output)
   (action (diff test_timing.expected test_timing.output))
+)
+
+(rule
+  (deps (source_tree test_wrong_timing.mls))
+  (target test_wrong_timing.output)
+  (action
+    (run ../main.exe -test-mode test_wrong_timing.mls)
+  )
+)
+(rule
+  (alias runtest)
+  (deps (source_tree test_wrong_timing.expected) test_wrong_timing.output)
+  (action (diff test_wrong_timing.expected test_wrong_timing.output))
 )

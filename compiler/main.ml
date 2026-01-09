@@ -43,7 +43,6 @@ let parse_file filename : (Extracted.LustreAst.node, string) result =
     Result.Error (Format.sprintf "%s@\n" (Printexc.to_string e))
 
 let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
-  | TVoid -> fprintf fmt "void"
   | TBool -> fprintf fmt "bool"
   | TInt -> fprintf fmt "int"
 

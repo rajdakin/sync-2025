@@ -54,7 +54,6 @@ Inductive binop: Type :=
 
   (** Timing binop *)
   | Bop_arrow: binop
-  | Bop_fby: binop
   .
 
 Inductive exp: Type :=
@@ -170,7 +169,6 @@ Definition binop_eqb (x y: binop): bool :=
     | Bop_gt, Bop_gt => true
     | Bop_ge, Bop_ge => true
     | Bop_arrow, Bop_arrow => true
-    | Bop_fby, Bop_fby => true
     | _, _ => false
   end.
 

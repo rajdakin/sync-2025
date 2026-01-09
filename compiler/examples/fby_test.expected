@@ -1,0 +1,18 @@
+Test success
+
+struct s_t {
+    int var_3;
+};
+
+int fun_init_t(struct s_t *this, int var_1) {
+    this->var_3 = var_1;
+    int var_0 = 0;
+    return var_0;
+}
+
+int fun_step_t(struct s_t *this, int var_1) {
+    int var_2 = this->var_3;
+    this->var_3 = var_1;
+    int var_0 = var_2;
+    return var_0;
+}

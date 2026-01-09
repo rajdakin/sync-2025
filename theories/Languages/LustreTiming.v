@@ -993,25 +993,25 @@ Inductive sem_raw_exp (h: history) | : nat -> forall {ty}, raw_exp ty -> value t
     sem_raw_exp (S t) e2 v -> forall loc, sem_raw_exp (S t) (Raw_EArrow loc e1 e2) v
 .
 
-Inductive sem_comb_exp (h: history) | : nat -> forall {ty}, comb_exp ty -> value ty -> Prop :=
-  | SeConst (t: nat) {ty} (c: const ty):
-      forall loc, sem_comb_exp t (EConst loc c) (const_to_value c)
+Inductive sem_comb_exp (h: history) (t: nat) | : forall {ty}, comb_exp ty -> value ty -> Prop :=
+  | SeConst {ty} (c: const ty):
+      forall loc, sem_comb_exp (EConst loc c) (const_to_value c)
   
-  | SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: comb_exp _) (vin vout: value _):
-    sem_comb_exp t e vin -> sem_unop op vin vout -> forall loc, sem_comb_exp t (EUnop loc op e) vout
+  | SeUnop {tyin tyout} (op: unop tyin tyout) (e: comb_exp _) (vin vout: value _):
+    sem_comb_exp e vin -> sem_unop op vin vout -> forall loc, sem_comb_exp (EUnop loc op e) vout
   
-  | SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: comb_exp _) (v1 v2 vout: value _):
-    sem_comb_exp t e1 v1 -> sem_comb_exp t e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_comb_exp t (EBinop loc op e1 e2) vout
+  | SeBinop {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: comb_exp _) (v1 v2 vout: value _):
+    sem_comb_exp e1 v1 -> sem_comb_exp e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_comb_exp (EBinop loc op e1 e2) vout
 
-  | SeIfte (t: nat) {ty} (e1: comb_exp TBool) (e2 e3: comb_exp ty) (v1 v2 v3: value _):
-    sem_comb_exp t e1 v1 ->
-    sem_comb_exp t e2 v2 ->
-    sem_comb_exp t e3 v3 ->
-    forall loc, sem_comb_exp t (EIfte loc e1 e2 e3) (vifte v1 v2 v3)
+  | SeIfte {ty} (e1: comb_exp TBool) (e2 e3: comb_exp ty) (v1 v2 v3: value _):
+    sem_comb_exp e1 v1 ->
+    sem_comb_exp e2 v2 ->
+    sem_comb_exp e3 v3 ->
+    forall loc, sem_comb_exp (EIfte loc e1 e2 e3) (vifte v1 v2 v3)
 
-  | SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
+  | SeVar (b: binder) (v: Stream.t (value (binder_ty b))):
       Dict.maps_to (fst b) (existT _ _ v) h ->
-      forall loc, sem_comb_exp t (EVar loc b) (Stream.nth t v)
+      forall loc, sem_comb_exp (EVar loc b) (Stream.nth t v)
 .
 
 Definition sem_raw_eq (eq: raw_equation) (h: history) : Prop :=

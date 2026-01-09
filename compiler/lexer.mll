@@ -41,7 +41,6 @@ rule token = parse
   | "tel"       { TEL }
   | "bool"      { BOOL }
   | "int"       { INT }
-  | "void"      { VOID }
   | "if"        { IF }
   | "then"      { THEN }
   | "else"      { ELSE }

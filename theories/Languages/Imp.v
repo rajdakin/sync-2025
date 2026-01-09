@@ -6,6 +6,8 @@ From Reactive.Props Require Import Identifier Sigma.
 
 From Reactive.Datatypes Require Dict.
 
+Import ListNotations.
+
 Inductive unop: type -> type -> Set :=
   | Uop_not: unop TInt TInt
   | Uop_neg: unop TInt TInt
@@ -245,136 +247,65 @@ Record method_pair := mk_method {
 
 (** ** Semantics *)
 
-Inductive value : type -> Set :=
-  | VConst : forall {ty}, const ty -> value ty
-  | VUnop  : forall {ty tout}, unop ty tout -> value ty -> value tout
-  | VBAnd  : value TBool -> value TBool -> value TBool
-  | VBOr   : value TBool -> value TBool -> value TBool
-  | VBinop : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
-  | VIfte  : forall {ty}, value TBool -> value ty -> value ty -> value ty
-.
+Inductive sem_unop : forall {tyin tyout : type}, unop tyin tyout -> value tyin -> value tyout -> Prop :=
+  | SeNot (v: value TInt) : sem_unop Uop_not v (vnot v)
+  | SeNeg (v: value TInt) : sem_unop Uop_neg v (vneg v).
 
-Lemma value_inv {ty} (x: value ty) :
-  {c : const ty | x = VConst c} +
-  {tin : type & {op : unop tin ty & {e : value tin | x = VUnop op e}}} +
-  {eq : ty = _ & {e1 : value _ & {e2 : value _ | x = eq_rect _ value (VBAnd e1 e2) _ (eq_sym eq)}}} +
-  {eq : ty = _ & {e1 : value _ & {e2 : value _ | x = eq_rect _ value (VBOr e1 e2) _ (eq_sym eq)}}} +
-  {ty1 : type & {ty2 : type & {op : binop ty1 ty2 ty & {e1 : value ty1 & {e2 : value ty2 | x = VBinop op e1 e2}}}}} +
-  {eb : value TBool & {et : value ty & {ef : value ty | x = VIfte eb et ef}}}.
-Proof using.
-  destruct x.
-  1-5: left.
-  1-4: left.
-  1-3: left.
-  1-2: left.
-  1-1: left.
-  2-6: right.
-  all: try solve [repeat eexists; exact eq_refl].
-  1-2: exists eq_refl; exact (existT _ _ (exist _ _ eq_refl)).
-Defined.
-Lemma value_dec {ty} (e1 e2: value ty) : {e1 = e2} + {e1 <> e2}.
-Proof.
-  revert e2.
-  induction e1 as [ ty c | tin tout op e1 IH | e11 IH1 e12 IH2 | e11 IH1 e12 IH2 | ty1 ty2 tout op e11 IH1 e12 IH2 | ty eb1 IHb et1 IHt ef1 IHf ].
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin & op & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1: destruct (const_dec c c') as [e|n]; [left; exact (f_equal _ e)|right; intros [=f]; apply sig2T_eq_type in f; exact (n f)].
-    all: right; try destruct H as [eq1 ->]; subst; discriminate.
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1,3-6: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (type_dec tin tin') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
-    destruct (unop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type f)))].
-    destruct (IH e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-2,4-6: right; subst; try discriminate; rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); discriminate.
-    rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl).
-    destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1 & ty2 & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-3,5-6: right; subst; try discriminate; rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); discriminate.
-    rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl).
-    destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb & et & ef & ->) ].
-    1-4,6: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (type_dec ty1 ty1') as [<-|ne]; [|right; intros [=f _ _ _]; exact (ne f)].
-    destruct (type_dec ty2 ty2') as [<-|ne]; [|right; intros [=f _ _]; exact (ne f)].
-    destruct (binop_dec op op') as [<-|ne]; [|right; intros [=f _]; exact (ne (sig2T_eq_type (sig2T_eq_type (sig2T_eq_type f))))].
-    destruct (IH1 e1') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    destruct (IH2 e2') as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-  - intros e2; destruct (value_inv e2) as [ [ [ [ [
-      (c' & ->) | (tin' & op' & e1' & ->) ] | (e & e1' & e2' & ->) ] | (e & e1' & e2' & ->) ] | (ty1' & ty2' & op' & e1' & e2' & ->) ] | (eb2 & et2 & ef2 & ->) ].
-    1-5: right; try destruct H as [eq1 ->]; subst; discriminate.
-    destruct (IHb eb2) as [<-|ne]; [|right; intros [=f]; exact (ne f)].
-    destruct (IHt et2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    destruct (IHf ef2) as [<-|ne]; [|right; intros [=f]; exact (ne (sig2T_eq_type f))].
-    left; reflexivity.
-Defined.
-
-Definition stack := Dict.t (sigT value).
+Inductive sem_binop : forall {ty1 ty2 tyout : type}, binop ty1 ty2 tyout -> value ty1 -> value ty2 -> value tyout -> Prop :=
+  | SeXor (v1 v2: value TBool) : sem_binop Bop_xor v1 v2 (vxor v1 v2)
+  | SePlus (v1 v2: value TInt) : sem_binop Bop_plus v1 v2 (vplus v1 v2)
+  | SeMinus (v1 v2: value TInt) : sem_binop Bop_minus v1 v2 (vminus v1 v2)
+  | SeMult (v1 v2: value TInt) : sem_binop Bop_mult v1 v2 (vmult v1 v2)
+  | SeDiv (v1 v2: value TInt) : sem_binop Bop_div v1 v2 (vdiv v1 v2)
+  | SeEq (v1 v2: value TInt) : sem_binop Bop_eq v1 v2 (veq v1 v2)
+  | SeNeq (v1 v2: value TInt) : sem_binop Bop_neq v1 v2 (vneq v1 v2)
+  | SeLe (v1 v2: value TInt) : sem_binop Bop_le v1 v2 (vle v1 v2)
+  | SeLt (v1 v2: value TInt) : sem_binop Bop_lt v1 v2 (vlt v1 v2)
+  | SeGe (v1 v2: value TInt) : sem_binop Bop_ge v1 v2 (vge v1 v2)
+  | SeGt (v1 v2: value TInt) : sem_binop Bop_gt v1 v2 (vgt v1 v2).
 
 Inductive sem_exp: stack -> forall {ty}, exp ty -> value ty -> Prop :=
   | SeConst (s: stack) {ty} (c: const ty):
-      sem_exp s (EConst c) (VConst c)
+      sem_exp s (EConst c) (const_to_value c)
 
   | SeVar (s: stack) (b: binder) (v: value _):
       Dict.maps_to (fst b) (existT value (snd b) v) s ->
       sem_exp s (EVar b) v
 
-  | SeUnop (s: stack) {ty tout} (op: unop ty tout) (e: exp _) (v: value _):
-      sem_exp s e v ->
-      sem_exp s (EUnop op e) (VUnop op v)
+  | SeUnop (s: stack) {ty tout} (op: unop ty tout) (e: exp _) (vin vout: value _):
+      sem_exp s e vin ->
+      sem_unop op vin vout ->
+      sem_exp s (EUnop op e) vout
 
   | SeBAndConstF (s: stack) (e1 e2: exp _):
-      sem_exp s e1 (VConst (CBool false)) ->
-      sem_exp s (EBAnd e1 e2) (VConst (CBool false))
+      sem_exp s e1 (VBool false) ->
+      sem_exp s (EBAnd e1 e2) (VBool false)
 
   | SeBAndConstT (s: stack) (e1 e2: exp _) (v2: value _):
-      sem_exp s e1 (VConst (CBool true)) ->
+      sem_exp s e1 (VBool true) ->
       sem_exp s e2 v2 ->
       sem_exp s (EBAnd e1 e2) v2
 
-  | SeBAndDefer (s: stack) (e1 e2: exp _) (v1 v2: value _):
-      sem_exp s e1 v1 ->
-      v1 <> VConst (CBool true) ->
-      v1 <> VConst (CBool false) ->
-      sem_exp s e2 v2 ->
-      sem_exp s (EBAnd e1 e2) (VBAnd v1 v2)
-
   | SeBOrConstF (s: stack) (e1 e2: exp _) (v2: value _):
-      sem_exp s e1 (VConst (CBool false)) ->
+      sem_exp s e1 (VBool false) ->
       sem_exp s e2 v2 ->
       sem_exp s (EBOr e1 e2) v2
 
   | SeBOrConstT (s: stack) (e1 e2: exp _):
-      sem_exp s e1 (VConst (CBool true)) ->
-      sem_exp s (EBOr e1 e2) (VConst (CBool true))
+      sem_exp s e1 (VBool true) ->
+      sem_exp s (EBOr e1 e2) (VBool true)
 
-  | SeBOrDefer (s: stack) (e1 e2: exp _) (v1 v2: value _):
-      sem_exp s e1 v1 ->
-      v1 <> VConst (CBool true) ->
-      v1 <> VConst (CBool false) ->
-      sem_exp s e2 v2 ->
-      sem_exp s (EBOr e1 e2) (VBOr v1 v2)
-
-  | SeBinop (s: stack) {ty1 ty2 tout} (op: binop ty1 ty2 tout) (e1 e2: exp _) (v1 v2: value _):
+  | SeBinop (s: stack) {ty1 ty2 tout} (op: binop ty1 ty2 tout) (e1 e2: exp _) (v1 v2 vout: value _):
       sem_exp s e1 v1 ->
       sem_exp s e2 v2 ->
-      sem_exp s (EBinop op e1 e2) (VBinop op v1 v2)
+      sem_binop op v1 v2 vout ->
+      sem_exp s (EBinop op e1 e2) vout
 
   | SeIfte (s: stack) {ty} (e1: exp _) (e2 e3: exp ty) (v1 v2 v3: value _):
       sem_exp s e1 v1 ->
       sem_exp s e2 v2 ->
       sem_exp s e3 v3 ->
-      sem_exp s (EIfte e1 e2 e3) (VIfte v1 v2 v3).
+      sem_exp s (EIfte e1 e2 e3) (vifte v1 v2 v3).
 
 Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
   | SeAssign (s: stack) (name: ident) (ty: type) (e: exp _) (v: value _):
@@ -389,6 +320,28 @@ Inductive sem_stmt: stack -> stmt -> stack -> Prop :=
   | SeNop (s: stack):
       sem_stmt s SNop s.
 
+Definition sem_node (inputs: Stream.t stack) (ss: Stream.t stack) (m: method_pair): Prop :=
+  sem_stmt (Stream.hd inputs) m.(m_init) (Stream.hd ss) /\
+  forall n: nat, sem_stmt (
+    Dict.union (Stream.nth n ss) (Stream.nth (S n) inputs)
+    ) m.(m_step) (Stream.nth (S n) ss).
+
+Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ => acc
+    | EVar (name, ty) => (name, ty) :: acc
+    | EUnop _ e => var_of_exp_aux e acc
+    | EBAnd e1 e2 =>  var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EBOr e1 e2 =>  var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EBinop _ e1 e2 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
+  end.
+
+Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
+  var_of_exp_aux e [].
+
 
 (** ** Properties *)
 
@@ -399,36 +352,106 @@ end.
 
 Fixpoint eval_exp {ty} (e: exp ty) (s: stack): option (value ty) :=
   match e with
-    | EConst c => Some (VConst c)
+    | EConst c => Some (const_to_value c)
     | EVar (name, typ) => match Dict.find name s with Some (existT _ ty' v) => try_cast_value_type typ v | None => None end
-    | EUnop op e => match eval_exp e s with
-      | Some v => Some (VUnop op v)
-      | None => None
+    | EUnop op e => match op, e with
+      | Uop_not, e => option_map (fun v => vnot v) (eval_exp e s)
+      | Uop_neg, e => option_map (fun v => vneg v) (eval_exp e s)
     end
     | EBAnd e1 e2 => match eval_exp e1 s, eval_exp e2 s with
-      | Some (VConst (CBool false)), _ => Some (VConst (CBool false))
-      | Some (VConst (CBool true)), Some v2 => Some v2
-      | Some v1, Some v2 => Some (VBAnd v1 v2)
+      | Some (VBool false), _ => Some (VBool false)
+      | Some (VBool true), Some v2 => Some v2
       | _, _ => None
     end
     | EBOr e1 e2 => match eval_exp e1 s, eval_exp e2 s with
-      | Some (VConst (CBool false)), Some v2 => Some v2
-      | Some (VConst (CBool true)), _ => Some (VConst (CBool true))
-      | Some v1, Some v2 => Some (VBOr v1 v2)
+      | Some (VBool false), Some v2 => Some v2
+      | Some (VBool true), _ => Some (VBool true)
       | _, _ => None
     end
-    | EBinop op e1 e2 => match eval_exp e1 s, eval_exp e2 s with
-      | Some v1, Some v2 => Some (VBinop op v1 v2)
-      | _, _ => None
+    | EBinop op e1 e2 => match op, e1, e2 with
+      | Bop_xor, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vxor v1 v2)
+        | _, _ => None
+      end
+      | Bop_plus, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vplus v1 v2)
+        | _, _ => None
+      end
+      | Bop_minus, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vminus v1 v2)
+        | _, _ => None
+      end
+      | Bop_mult, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vmult v1 v2)
+        | _, _ => None
+      end
+      | Bop_div, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vdiv v1 v2)
+        | _, _ => None
+      end
+      | Bop_eq, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (veq v1 v2)
+        | _, _ => None
+      end
+      | Bop_neq, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vneq v1 v2)
+        | _, _ => None
+      end
+      | Bop_le, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vle v1 v2)
+        | _, _ => None
+      end
+      | Bop_lt, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vlt v1 v2)
+        | _, _ => None
+      end
+      | Bop_ge, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vge v1 v2)
+        | _, _ => None
+      end
+      | Bop_gt, e1, e2 => match (eval_exp e1 s), (eval_exp e2 s) with
+        | Some v1, Some v2 => Some (vgt v1 v2)
+        | _, _ => None
+      end
     end
     | EIfte e1 e2 e3 => match eval_exp e1 s, eval_exp e2 s, eval_exp e3 s with
-      | Some v1, Some v2, Some v3 => Some (VIfte v1 v2 v3)
+      | Some v1, Some v2, Some v3 => Some (vifte v1 v2 v3)
       | _, _, _ => None
     end
   end.
 
 
 (** ** Lemmas *)
+
+Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
+  var_of_exp_aux e l = var_of_exp e ++ l.
+Proof.
+  revert l.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - apply IH.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
+Qed.
 
 Lemma unop_eqb_refl {ty tout} (op: unop ty tout):
   unop_eqb op op = true.
@@ -541,3 +564,248 @@ Proof.
     apply IH3 in H3.
     f_equal; assumption.
 Qed. *)
+
+
+Lemma sem_exp_without_useless_var (s: stack) (name: ident) {ty} (e: exp ty) (v: value ty):
+  sem_exp s e v -> (forall tyv, ~ In (name, tyv) (var_of_exp e))
+  -> sem_exp (Dict.remove name s) e v.
+Proof.
+  intros Hexp Hnin.
+  revert v Hexp.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    apply SeConst.
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    destruct b.
+    injection H3 as ->.
+    apply SeVar.
+    simpl.
+    apply Dict.maps_to_not_removed; [ assumption | ].
+    intros Heq.
+    apply (Hnin t).
+    left.
+    f_equal.
+    assumption.
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e) in Hnin.
+    specialize (IH Hnin _ H3).
+    apply (SeUnop _ _ _ _ _ IH H6).
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    all: simpl_exist_type; subst.
+    + apply SeBAndConstF.
+      apply IH1.
+      2: assumption.
+      intro tyv.
+      specialize (Hnin tyv).
+      rewrite in_app_iff in Hnin.
+      apply Decidable.not_or in Hnin.
+      tauto.
+    + apply SeBAndConstT.
+      1: apply IH1.
+      3: apply IH2.
+      2, 4: assumption.
+      all: intro tyv.
+      all: specialize (Hnin tyv).
+      all: rewrite in_app_iff in Hnin.
+      all: apply Decidable.not_or in Hnin.
+      all: tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    all: simpl_exist_type; subst.
+    + apply SeBOrConstF.
+      1: apply IH1.
+      3: apply IH2.
+      2, 4: assumption.
+      all: intro tyv.
+      all: specialize (Hnin tyv).
+      all: rewrite in_app_iff in Hnin.
+      all: apply Decidable.not_or in Hnin.
+      all: tauto.
+    + apply SeBOrConstT.
+      apply IH1.
+      2: assumption.
+      intro tyv.
+      specialize (Hnin tyv).
+      rewrite in_app_iff in Hnin.
+      apply Decidable.not_or in Hnin.
+      tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    simpl_exist_type.
+    subst.
+    apply (SeBinop _ _ _ _ v1 v2).
+    3: assumption.
+    1: apply IH1.
+    3: apply IH2.
+    2, 4: assumption.
+    all: intro tyv.
+    all: specialize (Hnin tyv).
+    all: rewrite in_app_iff in Hnin.
+    all: apply Decidable.not_or in Hnin.
+    all: tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e3) in Hnin.
+    rewrite 2!var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    simpl_exist_type.
+    subst.
+    constructor.
+    1: apply IH1.
+    3: apply IH2.
+    5: apply IH3.
+    2, 4, 6: assumption.
+    all: intro tyv.
+    all: specialize (Hnin tyv).
+    all: rewrite 2!in_app_iff in Hnin.
+    all: apply Decidable.not_or in Hnin.
+    all: destruct Hnin as [Hn1 Hn2].
+    all: apply Decidable.not_or in Hn2.
+    all: tauto.
+Qed.
+
+Lemma sem_exp_with_useless_var (s: stack) (name: ident) {ty} (e: exp ty) (v: value ty):
+  sem_exp s e v -> (forall tyv, ~ In (name, tyv) (var_of_exp e)) -> forall {tyv} (v': value tyv), sem_exp (Dict.add name (existT _ _ v') s) e v.
+Proof.
+  intros Hexp Hnin.
+  revert v Hexp.
+  induction e as [ ty c | (i, ty) | ty tout op e IH | e1 IH1 e2 IH2 | e1 IH1 e2 IH2 | ty1 ty2 tout op e1 IH1 e2 IH2 | ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp tyv v'.
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    apply SeConst.
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    destruct b.
+    injection H3 as ->.
+    apply SeVar.
+    simpl.
+    simpl in v, H2, Hexp, H1, Hnin.
+    destruct (PeanoNat.Nat.eq_dec i name).
+    + subst.
+      specialize (Hnin t).
+      exfalso.
+      apply Hnin.
+      left.
+      reflexivity.
+    + apply (Dict.maps_to_add _ _ _ _ _ H2 n).
+  - inversion Hexp.
+    subst.
+    simpl_exist_type.
+    subst.
+    unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e) in Hnin.
+    specialize (IH Hnin _ H3).
+    apply (SeUnop _ _ _ _ _ (IH tyv v') H6).
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    all: simpl_exist_type; subst.
+    + apply SeBAndConstF.
+      apply IH1.
+      2: assumption.
+      intro tyv'.
+      specialize (Hnin tyv').
+      rewrite in_app_iff in Hnin.
+      apply Decidable.not_or in Hnin.
+      tauto.
+    + apply SeBAndConstT.
+      1: apply IH1.
+      3: apply IH2.
+      2, 4: assumption.
+      all: intro tyv'.
+      all: specialize (Hnin tyv').
+      all: rewrite in_app_iff in Hnin.
+      all: apply Decidable.not_or in Hnin.
+      all: tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    all: simpl_exist_type; subst.
+    + apply SeBOrConstF.
+      1: apply IH1.
+      3: apply IH2.
+      2, 4: assumption.
+      all: intro tyv'.
+      all: specialize (Hnin tyv').
+      all: rewrite in_app_iff in Hnin.
+      all: apply Decidable.not_or in Hnin.
+      all: tauto.
+    + apply SeBOrConstT.
+      apply IH1.
+      2: assumption.
+      intro tyv'.
+      specialize (Hnin tyv').
+      rewrite in_app_iff in Hnin.
+      apply Decidable.not_or in Hnin.
+      tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e2) in Hnin.
+    rewrite var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    simpl_exist_type.
+    subst.
+    apply (SeBinop _ _ _ _ v1 v2).
+    3: assumption.
+    1: apply IH1.
+    3: apply IH2.
+    2, 4: assumption.
+    all: intro tyv'.
+    all: specialize (Hnin tyv').
+    all: rewrite in_app_iff in Hnin.
+    all: apply Decidable.not_or in Hnin.
+    all: tauto.
+  - unfold var_of_exp in Hnin.
+    simpl in Hnin.
+    fold (var_of_exp e3) in Hnin.
+    rewrite 2!var_of_exp_aux_eq in Hnin.
+    inversion Hexp; subst.
+    simpl_exist_type.
+    subst.
+    constructor.
+    1: apply IH1.
+    3: apply IH2.
+    5: apply IH3.
+    2, 4, 6: assumption.
+    all: intro tyv'.
+    all: specialize (Hnin tyv').
+    all: rewrite 2!in_app_iff in Hnin.
+    all: apply Decidable.not_or in Hnin.
+    all: destruct Hnin as [Hn1 Hn2].
+    all: apply Decidable.not_or in Hn2.
+    all: tauto.
+Qed.
