@@ -217,188 +217,118 @@ Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd 
 Definition raw_equation : Type := ident * { ty : type & raw_exp ty }.
 Definition raw_equation_dest (eq : raw_equation) : ident * type := (fst eq, projT1 (snd eq)).
 
-Lemma timed_exp {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp {ty} (vname: string) (vid: ident) (vty: type) (n: nat) (exp: raw_exp ty):
   Result.t type (well_timed n exp).
 Proof.
   induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
-  - constructor 1.
+  - apply Result.Ok.
     constructor.
-  - constructor 1.
+  - apply Result.Ok.
     constructor.
-  - specialize (IH n).
-    destruct IH as [IH | err].
-    2: constructor 2; exact err.
-    constructor 1.
+  - refine (Result.bind (IH n) _); clear IH; intros IH.
+    apply Result.Ok.
     constructor.
     apply IH.
-  - specialize (IH1 n).
-    specialize (IH2 n).
-    destruct IH1 as [IH1 | err1].
-    + destruct IH2 as [IH2 | err2].
-      * constructor 1.
-        constructor.
-        all: assumption.
-      * constructor 2.
-        exact err2.
-    + destruct IH2 as [_ | err2].
-      all: constructor 2.
-      * exact err1.
-      * exact (err1 ++ err2).
-  - specialize (IHc n).
-    specialize (IH1 n).
-    specialize (IH2 n).
-    destruct IHc as [IHc | errc].
-    + destruct IH1 as [IH1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        -- constructor 1.
-           constructor.
-           all: assumption.
-        -- constructor 2.
-           exact err2.
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact err1.
-        exact (err1 ++ err2).
-    + destruct IH1 as [IH1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact errc.
-        exact (errc ++ err2).
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact (errc ++ err1).
-        exact (errc ++ err1 ++ err2).
+  - refine (Result.bind (IH1 n) _); clear IH1; intros IH1.
+    refine (Result.bind (IH2 n) _); clear IH2; intros IH2.
+    apply Result.Ok.
+    constructor.
+    all: assumption.
+  - refine (Result.bind (IHc n) _); clear IHc; intros IHc.
+    refine (Result.bind (IH1 n) _); clear IH1; intros IH1.
+    refine (Result.bind (IH2 n) _); clear IH2; intros IH2.
+    apply Result.Ok.
+    constructor.
+    all: assumption.
   - destruct n.
-    + constructor 2.
-      exact [(l, (Result.InvalidTiming vname vid ty))].
-    + specialize (IH n).
-      destruct IH as [IH | err].
-      2: constructor 2; exact err.
-      constructor 1.
+    + exact (Result.Err [(l, (Result.InvalidTiming vname vid vty))]).
+    + refine (Result.bind (IH n) _); clear IH; intros IH.
+      apply Result.Ok.
       constructor.
       apply IH.
   - destruct n.
-    + specialize (IH1 0).
-      destruct IH1 as [IH1 | err].
-      * constructor 1.
-        constructor.
-        assumption.
-      * constructor 2.
-        exact err.
-    + specialize (IH2 (S n)).
-      destruct IH2 as [IH2 | err].
-      * constructor 1.
-        constructor.
-        assumption.
-      * constructor 2.
-        exact err.
+    + refine (Result.bind (IH1 O) _); clear IH1; intros IH1.
+      apply Result.Ok.
+      constructor.
+      assumption.
+    + refine (Result.bind (IH2 (S n)) _); clear IH2; intros IH2.
+      apply Result.Ok.
+      constructor.
+      assumption.
 Defined.
 
-Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (vty: type) (n: nat) (exp: raw_exp ty):
   Result.t type (forall n', n <= n' -> well_timed n' exp).
 Proof.
   induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
-  - constructor 1.
+  - apply Result.Ok.
     intros.
     constructor.
-  - constructor 1.
+  - apply Result.Ok.
     intros.
     constructor.
-  - specialize (IH n).
-    destruct IH as [IH | err].
-    2: constructor 2; exact err.
-    constructor 1.
+  - refine (Result.bind (IH n) _); clear IH; intros IH.
+    apply Result.Ok.
     intros n' isless.
     specialize (IH _ isless).
     constructor.
     apply IH.
-  - specialize (IH1 n).
-    specialize (IH2 n).
-    destruct IH1 as [IH1 | err1].
-    + destruct IH2 as [IH2 | err2].
-      * constructor 1.
-        intros n' isless.
-        specialize (IH1 _ isless).
-        specialize (IH2 _ isless).
-        constructor.
-        all: assumption.
-      * constructor 2.
-        exact err2.
-    + destruct IH2 as [_ | err2].
-      all: constructor 2.
-      * exact err1.
-      * exact (err1 ++ err2).
-  - specialize (IHc n).
-    specialize (IH1 n).
-    specialize (IH2 n).
-    destruct IHc as [IHc | errc].
-    + destruct IH1 as [IH1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        -- constructor 1.
-           intros n' isless.
-           specialize (IHc _ isless).
-           specialize (IH1 _ isless).
-           specialize (IH2 _ isless).
-           constructor.
-           all: assumption.
-        -- constructor 2.
-           exact err2.
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact err1.
-        exact (err1 ++ err2).
-    + destruct IH1 as [IH1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact errc.
-        exact (errc ++ err2).
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact (errc ++ err1).
-        exact (errc ++ err1 ++ err2).
+  - refine (Result.bind (IH1 n) _); clear IH1; intros IH1.
+    refine (Result.bind (IH2 n) _); clear IH2; intros IH2.
+    apply Result.Ok.
+    intros n' isless.
+    specialize (IH1 _ isless).
+    specialize (IH2 _ isless).
+    constructor.
+    all: assumption.
+  - refine (Result.bind (IHc n) _); clear IHc; intros IHc.
+    refine (Result.bind (IH1 n) _); clear IH1; intros IH1.
+    refine (Result.bind (IH2 n) _); clear IH2; intros IH2.
+    apply Result.Ok.
+    intros n' isless.
+    specialize (IHc _ isless).
+    specialize (IH1 _ isless).
+    specialize (IH2 _ isless).
+    constructor.
+    all: assumption.
   - destruct n.
-    + constructor 2.
-      exact [(l, (Result.InvalidTiming vname vid ty))].
-    + specialize (IH n).
-      destruct IH as [IH | err].
-      2: constructor 2; exact err.
-      constructor 1.
+    + exact (Result.Err [(l, (Result.InvalidTiming vname vid vty))]).
+    + refine (Result.bind (IH n) _); clear IH; intros IH.
+      apply Result.Ok.
       intros n' isless.
       destruct n' as [|n'].
-      1: inversion isless.
+      1: contradiction (Nat.nlt_0_r _ isless).
       apply le_S_n in isless.
+      specialize (IH _ isless).
       constructor.
-      apply IH.
       assumption.
   - destruct n as [| n].
-    + refine (Result.bind (Result.combine_prop (timed_exp vname vid 0 e1) (IH2 (S O))) _); clear IH1 IH2.
-      intros [timed_1 IH2].
-      constructor 1.
+    + refine (Result.bind (timed_exp vname vid vty O e1) _); clear IH1; intros timed_1.
+      refine (Result.bind (IH2 (S O)) _); clear IH2; intros IH2.
+      apply Result.Ok.
       intros n' isless.
       destruct n' as [| n'].
       2: specialize (IH2 (S n') (le_n_S _ _ (le_0_n _))).
       all: constructor.
       all: assumption.
-    + specialize (IH2 n).
-      destruct IH2 as [IH2 | err2].
-      2: constructor 2; exact err2.
-      constructor 1.
+    + refine (Result.bind (IH2 (S n)) _); clear IH2; intros IH2.
+      apply Result.Ok.
       intros n' isless.
       destruct n' as [|n'].
-      1: inversion isless.
+      1: contradiction (Nat.nlt_0_r _ isless).
       constructor.
-      apply IH2, le_S, le_S_n.
+      apply IH2.
       assumption.
 Defined.
 
 Definition well_timed_eq (eq: raw_equation) : Prop := forall n, well_timed n (projT2 (snd eq)).
 
-Lemma timed_eq (vname: string) (eq: raw_equation) : Result.t type (well_timed_eq eq).
+Lemma timed_eq (eq: raw_equation) : Result.t type (well_timed_eq eq).
 Proof.
   unfold well_timed_eq.
   destruct eq as [ident [ty e]].
   simpl.
-  destruct (timed_exp_ge vname ident 0 e) as [timed | err].
+  destruct (timed_exp_ge "<information lost>" ident ty 0 e) as [timed | err].
   2: right; exact err.
   left.
   intro n.
@@ -406,17 +336,10 @@ Proof.
   apply le_0_n.
 Defined.
 
-Lemma timed_list_eq (vname: string) (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
+Lemma timed_list_eq (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
 Proof.
-  induction eqs as [|eq eqs IH].
-  1: left; constructor.
-  destruct IH as [timed_eqs | err].
-  2: right; exact err.
-  destruct (timed_eq vname eq) as [timed | err].
-  2: right; exact err.
-  left.
-  apply Forall_cons.
-  all: assumption.
+  refine (Result.list_map _ _).
+  exact timed_eq.
 Defined.
 
 Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
@@ -1115,3 +1038,133 @@ Definition sem_node (n: node) (h: history) : Prop :=
    h_maps_to i s h /\
    forall n loc, sem_comb_exp h n (EVar loc (j, ty)) (Stream.nth (S n) s))
   .
+
+Lemma timed_exp_complete : forall {ty} vname vid vty n e es, @timed_exp ty vname vid vty n e = Result.Err es ->
+  ~ well_timed n e /\ exists l, es = [(l, Result.InvalidTiming vname vid vty)].
+Proof using.
+  intros ty vname vid vty n e es H.
+  revert n es H; induction e as [| |l tin tout op e IH|l ty1 ty2 tout op e1 IH1 e2 IH2|l ty e1 IH1 e2 IH2 e3 IH3|l ty e IH|l ty e1 IH1 e2 IH2]; intros n es H.
+  1,2: discriminate H.
+  all: simpl timed_exp in H.
+  - specialize (IH n); destruct (timed_exp vname vid vty n e); [discriminate H|injection H as ->].
+    specialize (IH _ eq_refl) as [IH [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    intros f; inversion f; simpl_exist_type; subst; contradict IH; assumption.
+  - specialize (IH1 n); destruct (timed_exp vname vid vty n e1) as [?|es1]; [|injection H as <-].
+    2: specialize (IH1 _ eq_refl) as [IH1 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+    specialize (IH2 n); destruct (timed_exp vname vid vty n e2) as [?|es2]; [discriminate H|injection H as <-].
+    specialize (IH2 _ eq_refl) as [IH2 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    intros f; inversion f; subst; simpl_exist_type; subst; contradict IH2; assumption.
+  - specialize (IH1 n); destruct (timed_exp vname vid vty n e1) as [?|es1]; [|injection H as <-].
+    2: specialize (IH1 _ eq_refl) as [IH1 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+    specialize (IH2 n); destruct (timed_exp vname vid vty n e2) as [?|es2]; [|injection H as <-].
+    2: specialize (IH2 _ eq_refl) as [IH2 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH2; assumption.
+    specialize (IH3 n); destruct (timed_exp vname vid vty n e3) as [?|es3]; [discriminate H|injection H as <-].
+    specialize (IH3 _ eq_refl) as [IH3 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    intros f; inversion f; subst; simpl_exist_type; subst; contradict IH3; assumption.
+  - destruct n as [|n].
+    1: split; [intros f; inversion f|injection H as <-; exact (ex_intro _ _ eq_refl)].
+    specialize (IH n); destruct (timed_exp vname vid vty n e); [discriminate H|injection H as <-].
+    specialize (IH _ eq_refl) as [IH [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    intros f; inversion f; simpl_exist_type; subst; contradict IH; assumption.
+  - destruct n as [|n].
+    2: specialize (IH2 (S n)); destruct (timed_exp vname vid vty (S n) e2); [discriminate H|injection H as <-].
+    2: specialize (IH2 _ eq_refl) as [IH2 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    2: intros f; inversion f; simpl_exist_type; subst; contradict IH2; assumption.
+    specialize (IH1 O); destruct (timed_exp vname vid vty O e1); [discriminate H|injection H as <-].
+    specialize (IH1 _ eq_refl) as [IH1 [l' ->]]; split; [|exact (ex_intro _ l' eq_refl)].
+    intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+Qed.
+
+Lemma timed_exp_ge_complete : forall {ty} vname vid vty n e es, @timed_exp_ge ty vname vid vty n e = Result.Err es ->
+  exists n', n <= n' /\ ~ well_timed n' e /\ exists l, es = [(l, Result.InvalidTiming vname vid vty)].
+Proof using.
+  intros ty vname vid vty n e es H.
+  revert n es H; induction e as [| |l tin tout op e IH|l ty1 ty2 tout op e1 IH1 e2 IH2|l ty e1 IH1 e2 IH2 e3 IH3|l ty e IH|l ty e1 IH1 e2 IH2]; intros n es H.
+  1,2: discriminate H.
+  all: simpl timed_exp_ge in H.
+  - specialize (IH n); destruct (timed_exp_ge vname vid vty n e); [discriminate H|injection H as ->].
+    specialize (IH _ eq_refl) as (n' & Hn & IH & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    intros f; inversion f; simpl_exist_type; subst; contradict IH; assumption.
+  - specialize (IH1 n); destruct (timed_exp_ge vname vid vty n e1) as [?|es1]; [|injection H as <-].
+    2: specialize (IH1 _ eq_refl) as (n' & Hn & IH1 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+    specialize (IH2 n); destruct (timed_exp_ge vname vid vty n e2) as [?|es2]; [discriminate H|injection H as <-].
+    specialize (IH2 _ eq_refl) as (n' & Hn & IH2 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    intros f; inversion f; subst; simpl_exist_type; subst; contradict IH2; assumption.
+  - specialize (IH1 n); destruct (timed_exp_ge vname vid vty n e1) as [?|es1]; [|injection H as <-].
+    2: specialize (IH1 _ eq_refl) as (n' & Hn & IH1 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+    specialize (IH2 n); destruct (timed_exp_ge vname vid vty n e2) as [?|es2]; [|injection H as <-].
+    2: specialize (IH2 _ eq_refl) as (n' & Hn & IH2 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH2; assumption.
+    specialize (IH3 n); destruct (timed_exp_ge vname vid vty n e3) as [?|es3]; [discriminate H|injection H as <-].
+    specialize (IH3 _ eq_refl) as (n' & Hn & IH3 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    intros f; inversion f; subst; simpl_exist_type; subst; contradict IH3; assumption.
+  - destruct n as [|n].
+    1: exists O; split; [exact (le_n _)|split; [intros f; inversion f|injection H as <-; exact (ex_intro _ _ eq_refl)]].
+    specialize (IH n); destruct (timed_exp_ge vname vid vty n e); [discriminate H|injection H as <-].
+    specialize (IH _ eq_refl) as (n' & Hn & IH & [l' ->]); exists (S n'); split; [exact (le_n_S _ _ Hn)|split; [|exact (ex_intro _ l' eq_refl)]].
+    intros f; inversion f; simpl_exist_type; subst; contradict IH; assumption.
+  - destruct n as [|n].
+    2: specialize (IH2 (S n)); destruct (timed_exp_ge vname vid vty (S n) e2); [discriminate H|injection H as <-].
+    2: specialize (IH2 _ eq_refl) as (n' & Hn & IH2 & [l' ->]); exists n'; split; [exact Hn|split; [|exact (ex_intro _ l' eq_refl)]].
+    2: intros f; inversion f; [subst; inversion Hn|simpl_exist_type; subst; contradict IH2; assumption].
+    clear IH1; assert (IH1 := timed_exp_complete vname vid vty O e1).
+    destruct (timed_exp vname vid vty O e1); [|injection H as <-].
+    2: exists O; split; [exact (le_n _)|].
+    2: specialize (IH1 _ eq_refl) as (IH1 & [l' ->]); split; [|exact (ex_intro _ l' eq_refl)].
+    2: intros f; inversion f; subst; simpl_exist_type; subst; contradict IH1; assumption.
+    specialize (IH2 (S O)); destruct (timed_exp_ge vname vid vty (S O) e2) as [?|es2]; [discriminate H|injection H as <-].
+    specialize (IH2 _ eq_refl) as (n' & Hn & IH2 & [l' ->]); exists n'; split; [exact (le_0_n _)|split; [|exact (ex_intro _ l' eq_refl)]].
+    intros f; inversion f; [subst; inversion Hn|subst; simpl_exist_type; subst; contradict IH2; assumption].
+Qed.
+
+Lemma timed_eq_complete : forall eq es, timed_eq eq = Result.Err es ->
+  exists n, ~ well_timed n (projT2 (snd eq)) /\
+  exists vname l, es = [(l, Result.InvalidTiming vname (fst eq) (projT1 (snd eq)))].
+Proof using.
+  intros [vid [vty e]] es H.
+  unfold timed_eq in H.
+  match type of H with match timed_exp_ge ?s _ _ _ _ with _ => _ end = _ => remember s as vname eqn:eqvname; clear eqvname end.
+  specialize (timed_exp_ge_complete vname vid vty O e) as tmp.
+  destruct (timed_exp_ge vname vid vty O e) as [|es']; [discriminate H|injection H as ->].
+  specialize (tmp _ eq_refl) as (n & _ & H1 & H2).
+  exists n; split; [exact H1|exists vname; exact H2].
+Qed.
+
+Lemma timed_list_eq_complete : forall eqs es, timed_list_eq eqs = Result.Err es ->
+  exists eqs0, incl eqs0 eqs /\
+  Forall (fun eq => In eq eqs0 <-> exists n, ~ well_timed n (projT2 (snd eq))) eqs /\
+  exists aux,
+  es = List.map (fun '((vid, vty), (l, vname)) => (l, Result.InvalidTiming vname vid vty))
+         (List.combine (List.map raw_equation_dest eqs0) aux).
+Proof using.
+  intros eqs; induction eqs as [|eq eqs IH]; intros es H.
+  1: discriminate H.
+  simpl timed_list_eq in H.
+  assert (Heq := timed_eq_complete eq).
+  destruct (timed_eq eq) as [Hok|eq1]; [clear Heq|specialize (Heq _ eq_refl)];
+    (destruct (timed_list_eq eqs) as [IHok|eq2]; [clear IH|specialize (IH _ eq_refl)]); [discriminate H|injection H as <-..].
+  - destruct IH as (eqs0 & H1 & H2 & H3); exists eqs0; split; [exact (fun _ h => or_intror (H1 _ h))|split; [|exact H3]].
+    constructor; [|exact H2].
+    split; [|intros [n Hn]; contradict Hn; exact (Hok _)].
+    intros H; assert (H' := H).
+    apply H1, (proj1 (Forall_forall _ _) H2), proj1 in H'.
+    exact (H' H).
+  - destruct Heq as (n & Hn & vname & l & ->).
+    exists [eq]; split; [intros ? [h|[]]; left; exact h|].
+    split; [|exists [(l, vname)]; exact eq_refl].
+    constructor; [split; [intros _; exists n; exact Hn|intros _; left; exact eq_refl]|].
+    refine (Forall_impl _ _ IHok); clear - Hn.
+    intros eq' H; split; [intros [->|[]]; exists n; exact Hn|intros [n' Hn']; contradiction (Hn' (H _))].
+  - destruct Heq as (n & Hn & vname & l & ->).
+    destruct IH as (eqs0 & H1 & H2 & aux & Haux).
+    exists (eq :: eqs0); split; [intros ? [h|h]; [left; exact h|right; exact (H1 _ h)]|].
+    split; [|exists ((l, vname) :: aux); exact (f_equal (cons _) Haux)].
+    constructor; [split; [intros _; exists n; exact Hn|intros _; left; exact eq_refl]|].
+    refine (Forall_impl _ _ H2); clear - Hn.
+    intros eq' H; cbn; rewrite H; split; [intros [->|h]; [exists n; exact Hn|exact h]|intros h; right; exact h].
+Qed.
