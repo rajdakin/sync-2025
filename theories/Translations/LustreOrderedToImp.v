@@ -13,84 +13,64 @@ Module Target := Imp.
 
 Definition translate_unop {ty tout} (op: Source.unop ty tout): Target.unop ty tout :=
   match op with
-  | Source.Lustre.Uop_not => Target.Uop_not
-  | Source.Lustre.Uop_neg => Target.Uop_neg
-  | Source.Lustre.Uop_pre => ABORT_FIXME _ tt
+  | Source.Source.Uop_not => Target.Uop_not
+  | Source.Source.Uop_neg => Target.Uop_neg
   end.
 
 Definition translate_binop {ty1 ty2 tout} (op: Source.binop ty1 ty2 tout):
-    match op with Source.Lustre.Bop_and | Source.Lustre.Bop_or => False | _ => True end ->
+    match op with
+    | Source.Source.Bop_and | Source.Source.Bop_or => False
+    | _ => True end ->
     Target.binop ty1 ty2 tout :=
   match op with
-  | Source.Lustre.Bop_and => fun f => False_rect _ f
-  | Source.Lustre.Bop_or => fun f => False_rect _ f
-  | Source.Lustre.Bop_xor => fun _ => Target.Bop_xor
-  | Source.Lustre.Bop_plus => fun _ => Target.Bop_plus
-  | Source.Lustre.Bop_minus => fun _ => Target.Bop_minus
-  | Source.Lustre.Bop_mult => fun _ => Target.Bop_mult
-  | Source.Lustre.Bop_div => fun _ => Target.Bop_div
-  | Source.Lustre.Bop_eq => fun _ => Target.Bop_eq
-  | Source.Lustre.Bop_neq => fun _ => Target.Bop_neq
-  | Source.Lustre.Bop_lt => fun _ => Target.Bop_lt
-  | Source.Lustre.Bop_le => fun _ => Target.Bop_le
-  | Source.Lustre.Bop_gt => fun _ => Target.Bop_gt
-  | Source.Lustre.Bop_ge => fun _ => Target.Bop_ge
-  | Source.Lustre.Bop_arrow => fun _ => ABORT_FIXME _ tt
-  end.
-
-Fixpoint translate_value {ty} (v: Source.value ty): Target.value ty :=
-  match v with
-  | Source.Lustre.VConst c => Target.VConst c
-  | Source.Lustre.VUnop op v => Target.VUnop (translate_unop op) (translate_value v)
-  | Source.Lustre.VBinop op v1 v2 =>
-      (match op in Source.Lustre.binop ty1 ty2 tout
-                return Target.value ty1 -> Target.value ty2 -> Target.value tout with
-      | Source.Lustre.Bop_and => fun v1 v2 =>
-          match v1 with
-          | Target.VConst (CBool false) => Target.VConst (CBool false)
-          | Target.VConst (CBool true) => v2
-          | _ => Target.VBAnd v1 v2
-          end
-      | Source.Lustre.Bop_or => fun v1 v2 =>
-          match v1 with
-          | Target.VConst (CBool false) => v2
-          | Target.VConst (CBool true) => Target.VConst (CBool true)
-          | _ => Target.VBOr v1 v2
-          end
-      | op => fun v1 v2 => Target.VBinop (translate_binop op I) v1 v2
-      end) (translate_value v1) (translate_value v2)
-  | Source.Lustre.VIfte v1 v2 v3 => Target.VIfte (translate_value v1) (translate_value v2) (translate_value v3)
+  | Source.Source.Bop_and => fun f => False_rect _ f
+  | Source.Source.Bop_or => fun f => False_rect _ f
+  | Source.Source.Bop_xor => fun _ => Target.Bop_xor
+  | Source.Source.Bop_plus => fun _ => Target.Bop_plus
+  | Source.Source.Bop_minus => fun _ => Target.Bop_minus
+  | Source.Source.Bop_mult => fun _ => Target.Bop_mult
+  | Source.Source.Bop_div => fun _ => Target.Bop_div
+  | Source.Source.Bop_eq => fun _ => Target.Bop_eq
+  | Source.Source.Bop_neq => fun _ => Target.Bop_neq
+  | Source.Source.Bop_lt => fun _ => Target.Bop_lt
+  | Source.Source.Bop_le => fun _ => Target.Bop_le
+  | Source.Source.Bop_gt => fun _ => Target.Bop_gt
+  | Source.Source.Bop_ge => fun _ => Target.Bop_ge
   end.
 
 Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp ty :=
   match e with
-  | Source.Lustre.EConst _ c => Target.EConst c
-  | Source.Lustre.EVar _ b => Target.EVar b
-  | Source.Lustre.EUnop _ op e => Target.EUnop (translate_unop op) (translate_exp e)
-  | Source.Lustre.EBinop _ op e1 e2 =>
-      (match op in Source.Lustre.binop ty1 ty2 tout return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout with
-      | Source.Lustre.Bop_and => fun e1 e2 => Target.EBAnd (translate_exp e1) (translate_exp e2)
-      | Source.Lustre.Bop_or => fun e1 e2 => Target.EBOr (translate_exp e1) (translate_exp e2)
+  | Source.Source.EConst _ c => Target.EConst c
+  | Source.Source.EVar _ b => Target.EVar b
+  | Source.Source.EUnop _ op e => Target.EUnop (translate_unop op) (translate_exp e)
+  | Source.Source.EBinop _ op e1 e2 =>
+      (match op in Source.Source.binop ty1 ty2 tout
+      return Source.exp ty1 -> Source.exp ty2 -> Target.exp tout
+      with
+      | Source.Source.Bop_and => fun e1 e2 => Target.EBAnd (translate_exp e1) (translate_exp e2)
+      | Source.Source.Bop_or => fun e1 e2 => Target.EBOr (translate_exp e1) (translate_exp e2)
       | op => fun e1 e2 => Target.EBinop (translate_binop op I) (translate_exp e1) (translate_exp e2)
       end) e1 e2
-  | Source.Lustre.EIfte _ e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
+  | Source.Source.EIfte _ e1 e2 e3 => Target.EIfte (translate_exp e1) (translate_exp e2) (translate_exp e3)
   end.
 
 Definition translate_equation (eq: Source.equation): Target.stmt :=
   Target.SAssign (fst eq, projT1 (snd eq)) (translate_exp (projT2 (snd eq))).
 
-Definition translate_history (h: Source.history): Target.stack :=
-  Dict.map (fun x => existT Target.value  (projT1 x) (translate_value (Stream.hd (projT2 x)))) h.
+Definition translate_node_body (stmt: Target.stmt) (body: list Source.equation): Target.stmt :=
+  fold_right (fun x acc => Target.SSeq acc (translate_equation x)) stmt body.
 
-Definition translate_node_body (body: list Source.equation): Target.stmt :=
-  fold_right (fun acc x => Target.SSeq x acc) Target.SNop (List.map translate_equation body).
+Definition translate_node_init (init: list Source.equation): Target.stmt := translate_node_body Target.SNop init.
+
+Definition translate_node_step (pre: list (binder * ident)) (step: list Source.equation): Target.stmt :=
+  translate_node_body (fold_right (fun x acc => Target.SSeq acc (Target.SAssign (fst x) (Target.EVar (snd x, snd (fst x))))) Target.SNop pre) step.
 
 Lemma lustre_assignment_is_substmt (name: ident) (ty: type) (exp: Source.exp ty):
-  forall body,
+  forall stmt body,
   In (name, existT Source.exp ty exp) body ->
-  Target.is_substmt (Target.SAssign (name, ty) (translate_exp exp)) (translate_node_body body) = true.
+  Target.is_substmt (Target.SAssign (name, ty) (translate_exp exp)) (translate_node_body stmt body) = true.
 Proof.
-  intros n_body Hin.
+  intros stmt n_body Hin.
   induction n_body as [ | (eq_left, (ty', eq_right)) body IH ]; [ inversion Hin | ].
   simpl.
   apply Bool.orb_true_intro.
@@ -108,8 +88,8 @@ Proof.
 Qed.
 
 Lemma in_map_fstsnd y xs:
-  In y (List.map Source.Lustre.equation_dest xs) ->
-    exists ys, In (fst y, existT Source.Lustre.exp (snd y) ys) xs.
+  In y (List.map Source.Source.equation_dest xs) ->
+    exists ys, In (fst y, existT Source.exp (snd y) ys) xs.
 Proof.
   induction xs as [| x xs IHxs ].
   { intros []. }
@@ -127,7 +107,7 @@ Proof.
     assumption.
 Qed.
 
-Definition translate_node (n: Source.node_ordered): Target.method.
+Definition translate_node (n: Source.node_ordered): Target.method_pair.
 Proof.
   pose n as n'.
   destruct n.
@@ -139,142 +119,82 @@ Proof.
 
     Target.m_in := n_in;
     Target.m_out := n_out;
-    Target.m_vars := n_vars;
+    Target.m_locals := n_locals;
+    Target.m_pre := map fst n_pre;
 
-    Target.m_body := translate_node_body n_body
+    Target.m_init := translate_node_init n_init;
+    Target.m_step := translate_node_step n_pre n_step
   |}).
 
-  intros b Hb.
-  specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
+  all: intros b Hb.
+  1: specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_init_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
     as b_assigned.
-  apply in_map_iff in b_assigned.
-  destruct b_assigned as [ [ i [ ty' exp ] ] [ <- Hexp ] ].
-  exists (translate_exp exp).
-  replace n_body with (Source.Lustre.n_body (Source.node_ordered_is_node n')); [ | reflexivity ].
-  apply lustre_assignment_is_substmt.
-  assumption.
+  2: specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_step_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
+    as b_assigned.
+  all: apply in_map_iff in b_assigned.
+  all: destruct b_assigned as [ [ i [ ty' exp ] ] [ <- Hexp ] ].
+  all: exists (translate_exp exp).
+  1: replace n_init with (Source.Source.n_init (Source.node_ordered_is_node n')); [ | reflexivity ].
+  2: replace n_step with (Source.Source.n_step (Source.node_ordered_is_node n')); [ | reflexivity ].
+  all: apply lustre_assignment_is_substmt.
+  all: assumption.
 Defined.
 
 
 (** Lemmas *)
 
-Lemma correctness_exp (h: Source.history) {ty} (e: Source.exp ty) (out: Source.value ty):
-  Source.Lustre.sem_exp h e out ->
-    Target.sem_exp (translate_history h) (translate_exp e) (translate_value out).
+Lemma correctness_exp (h: history) (t: nat) {ty} (e: Source.exp ty) (out: value ty):
+  Source.sem_exp h t e out -> Target.sem_exp (project_time h t) (translate_exp e) out.
 Proof.
-  induction 1 as [| | |h loc ty1 ty2 tout op e1 e2 v1 v2 H1 IH1 H2 IH2|].
+  induction 1 as [ty c loc|tyin tyout op e vin vout sem_e sem_target_e sem_op loc | ty1 ty2 tyout op e1 e2 v1 v2 vout sem_e1 sem_target_e1 sem_e2 sem_target_e2 sem_op loc | ty e1 e2 e3 vb v1 v2 sem_e1 target_sem_e1 sem_e2 target_sem_e2 sem_e3 target_sem_e3|].
 
   - (* EConst *)
     apply Target.SeConst.
+  
+  - (* EUnop *)
+    simpl.
+    apply (Target.SeUnop _ _ _ _ _ sem_target_e).
+    destruct op.
+    all: simpl; inversion sem_op.
+    all: apply sig2T_eq_type in H, H0; subst.
+    all: constructor.
+  
+  - (* EBinop *)
+    destruct op.
+    all: simpl.
+    3-13: apply (Target.SeBinop _ _ _ _ _ _ _ sem_target_e1 sem_target_e2).
+    3-13: inversion sem_op.
+    3-13: apply sig2T_eq_type in H, H0, H1; subst.
+    3-13: constructor.
+    1-2: destruct (vbool_dec v1), (vbool_dec v2); subst.
+    all: inversion sem_op.
+    all: apply sig2T_eq_type in H, H0, H1; subst.
+    all: simpl in sem_op.
+    all: simpl.
+    1-2: apply (Target.SeBAndConstT _ _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBAndConstF _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBOrConstT _ _ _ sem_target_e1).
+    3-4: apply (Target.SeBOrConstF _ _ _ _ sem_target_e1).
+    all: assumption.
+
+  - (* EIfte*)
+    simpl.
+    constructor.
+    all: assumption.
 
   - (* EVar *)
     apply Target.SeVar with (b := b); simpl.
 
     exact (Dict.maps_to_map _ _ _ _ H).
-
-  - (* EUnop *)
-    simpl.
-    apply Target.SeUnop.
-    assumption.
-
-  - (* EBinop *)
-    simpl.
-
-    destruct op; try solve [apply Target.SeBinop; assumption].
-    all: clear H1 H2.
-    all: remember (translate_history h) as th eqn:eqh.
-    all: remember (translate_exp e1) as te1 eqn:eqe1.
-    all: remember (translate_exp e2) as te2 eqn:eqe2.
-    all: remember (translate_value v1) as tv1 eqn:eqv1.
-    all: remember (translate_value v2) as tv2 eqn:eqv2.
-    all: clear h e1 e2 v1 v2 eqh eqe1 eqe2 eqv1 eqv2.
-    1,2: destruct (Target.value_inv tv1) as [ [ [ [ [
-      (c' & ->) | (tin & op & v1' & ->) ] | (e & v1' & v2' & ->) ] | (e & v1' & v2' & ->) ] |
-      (ty1 & ty2 & op & v1' & v2' & ->) ] | (eb & et & ef & ->) ].
-    3,4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    2-6: apply Target.SeBAndDefer; try assumption; discriminate.
-    4,5: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    3-7: apply Target.SeBOrDefer; try assumption; discriminate.
-    1,2: destruct (const_inv c') as [ [ (e & [|] & ->) | (f & _) ] | (f & _) ]; try discriminate f.
-    1-4: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in *.
-    1: apply Target.SeBAndConstT; assumption.
-    1: apply Target.SeBAndConstF; assumption.
-    1: apply Target.SeBOrConstT; assumption.
-    1: apply Target.SeBOrConstF; assumption.
-
-  - (* EIfte *)
-    simpl.
-    apply Target.SeIfte; assumption.
 Qed.
 
-Lemma sem_exp_without_useless_var (h: Source.history) (name: ident) {ty} (e: Source.exp ty) (v: Source.value ty):
-  Source.Lustre.sem_exp h e v ->
-  (forall tyv, ~ In (name, tyv) (Source.var_of_exp e)) ->
-    Source.Lustre.sem_exp (Dict.remove name h) e v.
-Proof.
-  intros Hexp Hnin.
-  revert v Hexp.
-  induction e as [ loc ty c | loc (i, t) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v Hexp.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    apply Source.Lustre.SeConst.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    unfold Source.var_of_exp in Hnin.
-    simpl in Hnin.
-    destruct b.
-    injection H4 as ->.
-    apply Source.Lustre.SeVar.
-    simpl.
-    apply Dict.maps_to_not_removed; [ assumption | ].
-    intros Heq.
-    apply (Hnin t).
-    left.
-    f_equal.
-    assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    apply Source.Lustre.SeUnop.
-    apply IH; assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    pose proof (Source.var_of_exp_not_in_binop loc e1 e2 name op) as tmp.
-    pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
-    pose proof (fun ty => proj2 (tmp Hnin ty)) as H2'.
-    clear tmp.
-    apply Source.Lustre.SeBinop.
-    + apply IH1; assumption.
-    + apply IH2; assumption.
-  - inversion Hexp.
-    subst.
-    simpl_exist_type.
-    subst.
-    pose proof (Source.var_of_exp_not_in_ifte loc e1 e2 e3 name) as tmp.
-    pose proof (fun ty => proj1 (tmp Hnin ty)) as H1'.
-    pose proof (fun ty => proj1 (proj2 (tmp Hnin ty))) as H2'.
-    pose proof (fun ty => proj2 (proj2 (tmp Hnin ty))) as H3'.
-    clear tmp.
-    apply Source.Lustre.SeIfte.
-    + apply IH1; assumption.
-    + apply IH2; assumption.
-    + apply IH3; assumption.
-Qed.
+Definition evaluable_equations (s: stack) (l: list Source.equation): Prop :=
+  Forall (fun '(name, existT _ ty eq) => exists v: value _, Target.sem_exp s (translate_exp eq) v) l.
 
-Definition evaluable_equations (s: Target.stack) (l: list Source.equation): Prop :=
-  Forall (fun '(name, existT _ ty eq) => exists v: Target.value _, Target.sem_exp s (translate_exp eq) v) l.
-
-Lemma ordered_equations_are_evaluable (h: Source.history) (l: list Source.equation) n_in:
+(* Lemma ordered_equations_are_evaluable (h: history) (l: list Source.equation) n_in:
   (Forall (fun '(name, existT _ ty eq) =>
-      exists (v': Stream.t (Source.value _)),
-      Dict.maps_to name (existT _ ty v') h /\ Source.Lustre.sem_exp h eq (Stream.hd v')
+      exists (v': Stream.t (value _)),
+      Dict.maps_to name (existT _ ty v') h /\ Source.Source.sem_exp h eq (Stream.hd v')
     ) l
   ) ->
   Ordered.t (Source.equations_to_dag l n_in) -> evaluable_equations (translate_history h) l.
@@ -294,17 +214,17 @@ Proof.
     injection Heqdag as <- -> -> ->.
     inversion Hord; subst.
     constructor.
-    + assert (Forall (fun v => Source.Lustre.in_history h v) (Source.var_of_exp eq_right)) as Hvars.
+    + assert (Forall (fun v => in_history h v) (Source.var_of_exp eq_right)) as Hvars.
       * apply Source.Forall_impl_in with (P := fun y => exists ly, In (y, ly) (Source.equations_to_dag l n_in)); [ | assumption ].
         intros name Hin [ vars Hvars ].
         apply Forall_inv in Hhist as [ v' [ Hmaps Hsem ] ].
-        apply Source.Lustre.sem_eval_exp in Hsem.
-        pose proof (Source.Lustre.exp_evaluable_have_evaluable_vars _ _ _ Hsem) as H'.
+        apply Source.Source.sem_eval_exp in Hsem.
+        pose proof (Source.exp_evaluable_have_evaluable_vars _ _ _ Hsem) as H'.
         apply Forall_forall with (x := name) in H'; assumption.
-      * pose proof (Source.Lustre.exp_with_evaluable_vars_is_evaluable _ _ Hvars) as [ c Hc ].
+      * pose proof (Source.exp_with_evaluable_vars_is_evaluable _ _ Hvars) as [ c Hc ].
         exists (translate_value c).
         apply correctness_exp.
-        apply Source.Lustre.sem_eval_exp.
+        apply Source.Source.sem_eval_exp.
         assumption.
     + apply Forall_inv_tail in Hhist.
       refine (Forall_impl _ _ Hhist).
@@ -312,15 +232,15 @@ Proof.
       exists (translate_value (Stream.hd v')).
       apply correctness_exp.
       assumption.
-Qed.
+Qed. *)
 
-Lemma translation_ordered_body (body: list Source.equation) (h: Source.history) n_in:
+(* Lemma translation_ordered_body (body: list Source.equation) (h: history) n_in:
   Ordered.t (Source.equations_to_dag body n_in) ->
   (Forall (fun '(name, existT _ ty eq) =>
-      exists (v': Stream.t (Source.value _)),
-      Dict.maps_to name (existT _ _ v') h /\ Source.Lustre.sem_exp h eq (Stream.hd v')
+      exists (v': Stream.t (value _)),
+      Dict.maps_to name (existT _ _ v') h /\ Source.Source.sem_exp h eq (Stream.hd v')
   ) body ) ->
-  Forall (fun '(name, existT _ ty exp) => exists (v: Target.value _), Target.sem_exp (translate_history h) (translate_exp exp) v) body.
+  Forall (fun '(name, existT _ ty exp) => exists (v: value _), Target.sem_exp (translate_history h) (translate_exp exp) v) body.
 Proof.
   intros H Hhist.
   induction body; [ constructor | ].
@@ -341,55 +261,13 @@ Proof.
       assumption.
     + apply Forall_inv_tail in Hhist.
       assumption.
-Qed.
+Qed. *)
 
-Lemma translation_history_element_removal (h: Source.history) (name: ident):
-  Dict.remove name (translate_history h) = translate_history (Dict.remove name h).
-Proof.
-  apply Dict.equivalence_is_eq.
-  destruct h as [ l Hsort ].
-  split.
-  - intros i x H.
-    unfold Dict.map, Dict.maps_to, Dict.remove, Dict.find in *.
-    simpl in *.
-    induction l as [ | (j, y) l IH ]; [ discriminate | ].
-    simpl in *.
-    destruct (name =? j) eqn: Heq.
-    + apply PeanoNat.Nat.eqb_eq in Heq.
-      subst.
-      assumption.
-    + apply PeanoNat.Nat.eqb_neq in Heq.
-      simpl in *.
-      destruct (i =? j) eqn: Heq'; [ assumption | ].
-      apply IH.
-      * apply Sorted.cons in Hsort.
-        assumption.
-      * apply PeanoNat.Nat.eqb_neq in Heq'.
-        assumption.
-  - intros i x H.
-    unfold Dict.map, Dict.maps_to, Dict.remove, Dict.find in *.
-    simpl in *.
-    induction l as [ | (j, y) l IH ]; [ discriminate | ].
-    simpl in *.
-    destruct (name =? j) eqn: Heq.
-    + apply PeanoNat.Nat.eqb_eq in Heq.
-      subst.
-      assumption.
-    + apply PeanoNat.Nat.eqb_neq in Heq.
-      simpl in *.
-      destruct (i =? j) eqn: Heq'; [ assumption | ].
-      apply IH.
-      * apply Sorted.cons in Hsort.
-        assumption.
-      * apply PeanoNat.Nat.eqb_neq in Heq'.
-        assumption.
-Qed.
-
-Lemma correctness_translation_equation (h: Source.history) (name: ident) {ty} (exp: Source.exp ty) (v: Stream.t (Source.value _)):
-  Source.Lustre.sem_exp h exp (Stream.hd v) ->
+(* Lemma correctness_translation_equation (h: history) (name: ident) {ty} (exp: Source.exp ty) (v: Stream.t (value _)):
+  Source.Source.sem_exp h exp (Stream.hd v) ->
   Dict.maps_to name (existT _ ty v) h ->
   (forall tyv, ~ In (name, tyv) (Source.var_of_exp exp)) ->
-  Target.sem_stmt (translate_history (Dict.remove name h)) (translate_equation (name, existT _ _ exp)) (translate_history h).
+  Target.sem_stmt (Dict.remove name h) (translate_equation (name, existT _ _ exp)) h.
 Proof.
   intros Hexp Hmaps Hnin.
   unfold translate_equation.
@@ -401,36 +279,36 @@ Proof.
     apply sem_exp_without_useless_var; assumption.
   - apply Dict.maps_to_map with (f := fun x => existT Target.value _ (translate_value (Stream.hd (projT2 x)))) in Hmaps.
     assumption.
-Qed.
+Qed. *)
 
-Lemma correctness_node_under_history_assumptions (n: Source.node_ordered) (h0 h: Source.history):
+(* Lemma correctness_node_under_history_assumptions (n: Source.node_ordered) (h0 h: history):
   (forall (i: ident),
     Dict.is_in i h0 <->
-    In i (map fst (Source.Lustre.n_in (Source.node_ordered_is_node n)))) ->
+    In i (map fst (Source.Source.n_in (Source.node_ordered_is_node n)))) ->
   Dict.inclusion h0 h ->
   (forall (i: ident),
     Dict.is_in i h <->
-    In i (map fst (Source.Lustre.n_body (Source.node_ordered_is_node n)) ++ map fst (Source.Lustre.n_in (Source.node_ordered_is_node n)))) ->
+    In i (map fst (Source.Source.n_body (Source.node_ordered_is_node n)) ++ map fst (Source.Source.n_in (Source.node_ordered_is_node n)))) ->
   (Forall (fun '(n, existT _ ty eq) =>
-      exists (v': Stream.t (Source.value _)),
-      Dict.maps_to n (existT _ ty v') h /\ Source.Lustre.sem_exp h eq (Stream.hd v')
-    ) (Source.Lustre.n_body (Source.node_ordered_is_node n))
+      exists (v': Stream.t (value _)),
+      Dict.maps_to n (existT _ ty v') h /\ Source.Source.sem_exp h eq (Stream.hd v')
+    ) (Source.Source.n_body (Source.node_ordered_is_node n))
   ) ->
-  Target.sem_stmt (translate_history h0) (Target.m_body (translate_node n)) (translate_history h).
+  Target.sem_stmt h0 (Target.m_body (translate_node n)) h.
 Proof.
   intros Hhist0 Hagree Hhist Hsource.
   destruct n.
   destruct node_ordered_is_node as [].
-  unfold Source.Lustre.n_body in *.
+  unfold Source.Source.n_body in *.
   simpl in *.
-  assert (assignments_wd : incl (map Source.Lustre.equation_dest n_body) (n_out ++ n_locals)).
+  assert (assignments_wd : incl (map Source.Source.equation_dest n_body) (n_out ++ n_locals)).
   { intros x Hx.
     exact (Permutation.Permutation_in x n_vars_all_assigned Hx). }
   clear n_vars_all_assigned n_all_vars_exist.
   revert h Hagree Hhist Hsource.
   induction n_body as [ | (eq_left, (ty, eq_right)) n_body IH ]; intros h Hagree Hhist Hsource.
   - simpl.
-    refine (eq_ind _ (fun h => Target.sem_stmt _ _ (translate_history h)) (Target.SeNop _) _ _).
+    refine (eq_ind _ (fun h => Target.sem_stmt _ _ h) (Target.SeNop _) _ _).
     apply Dict.equivalence_is_eq.
     split; [exact Hagree|].
     intros i x Hix.
@@ -446,7 +324,7 @@ Proof.
     fold Source.equations_to_dag in ordered_inner_body.
     apply translation_ordered_body with (h := h) in ordered as Htrans; [ | assumption ].
 
-    assert (incl (map Source.Lustre.equation_dest n_body) (n_out ++ n_locals)) as Hincl.
+    assert (incl (map Source.Source.equation_dest n_body) (n_out ++ n_locals)) as Hincl.
     { intros x Hx.
       apply assignments_wd.
       right.
@@ -461,7 +339,7 @@ Proof.
     apply Forall_inv in Hsource.
     destruct Hsource as [ v' [ Hv'1 Hv'2 ] ].
     apply Forall_inv in Htrans as [ w Hw ].
-    apply Target.SeSeq with (s2 := translate_history hprev).
+    apply Target.SeSeq with (s2 := hprev).
     2: { unfold translate_equation, hprev.
       simpl.
       apply correctness_translation_equation with (v := v'); [ assumption | assumption | ].
@@ -538,27 +416,27 @@ Proof.
          rewrite Source.equations_to_dag_is_map.
          apply in_map with (f := fun '(i, existT _ ty e) => (i, ty, Source.var_of_exp e)) in Hin.
          exact (in_or_app _ _ _ (or_introl Hin)).
-Qed.
+Qed. *)
 
-Theorem correctness_node (n: Source.node_ordered):
-  forall h0: Source.history,
+(* Theorem correctness_node (n: Source.node_ordered):
+  forall h0: history,
   (forall (i: ident) ty,
-    Source.in_history h0 (i, ty) <->
-    In (i, ty) (Source.Lustre.n_in (Source.node_ordered_is_node n))) ->
-  exists h: Source.history,
-  Target.sem_stmt (translate_history h0) (Target.m_body (translate_node n)) (translate_history h).
+    in_history h0 (i, ty) <->
+    In (i, ty) (Source.Source.n_in (Source.node_ordered_is_node n))) ->
+  exists h: history,
+  Target.sem_stmt h0 (Target.m_body (translate_node n)) h.
 Proof.
   intros h0 Hh0.
-  pose proof (Source.minimal_history (Source.Lustre.n_body (Source.node_ordered_is_node n)) _ _ Hh0 (Source.ordered n)) as ( h & H1 & H2 & H3 ).
+  pose proof (Source.minimal_history (Source.Source.n_body (Source.node_ordered_is_node n)) _ _ Hh0 (Source.ordered n)) as ( h & H1 & H2 & H3 ).
   exists h.
-  assert (Hh0' : forall i, Dict.is_in i h0 <-> In i (map fst (Source.Lustre.n_in (Source.node_ordered_is_node n)))).
+  assert (Hh0' : forall i, Dict.is_in i h0 <-> In i (map fst (Source.Source.n_in (Source.node_ordered_is_node n)))).
   { clear - Hh0; intros i; specialize (Hh0 i); split.
     - intros [[ty s] H]; refine (in_map _ _ _ (proj1 (Hh0 ty) _)).
-      unfold Source.in_history, Source.Lustre.in_history.
+      unfold in_history, in_history.
       rewrite H; exact eq_refl.
     - intros H; apply in_map_iff in H; destruct H as [[i' ty] [<- H]].
       apply Hh0 in H.
-      unfold Source.in_history, Source.Lustre.in_history in H.
+      unfold in_history, in_history in H.
       unfold Dict.is_in.
       destruct (Dict.find (fst (i', ty)) h0) as [[ty' s]|] eqn:eq; [subst|contradiction H].
       exists (existT _ ty s); exact eq. }
@@ -584,4 +462,4 @@ Proof.
     apply Sorted.in_map_fst in Hin.
     destruct Hin as [ ty Hin ].
     rewrite <-H1 in Hin; exact Hin.
-Qed.
+Qed. *)

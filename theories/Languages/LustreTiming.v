@@ -1,6 +1,6 @@
 Set Default Goal Selector "!".
 
-From Reactive.Props Require Import Freshness Identifier.
+From Reactive.Props Require Import Freshness Identifier Inclusion Permutations.
 From Reactive.Languages Require Lustre.
 From Reactive.Languages Require Import Semantics.
 
@@ -55,6 +55,151 @@ Inductive comb_exp : type -> Set :=
   | EIfte: Result.location -> forall {t}, comb_exp TBool -> comb_exp t -> comb_exp t -> comb_exp t
 .
 
+Fixpoint var_of_raw_exp_aux {ty} (e: raw_exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | Raw_EConst _ _ => acc
+    | Raw_EVar _ (name, ty) => (name, ty) :: acc
+    | Raw_EUnop _ _ e => var_of_raw_exp_aux e acc
+    | Raw_EBinop _ _ e1 e2 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
+    | Raw_EIfte _ e1 e2 e3 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 (var_of_raw_exp_aux e3 acc))
+    | Raw_EPre _ e => var_of_raw_exp_aux e acc
+    | Raw_EArrow _ e1 e2 =>
+      var_of_raw_exp_aux e1 (var_of_raw_exp_aux e2 acc)
+  end.
+
+Definition var_of_raw_exp {ty} (e: raw_exp ty): list (ident * type) :=
+  var_of_raw_exp_aux e [].
+
+Lemma var_of_raw_exp_aux_eq {ty} (e: raw_exp ty) (l: list (ident * type)):
+  var_of_raw_exp_aux e l = var_of_raw_exp e ++ l.
+Proof.
+  revert l.
+  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 | loc ty e IH | loc ty e1 IH1 e2 IH2]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - apply IH.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
+  - apply IH.
+  - unfold var_of_raw_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_aux_empty {ty} (e: raw_exp ty) (l: list (ident * type)):
+  var_of_raw_exp_aux e l = [] -> l = [].
+Proof.
+  intros H.
+  rewrite var_of_raw_exp_aux_eq in H.
+  apply app_eq_nil in H as [ _ H ].
+  assumption.
+Qed.
+
+Lemma var_of_raw_exp_aux_incl {ty} (e: raw_exp ty) (l1 l2: list (ident * type)):
+  incl l1 l2 -> incl (var_of_raw_exp_aux e l1) (var_of_raw_exp_aux e l2).
+Proof.
+  intros H i Hi.
+  rewrite var_of_raw_exp_aux_eq in Hi |- *.
+  apply in_or_app.
+  apply in_app_or in Hi as [ Hin | Hin ]; auto.
+Qed.
+
+Lemma var_of_raw_exp_aux_in_exp {ty tyv} (e: raw_exp ty) (l: list (ident * type)) (x: ident):
+  In (x, tyv) (var_of_raw_exp e) -> In (x, tyv) (var_of_raw_exp_aux e l).
+Proof.
+  apply var_of_raw_exp_aux_incl with (l1 := []).
+  intros a Hin.
+  destruct Hin.
+Qed.
+
+Lemma var_of_raw_exp_aux_in_acc {ty tyv} (e: raw_exp ty) (l: list (ident * type)) (x: ident):
+  In (x, tyv) l -> In (x, tyv) (var_of_raw_exp_aux e l).
+Proof.
+  intros H.
+  rewrite var_of_raw_exp_aux_eq.
+  apply in_or_app.
+  auto.
+Qed.
+
+Lemma var_of_raw_exp_binop_eq {ty1 ty2 ty} (l: Result.location) (e1 e2: raw_exp _) (b: binop ty1 ty2 ty):
+  var_of_raw_exp (Raw_EBinop l b e1 e2) = var_of_raw_exp e1 ++ var_of_raw_exp e2.
+Proof.
+  unfold var_of_raw_exp.
+  simpl.
+  rewrite var_of_raw_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_ifte_eq {ty} (l: Result.location) (e1 : raw_exp TBool) (e2 e3: raw_exp ty):
+  var_of_raw_exp (Raw_EIfte l e1 e2 e3) = var_of_raw_exp e1 ++ var_of_raw_exp e2 ++ var_of_raw_exp e3.
+Proof.
+  unfold var_of_raw_exp.
+  simpl.
+  do 2 rewrite var_of_raw_exp_aux_eq.
+  reflexivity.
+Qed.
+
+Lemma var_of_raw_exp_not_in_binop {ty1 ty2 ty} (l: Result.location) (exp1 exp2: raw_exp _) (x: ident) (b: binop ty1 ty2 ty):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EBinop l b exp1 exp2))) ->
+  forall tyv, (~ In (x, tyv) (var_of_raw_exp exp1) /\ ~ In (x, tyv) (var_of_raw_exp exp2)).
+Proof.
+  intros Hnin.
+  split.
+  - intros Hin1.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_exp.
+    assumption.
+  - intros Hin1.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_acc.
+    assumption.
+Qed.
+
+Lemma var_of_raw_exp_not_in_ifte {ty} (l: Result.location) (e1: raw_exp TBool) (e2 e3: raw_exp ty) (x: ident):
+  (forall tyv, ~ In (x, tyv) (var_of_raw_exp (Raw_EIfte l e1 e2 e3))) ->
+  forall tyv, (~ In (x, tyv) (var_of_raw_exp e1) /\ ~ In (x, tyv) (var_of_raw_exp e2) /\ ~ In (x, tyv) (var_of_raw_exp e3)).
+Proof.
+  intros Hnin.
+  split.
+  - intros Hin.
+    apply (Hnin tyv).
+    unfold var_of_raw_exp.
+    simpl.
+    apply var_of_raw_exp_aux_in_exp.
+    assumption.
+  - split.
+    + intros Hin.
+      apply (Hnin tyv).
+      unfold var_of_raw_exp.
+      simpl.
+      apply var_of_raw_exp_aux_in_acc.
+      apply var_of_raw_exp_aux_in_exp.
+      assumption.
+    + intros Hin.
+      apply (Hnin tyv).
+      unfold var_of_raw_exp.
+      simpl.
+      apply var_of_raw_exp_aux_in_acc.
+      apply var_of_raw_exp_aux_in_acc.
+      assumption.
+Qed.
+
 Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
   | TimedConst: forall l (n: nat) {ty} (c: const ty), well_timed n (Raw_EConst l c)
   | TimedVar: forall l (n: nat) (b: binder), well_timed n (Raw_EVar l b)
@@ -69,7 +214,10 @@ Inductive well_timed: nat -> forall {ty}, raw_exp ty -> Prop :=
 Definition equation : Type := ident * { ty : type & comb_exp ty }.
 Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
 
-Lemma timed_exp {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+Definition raw_equation : Type := ident * { ty : type & raw_exp ty }.
+Definition raw_equation_dest (eq : raw_equation) : ident * type := (fst eq, projT1 (snd eq)).
+
+Lemma timed_exp {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
   Result.t type (well_timed n exp).
 Proof.
   induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
@@ -122,7 +270,7 @@ Proof.
         exact (errc ++ err1 ++ err2).
   - destruct n.
     + constructor 2.
-      exact [(loc, (Result.InvalidTiming vname vid ty))].
+      exact [(l, (Result.InvalidTiming vname vid ty))].
     + specialize (IH n).
       destruct IH as [IH | err].
       2: constructor 2; exact err.
@@ -146,7 +294,7 @@ Proof.
         exact err.
 Defined.
 
-Lemma timed_exp_gt {ty} (vname: string) (vid: ident) (loc: Result.location) (n: nat) (exp: raw_exp ty):
+Lemma timed_exp_ge {ty} (vname: string) (vid: ident) (n: nat) (exp: raw_exp ty):
   Result.t type (forall n', n <= n' -> well_timed n' exp).
 Proof.
   induction exp as [ l | l | l tin tout u exp IH | l ty1 ty2 tout b e1 IH1 e2 IH2 | l t ec IHc e1 IH1 e2 IH2 | l ty exp IH | l ty e1 IH1 e2 IH2] in n |- *.
@@ -210,7 +358,7 @@ Proof.
         exact (errc ++ err1 ++ err2).
   - destruct n.
     + constructor 2.
-      exact [(loc, (Result.InvalidTiming vname vid ty))].
+      exact [(l, (Result.InvalidTiming vname vid ty))].
     + specialize (IH n).
       destruct IH as [IH | err].
       2: constructor 2; exact err.
@@ -222,32 +370,68 @@ Proof.
       constructor.
       apply IH.
       assumption.
-  - specialize (IH2 n).
-    destruct n as [| n].
-    + assert (timed_1 := timed_exp vname vid loc 0 e1).
-      destruct timed_1 as [timed_1 | err1].
-      * destruct IH2 as [IH2 | err2].
-        2: constructor 2; exact err2.
-        constructor 1.
-        intros n' isless.
-        specialize (IH2 _ isless).
-        destruct n' as [| n'].
-        all: constructor.
-        all: assumption.
-      * destruct IH2 as [IH2 | err2].
-        all: constructor 2.
-        1: exact err1.
-        exact (err1 ++ err2).
-    + destruct IH2 as [IH2 | err2].
+  - destruct n as [| n].
+    + refine (Result.bind (Result.combine_prop (timed_exp vname vid 0 e1) (IH2 (S O))) _); clear IH1 IH2.
+      intros [timed_1 IH2].
+      constructor 1.
+      intros n' isless.
+      destruct n' as [| n'].
+      2: specialize (IH2 (S n') (le_n_S _ _ (le_0_n _))).
+      all: constructor.
+      all: assumption.
+    + specialize (IH2 n).
+      destruct IH2 as [IH2 | err2].
       2: constructor 2; exact err2.
       constructor 1.
       intros n' isless.
       destruct n' as [|n'].
       1: inversion isless.
       constructor.
-      apply IH2.
+      apply IH2, le_S, le_S_n.
       assumption.
 Defined.
+
+Definition well_timed_eq (eq: raw_equation) : Prop := forall n, well_timed n (projT2 (snd eq)).
+
+Lemma timed_eq (vname: string) (eq: raw_equation) : Result.t type (well_timed_eq eq).
+Proof.
+  unfold well_timed_eq.
+  destruct eq as [ident [ty e]].
+  simpl.
+  destruct (timed_exp_ge vname ident 0 e) as [timed | err].
+  2: right; exact err.
+  left.
+  intro n.
+  apply (timed n).
+  apply le_0_n.
+Defined.
+
+Lemma timed_list_eq (vname: string) (eqs: list raw_equation) : Result.t type (Forall well_timed_eq eqs).
+Proof.
+  induction eqs as [|eq eqs IH].
+  1: left; constructor.
+  destruct IH as [timed_eqs | err].
+  2: right; exact err.
+  destruct (timed_eq vname eq) as [timed | err].
+  2: right; exact err.
+  left.
+  apply Forall_cons.
+  all: assumption.
+Defined.
+
+Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
+  match e with
+    | EConst _ _ => acc
+    | EVar _ (name, ty) => (name, ty) :: acc
+    | EUnop _ _ e => var_of_exp_aux e acc
+    | EBinop _ _ e1 e2 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
+    | EIfte _ e1 e2 e3 =>
+      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
+  end.
+
+Definition var_of_exp {ty} (e: comb_exp ty): list (ident * type) :=
+  var_of_exp_aux e [].
 
 Record node := mk_node {
   n_loc: Result.location;
@@ -256,22 +440,46 @@ Record node := mk_node {
   n_in: list binder;
   n_out: list binder;
   n_locals: list binder; (* Also includes additionally created binders for pre *)
-  n_pre: list equation; (* Happens before n_init and n_step *)
+  n_pre: list (binder * ident); (* Happens before n_step *)
   n_init: list equation;
   n_step: list equation;
 
   n_vars: list binder := n_in ++ n_out ++ n_locals;
   n_assigned_vars_init: list binder := map equation_dest n_init;
-  n_assigned_vars_pre: list binder := map equation_dest n_pre;
   n_assigned_vars_step: list binder := map equation_dest n_step;
 
-  n_init_vars_all_assigned: Permutation (n_assigned_vars_pre ++ n_assigned_vars_init) (n_out ++ n_locals);
-  n_step_vars_all_assigned: Permutation (n_assigned_vars_pre ++ n_assigned_vars_step) (n_out ++ n_locals);
+  n_init_vars_all_assigned: Permutation n_assigned_vars_init (n_out ++ n_locals);
+  n_step_vars_all_assigned: Permutation n_assigned_vars_step (n_out ++ n_locals);
+  n_all_init_vars_exist: Forall (fun eq => incl (var_of_exp (projT2 (snd eq))) n_vars) n_init;
+  n_all_step_vars_exist: Forall (fun eq => incl (var_of_exp (projT2 (snd eq))) (n_vars ++ map fst n_pre)) n_step;
+  n_all_pre_vars_exist: Forall (fun eq => In (snd eq, snd (fst eq)) n_vars) n_pre;
 
-  n_vars_unique: NoDup (map fst n_vars);
+  n_vars_unique: NoDup (map fst n_vars ++ map (fun eq => fst (fst eq)) n_pre);
 
   n_seed: ident;
-  n_seed_always_fresh: forall n, ~In (iter n next_ident n_seed) (map fst n_vars);
+  n_seed_always_fresh: freshness n_seed (n_vars ++ map fst n_pre);
+}.
+
+Record raw_node := mk_raw_node {
+  rn_loc: Result.location;
+  rn_name: string;
+
+  rn_in: list binder;
+  rn_out: list binder;
+  rn_locals: list binder;
+  rn_body: list raw_equation;
+
+  rn_vars: list binder := rn_in ++ rn_out ++ rn_locals;
+  rn_assigned_vars: list binder := map raw_equation_dest rn_body;
+  rn_all_vars_exist: Forall (fun eq => incl (var_of_raw_exp (projT2 (snd eq))) rn_vars) rn_body;
+
+  rn_vars_all_assigned: Permutation rn_assigned_vars (rn_out ++ rn_locals);
+  rn_vars_unique: NoDup (map fst rn_vars);
+
+  rn_seed: ident;
+  rn_seed_always_fresh: freshness rn_seed rn_vars;
+
+  rn_well_timed: Forall well_timed_eq rn_body;
 }.
 
 
@@ -281,8 +489,8 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
     comb_exp ty (* init *)
     * comb_exp ty (* step *)
     * ident (* New identifier origin *)
-    * (list binder) (* Variables created for pre *)
-    * (list equation) (* pre equations *)
+    * list binder (* Variables created for pre *)
+    * (list (binder * ident)) (* pre equations *)
     (* Equations to merge with the regular equations *)
     (* for init: 
       prex = undef (a variable initialised later)
@@ -312,37 +520,25 @@ Fixpoint raw_to_comb {ty} (exp: raw_exp ty) (seed: ident): (
           let pre_var := (ident_pre, t) in
             let eq_var := (ident_eq, t) in
               (
-                EVar l pre_var,
+                EVar l eq_var,
                 EVar l pre_var,
                 next_orig,
-                pre_var::eq_var::binders,
-                (ident_pre, existT comb_exp t (EVar l eq_var))::eqs_pre,
+                eq_var::binders,
+                (pre_var, ident_eq)::eqs_pre,
                 (ident_eq, existT _ t ei)::init_post,
                 (ident_eq, existT _ t es)::step_post
               )
-    | Raw_EArrow l e1 e2 => let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
+    | Raw_EArrow _ e1 e2 =>
+      let '(ei1, es1, orig1, binders1, eqs_pre1, init_post1, step_post1) := raw_to_comb e1 seed in
       let '(e2i, e2s, orig2, binders2, eqs_pre2, init_post2, step_post2) := raw_to_comb e2 orig1 in
-        (ei1, e2s, orig2, binders1 ++ binders2, eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
+      (ei1, e2s, orig2, binders1 ++ binders2,
+       eqs_pre1 ++ eqs_pre2, init_post1 ++ init_post2, step_post1 ++ step_post2)
   end.
-
-Fixpoint var_of_exp_aux {ty} (e: comb_exp ty) (acc: list (ident * type)): list (ident * type) :=
-  match e with
-    | EConst _ _ => acc
-    | EVar _ (name, ty) => (name, ty) :: acc
-    | EUnop _ _ e => var_of_exp_aux e acc
-    | EBinop _ _ e1 e2 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 acc)
-    | EIfte _ e1 e2 e3 =>
-      var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
-  end.
-
-Definition var_of_exp {ty} (e: comb_exp ty): list (ident * type) :=
-  var_of_exp_aux e [].
 
 (** Properties *)
-Lemma raw_to_comb_nextseed {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
-  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> exists n, seed' = iter n next_ident seed.
+Lemma raw_to_comb_nextseed {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post) ->
+  exists n, seed' = iter n next_ident seed.
 Proof.
   intro eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -407,9 +603,9 @@ Proof.
     assumption.
 Qed.
 
-Lemma freshness_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
-  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> freshness seed' pre_binders.
+Lemma freshness_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post) ->
+  freshness seed' (pre_binders ++ map fst pre_eqs).
 Proof.
   intros eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -431,7 +627,10 @@ Proof.
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     assert (nextseed := raw_to_comb_nextseed unfold2).
     apply (freshness_later_e nextseed) in IHexp1.
-    apply (freshness_fusion IHexp1 IHexp2).
+    refine (freshness_permutation (freshness_fusion IHexp1 IHexp2) _).
+    rewrite map_app, !app_assoc.
+    apply Permutation_app_tail; rewrite <-2!app_assoc; apply Permutation_app_head.
+    exact (Permutation_app_comm _ _).
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
@@ -445,23 +644,25 @@ Proof.
     apply (freshness_later_e nextseed1) in IHexp1.
     apply (freshness_later_e nextseed2) in IHexp1.
     apply (freshness_later_e nextseed2) in IHexp2.
-    apply (freshness_fusion IHexp1 (freshness_fusion IHexp2 IHexp3)).
+    refine (freshness_permutation (freshness_fusion IHexp1 (freshness_fusion IHexp2 IHexp3)) _).
+    rewrite !map_app, !app_assoc.
+    apply Permutation_app_tail; rewrite <-!app_assoc; apply Permutation_app_head.
+    rewrite (Permutation_app_comm binders3), !app_assoc; apply Permutation_app_tail.
+    rewrite (Permutation_app_comm binders2); apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
     intros n isin.
-    rewrite <- !PeanoNat.Nat.iter_succ_r in isin.
-    rewrite !map_cons in isin.
-    unfold fst at 1 2 in isin.
-    destruct isin as [f | [f | isin]].
-    + apply ident_diff in f.
-      assumption.
-    + rewrite Nat.iter_succ_r in f.
-      apply ident_diff in f.
-      assumption.
-    + specialize (IHexp (S (S n))).
-      contradiction.
+    rewrite <- !PeanoNat.Nat.iter_succ_r in isin; simpl map in isin.
+    rewrite map_app, map_cons in isin.
+    destruct isin as [f | isin]; [|apply in_app_or in isin; destruct isin as [isin | [f | isin]]].
+    1: rewrite Nat.iter_succ_r in f.
+    1,3: apply ident_diff in f; exact f.
+    1,2: refine (IHexp (S (S n)) _); rewrite map_app; apply in_or_app.
+    1: left.
+    2: right.
+    1,2: exact isin.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
@@ -470,12 +671,15 @@ Proof.
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     assert (nextseed := raw_to_comb_nextseed unfold2).
     apply (freshness_later_e nextseed) in IHexp1.
-    apply (freshness_fusion IHexp1 IHexp2).
+    refine (freshness_permutation (freshness_fusion IHexp1 IHexp2) _).
+    rewrite map_app, !app_assoc.
+    apply Permutation_app_tail; rewrite <-2!app_assoc; apply Permutation_app_head.
+    exact (Permutation_app_comm _ _).
 Qed.
 
-Lemma isnext_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
-  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> forall x, In x (map fst pre_binders) -> exists n, x = iter n next_ident seed.
+Lemma isnext_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post) ->
+  forall x, In x (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs) -> exists n, x = iter n next_ident seed.
 Proof.
   intros eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -496,10 +700,11 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     intros x isin.
-    rewrite map_app in isin.
-    apply in_app_or in isin.
     specialize (IHexp1 x).
     specialize (IHexp2 x).
+    assert (isin' : In x (map fst binders1 ++ map (fun eq => fst (fst eq)) pre_eqs1) \/ In x (map fst binders2 ++ map (fun eq => fst (fst eq)) pre_eqs2))
+     by (rewrite !map_app, !in_app_iff in isin; rewrite !in_app_iff; tauto).
+    clear isin; rename isin' into isin.
     destruct isin as [isin | isin].
     1: tauto.
     specialize (IHexp2 isin).
@@ -531,8 +736,10 @@ Proof.
     rewrite nextseed1 in IHexp2.
     rewrite nextseed2 in IHexp3.
     rewrite nextseed1 in IHexp3.
-    rewrite !map_app in isin.
-    rewrite !in_app_iff in isin.
+    assert (isin' : In x (map fst binders1 ++ map (fun eq => fst (fst eq)) pre_eqs1) \/ In x (map fst binders2 ++ map (fun eq => fst (fst eq)) pre_eqs2) \/
+                    In x (map fst binders3 ++ map (fun eq => fst (fst eq)) pre_eqs3))
+     by (rewrite !map_app, !in_app_iff in isin; rewrite !in_app_iff; tauto).
+    clear isin; rename isin' into isin.
     destruct isin as [isin | [isin | isin]].
     + tauto.
     + specialize (IHexp2 isin).
@@ -553,8 +760,9 @@ Proof.
     specialize (IHexp x).
     assert (nextseed := raw_to_comb_nextseed unfold1).
     destruct nextseed as [nseed nextseed].
-    rewrite !map_cons in isin.
-    unfold fst at 1 2 in isin.
+    assert (isin' : In x (seed1 :: next_ident seed1 :: map fst binders1 ++ map (fun eq => fst (fst eq)) pre_eqs1))
+     by (cbn in isin |- *; rewrite in_app_iff in isin; cbn in isin; rewrite in_app_iff; tauto).
+    clear isin; rename isin' into isin.
     destruct isin as [isseed | [isnext | isin]]; subst.
     + exists nseed.
       reflexivity.
@@ -568,10 +776,11 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     intros x isin.
-    rewrite map_app in isin.
-    apply in_app_or in isin.
     specialize (IHexp1 x).
     specialize (IHexp2 x).
+    assert (isin' : In x (map fst binders1 ++ map (fun eq => fst (fst eq)) pre_eqs1) \/ In x (map fst binders2 ++ map (fun eq => fst (fst eq)) pre_eqs2))
+     by (rewrite !map_app, !in_app_iff in isin; rewrite !in_app_iff; tauto).
+    clear isin; rename isin' into isin.
     destruct isin as [isin | isin].
     1: tauto.
     specialize (IHexp2 isin).
@@ -584,9 +793,9 @@ Proof.
     assumption.
 Qed.
 
-Lemma nodup_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
+Lemma nodup_raw_to_comb {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
   raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> NoDup (map fst pre_binders).
+  -> NoDup (map fst pre_binders ++ map (fun eq => fst (fst eq)) pre_eqs).
 Proof.
   intros eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -605,14 +814,14 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     assert (freshness1 := freshness_raw_to_comb unfold1).
-    rewrite map_app.
-    apply NoDup_app.
-    1, 2: assumption.
+    rewrite !map_app.
+    refine (Permutation_NoDup _ (NoDup_app IHexp1 IHexp2 _)).
+    1: rewrite !app_assoc; apply Permutation_app_tail; rewrite <-!app_assoc; apply Permutation_app_head, Permutation_app_comm.
     intros x isin1 isin2.
     assert (isnext := isnext_raw_to_comb unfold2 x isin2).
     destruct isnext as [n isnext].
     apply (freshness1 n).
-    rewrite <- isnext.
+    rewrite <- isnext, map_app, map_map.
     assumption.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
@@ -627,15 +836,16 @@ Proof.
     assert (nextseed := raw_to_comb_nextseed unfold2).
     destruct nextseed as [nseed nextseed].
     rewrite !map_app.
-    apply NoDup_app.
-    + assumption.
-    + apply NoDup_app.
-      1,2: assumption.
-      intros x isin2 isin3.
+    refine (Permutation_NoDup _ (NoDup_app IHexp1 (NoDup_app IHexp2 IHexp3 _) _)).
+    + clear.
+      rewrite !app_assoc; apply Permutation_app_tail; rewrite <-!app_assoc; apply Permutation_app_head.
+      rewrite !app_assoc, (Permutation_app_comm _ (map _ binders2)), <-!app_assoc; apply Permutation_app_head.
+      rewrite app_assoc, (Permutation_app_comm _ (map _ binders3)); apply Permutation_refl.
+    + intros x isin2 isin3.
       assert (isnext := isnext_raw_to_comb unfold3 x isin3).
       destruct isnext as [n isnext].
       apply (freshness2 n).
-      rewrite <- isnext.
+      rewrite <- isnext, map_app, map_map.
       assumption.
     + intros x isin1 isin23.
       apply in_app_or in isin23.
@@ -643,14 +853,14 @@ Proof.
       * assert (isnext := isnext_raw_to_comb unfold2 x isin2).
         destruct isnext as [n isnext].
         apply (freshness1 n).
-        rewrite <- isnext.
+        rewrite <- isnext, map_app, map_map.
         assumption.
       * assert (isnext := isnext_raw_to_comb unfold3 x isin3).
         destruct isnext as [n isnext].
         rewrite nextseed in isnext.
         rewrite <- Nat.iter_add in isnext.
         apply (freshness1 (n + nseed)).
-        rewrite <- isnext.
+        rewrite <- isnext, map_app, map_map.
         assumption.
   - simpl in eqe.
     destruct (raw_to_comb exp seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
@@ -658,20 +868,24 @@ Proof.
     specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
     assert (freshness := freshness_raw_to_comb unfold1).
     rewrite !map_cons.
-    unfold fst at 1 2.
+    assert (Hperm : Permutation (seed1 :: next_ident seed1 :: map fst binders1 ++ map (fun eq => fst (fst eq)) pre_eqs1)
+                                (next_ident seed1 :: map fst binders1 ++ seed1 :: map (fun eq => fst (fst eq)) pre_eqs1))
+     by exact (Permutation_elt [] _ (_ :: _) _ _ (Permutation_refl _)).
+    refine (Permutation_NoDup Hperm _); clear Hperm.
     apply NoDup_cons.
     + intro isin.
       destruct isin as [f|isin].
-      * inversion f as [ff].
-        symmetry in ff.
-        apply (ident_diff _ 0) in ff.
+      * symmetry in f.
+        apply (ident_diff _ 0) in f.
         assumption.
       * apply (freshness 0).
+        rewrite map_app, map_map.
         assumption.
     + apply NoDup_cons.
       2: assumption.
       intro isin.
       apply (freshness 1).
+      rewrite map_app, map_map.
       assumption.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
@@ -680,20 +894,20 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     assert (freshness1 := freshness_raw_to_comb unfold1).
-    rewrite map_app.
-    apply NoDup_app.
-    1, 2: assumption.
+    rewrite !map_app.
+    refine (Permutation_NoDup _ (NoDup_app IHexp1 IHexp2 _)).
+    1: rewrite !app_assoc; apply Permutation_app_tail; rewrite <-!app_assoc; apply Permutation_app_head, Permutation_app_comm.
     intros x isin1 isin2.
     assert (isnext := isnext_raw_to_comb unfold2 x isin2).
     destruct isnext as [n isnext].
     apply (freshness1 n).
-    rewrite <- isnext.
+    rewrite <- isnext, map_app, map_map.
     assumption.
 Qed.
 
-Lemma raw_to_comb_assigned_init {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
-  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map equation_dest (pre_eqs ++ init_post)) pre_binders.
+Lemma raw_to_comb_assigned_init {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post) ->
+  Permutation (map equation_dest init_post) pre_binders.
 Proof.
   intro eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -712,14 +926,6 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite <- app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest init_post2)).
     apply Permutation_app.
     all: assumption.
   - simpl in eqe.
@@ -731,63 +937,25 @@ Proof.
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
     rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite map_app in IHexp3.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs2)).
-    rewrite <- !app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite !app_assoc.
-    rewrite <- app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest init_post3)).
-    rewrite IHexp3.
-    rewrite (Permutation_app_comm _ (map equation_dest init_post2)).
-    rewrite !app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest init_post2)).
-    rewrite IHexp2.
-    rewrite (Permutation_app_comm _ (map equation_dest init_post1)).
-    rewrite (Permutation_app_comm binders2).
-    rewrite !app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest init_post1)).
-    rewrite IHexp1.
+    rewrite IHexp1, IHexp2, IHexp3.
     apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
-    rewrite !map_app.
-    rewrite map_app in IHexp.
-    rewrite !map_cons.
-    unfold equation_dest at 1 3, fst, snd, projT1.
-    rewrite <- !Permutation_middle.
-    simpl.
-    rewrite perm_swap.
-    do 2 apply perm_skip.
-    assumption.
+    cbn; rewrite IHexp; apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
-    rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite <- app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest init_post2)).
-    apply Permutation_app.
-    all: assumption.
+    rewrite map_app, IHexp1, IHexp2; apply Permutation_refl.
 Qed.
 
-Lemma raw_to_comb_assigned_step {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs init_post step_post: list equation}:
-  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post)
-  -> Permutation (map equation_dest (pre_eqs ++ step_post)) pre_binders.
+Lemma raw_to_comb_assigned_step {ty} {exp: raw_exp ty} {ei es: comb_exp ty} {seed seed': ident} {pre_binders: list binder} {pre_eqs} {init_post step_post: list equation}:
+  raw_to_comb exp seed = (ei, es, seed', pre_binders, pre_eqs, init_post, step_post) ->
+  Permutation (map equation_dest step_post) pre_binders.
 Proof.
   intro eqe.
   induction exp in ei, es, seed, seed', pre_binders, pre_eqs, init_post, step_post, eqe.
@@ -805,17 +973,8 @@ Proof.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
-    rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite <- app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest step_post2)).
-    apply Permutation_app.
-    all: assumption.
+    rewrite !map_app, IHexp1, IHexp2.
+    apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
@@ -824,71 +983,135 @@ Proof.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
     specialize (IHexp3 _ _ _ _ _ _ _ _ unfold3).
-    rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite map_app in IHexp3.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs2)).
-    rewrite <- !app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite !app_assoc.
-    rewrite <- app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest step_post3)).
-    rewrite IHexp3.
-    rewrite (Permutation_app_comm _ (map equation_dest step_post2)).
-    rewrite !app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest step_post2)).
-    rewrite IHexp2.
-    rewrite (Permutation_app_comm _ (map equation_dest step_post1)).
-    rewrite (Permutation_app_comm binders2).
-    rewrite !app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest step_post1)).
-    rewrite IHexp1.
+    rewrite !map_app, IHexp1, IHexp2, IHexp3.
     apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp _ _ _ _ _ _ _ _ unfold1).
-    rewrite !map_app.
-    rewrite map_app in IHexp.
-    rewrite !map_cons.
-    unfold equation_dest at 1 3, fst, snd, projT1.
-    rewrite <- !Permutation_middle.
-    simpl.
-    rewrite perm_swap.
-    do 2 apply perm_skip.
-    assumption.
+    cbn; rewrite IHexp; apply Permutation_refl.
   - simpl in eqe.
     destruct (raw_to_comb exp1 seed) as [[[[[[ei1 es1] seed1] binders1] pre_eqs1] init_post1] step_post1] eqn: unfold1.
     destruct (raw_to_comb exp2 seed1) as [[[[[[ei2 es2] seed2] binders2] pre_eqs2] init_post2] step_post2] eqn: unfold2.
     injection eqe as <- <- <- <- <- <- <-.
     specialize (IHexp1 _ _ _ _ _ _ _ _ unfold1).
     specialize (IHexp2 _ _ _ _ _ _ _ _ unfold2).
-    rewrite !map_app.
-    rewrite map_app in IHexp1.
-    rewrite map_app in IHexp2.
-    rewrite (Permutation_app_comm (map equation_dest pre_eqs1)).
-    rewrite <- app_assoc.
-    rewrite Permutation_app_comm.
-    rewrite <- !app_assoc.
-    rewrite app_assoc.
-    rewrite (Permutation_app_comm (map equation_dest step_post2)).
-    apply Permutation_app.
-    all: assumption.
+    rewrite !map_app, IHexp1, IHexp2.
+    apply Permutation_refl.
+Qed.
+
+Lemma var_of_exp_aux_eq {ty} (e: comb_exp ty) (l: list (ident * type)):
+  var_of_exp_aux e l = var_of_exp e ++ l.
+Proof.
+  revert l.
+  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  - reflexivity.
+  - reflexivity.
+  - apply IH.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH1, IH2.
+    rewrite app_nil_r, app_assoc.
+    reflexivity.
+  - unfold var_of_exp.
+    simpl.
+    rewrite IH1, IH2, IH3, IH1, IH2, IH3.
+    rewrite app_nil_r, app_assoc, app_assoc, app_assoc.
+    reflexivity.
 Qed.
 
 (* Semantics *)
-Inductive value: type -> Set :=
-  | RVConst  : forall {ty}, const ty -> value ty
-  | RVUnop   : forall {ty tout}, unop ty tout -> value ty -> value tout
-  | RVBinop  : forall {ty1 ty2 tout}, binop ty1 ty2 tout -> value ty1 -> value ty2 -> value tout
-  | RVIfte   : forall {ty}, value TBool -> value ty -> value ty -> value ty
+Inductive sem_unop : forall {tyin tyout : type}, unop tyin tyout -> value tyin -> value tyout -> Prop :=
+  | SeNot (v: value TInt) : sem_unop Uop_not v (vnot v)
+  | SeNeg (v: value TInt) : sem_unop Uop_neg v (vneg v).
+
+Inductive sem_binop : forall {ty1 ty2 tyout : type}, binop ty1 ty2 tyout -> value ty1 -> value ty2 -> value tyout -> Prop :=
+  | SeAnd (v1 v2: value TBool) : sem_binop Bop_and v1 v2 (vand v1 v2)
+  | SeOr (v1 v2: value TBool) : sem_binop Bop_or v1 v2 (vor v1 v2)
+  | SeXor (v1 v2: value TBool) : sem_binop Bop_xor v1 v2 (vxor v1 v2)
+  | SePlus (v1 v2: value TInt) : sem_binop Bop_plus v1 v2 (vplus v1 v2)
+  | SeMinus (v1 v2: value TInt) : sem_binop Bop_minus v1 v2 (vminus v1 v2)
+  | SeMult (v1 v2: value TInt) : sem_binop Bop_mult v1 v2 (vmult v1 v2)
+  | SeDiv (v1 v2: value TInt) : sem_binop Bop_div v1 v2 (vdiv v1 v2)
+  | SeEq (v1 v2: value TInt) : sem_binop Bop_eq v1 v2 (veq v1 v2)
+  | SeNeq (v1 v2: value TInt) : sem_binop Bop_neq v1 v2 (vneq v1 v2)
+  | SeLe (v1 v2: value TInt) : sem_binop Bop_le v1 v2 (vle v1 v2)
+  | SeLt (v1 v2: value TInt) : sem_binop Bop_lt v1 v2 (vlt v1 v2)
+  | SeGe (v1 v2: value TInt) : sem_binop Bop_ge v1 v2 (vge v1 v2)
+  | SeGt (v1 v2: value TInt) : sem_binop Bop_gt v1 v2 (vgt v1 v2).
+
+Inductive sem_raw_exp (h: history) | : nat -> forall {ty}, raw_exp ty -> value ty -> Prop :=
+  | Raw_SeConst (t: nat) {ty} (c: const ty):
+    forall loc, sem_raw_exp t (Raw_EConst loc c) (const_to_value c)
+  
+  | Raw_SeUnop (t: nat) {tyin tyout} (op: unop tyin tyout) (e: raw_exp _) (vin vout: value _):
+    sem_raw_exp t e vin -> sem_unop op vin vout -> forall loc, sem_raw_exp t (Raw_EUnop loc op e) vout
+  
+  | Raw_SeBinop (t: nat) {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: raw_exp _) (v1 v2 vout: value _):
+    sem_raw_exp t e1 v1 -> sem_raw_exp t e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_raw_exp t (Raw_EBinop loc op e1 e2) vout
+
+  | Raw_SeIfte (t: nat) {ty} (e1: raw_exp TBool) (e2 e3: raw_exp ty) (v1 v2 v3: value _):
+    sem_raw_exp t e1 v1 ->
+    sem_raw_exp t e2 v2 ->
+    sem_raw_exp t e3 v3 ->
+    forall loc, sem_raw_exp t (Raw_EIfte loc e1 e2 e3) (vifte v1 v2 v3)
+
+  | Raw_SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
+      Dict.maps_to (fst b) (existT _ _ v) h ->
+      forall loc, sem_raw_exp t (Raw_EVar loc b) (Stream.nth t v)
+
+  | Raw_SePre {ty} (t: nat) (e: raw_exp ty) (v: value ty):
+    sem_raw_exp t e v -> forall loc, sem_raw_exp (S t) (Raw_EPre loc e) v
+
+  | Raw_SeArrow0 {ty} (e1 e2: raw_exp ty) (v: value ty):
+    sem_raw_exp O e1 v -> forall loc, sem_raw_exp O (Raw_EArrow loc e1 e2) v
+
+  | Raw_SeArrowS {ty} (t: nat) (e1 e2: raw_exp ty) (v: value ty):
+    sem_raw_exp (S t) e2 v -> forall loc, sem_raw_exp (S t) (Raw_EArrow loc e1 e2) v
 .
 
-Definition history := Dict.t {ty & Stream.t (value ty)}.
-Definition in_history (h : history) '((v, ty) : nat * type) := match Dict.find v h with
-  | Some (existT _ ty' _) => ty' = ty
-  | None => False
-end.
+Inductive sem_comb_exp (h: history) (t: nat) | : forall {ty}, comb_exp ty -> value ty -> Prop :=
+  | SeConst {ty} (c: const ty):
+      forall loc, sem_comb_exp (EConst loc c) (const_to_value c)
+  
+  | SeUnop {tyin tyout} (op: unop tyin tyout) (e: comb_exp _) (vin vout: value _):
+    sem_comb_exp e vin -> sem_unop op vin vout -> forall loc, sem_comb_exp (EUnop loc op e) vout
+  
+  | SeBinop {ty1 ty2 tyout} (op: binop ty1 ty2 tyout) (e1 e2: comb_exp _) (v1 v2 vout: value _):
+    sem_comb_exp e1 v1 -> sem_comb_exp e2 v2 -> sem_binop op v1 v2 vout -> forall loc, sem_comb_exp (EBinop loc op e1 e2) vout
+
+  | SeIfte {ty} (e1: comb_exp TBool) (e2 e3: comb_exp ty) (v1 v2 v3: value _):
+    sem_comb_exp e1 v1 ->
+    sem_comb_exp e2 v2 ->
+    sem_comb_exp e3 v3 ->
+    forall loc, sem_comb_exp (EIfte loc e1 e2 e3) (vifte v1 v2 v3)
+
+  | SeVar (b: binder) (v: Stream.t (value (binder_ty b))):
+      Dict.maps_to (fst b) (existT _ _ v) h ->
+      forall loc, sem_comb_exp (EVar loc b) (Stream.nth t v)
+.
+
+Definition sem_raw_eq (eq: raw_equation) (h: history) : Prop :=
+  exists (s: Stream.t (value (projT1 (snd eq)))),
+  h_maps_to (fst eq) s h /\ forall n, sem_raw_exp h n (projT2 (snd eq)) (Stream.nth n s).
+
+Definition sem_raw_node (n: raw_node) (h: history) : Prop :=
+  forall (i: ident) (ty: type),
+  In (i, ty) n.(rn_vars) ->
+   exists (s: Stream.t (value ty)),
+   h_maps_to i s h /\
+   (forall (e: raw_exp ty), In (i, existT _ _ e) n.(rn_body) -> forall n, sem_raw_exp h n e (Stream.nth n s))
+  .
+
+Definition sem_node (n: node) (h: history) : Prop :=
+  forall (i: ident) (ty: type),
+  (In (i, ty) n.(n_vars) ->
+   exists (s: Stream.t (value ty)),
+   h_maps_to i s h /\
+   (forall (e: comb_exp ty), In (i, existT _ _ e) n.(n_init) -> sem_comb_exp h 0 e (Stream.hd s)) /\
+   (forall (e: comb_exp ty), In (i, existT _ _ e) n.(n_step) -> forall n, sem_comb_exp h (S n) e (Stream.nth (S n) s))) /\
+  (forall j, In ((i, ty), j) n.(n_pre) ->
+   exists (s: Stream.t (value ty)),
+   h_maps_to i s h /\
+   forall n loc, sem_comb_exp h n (EVar loc (j, ty)) (Stream.nth (S n) s))
+  .

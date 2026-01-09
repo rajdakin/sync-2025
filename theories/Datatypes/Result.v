@@ -86,3 +86,9 @@ Module notations.
   Infix ">+<" := combine (at level 60, right associativity).
 
 End notations.
+
+Lemma ok_eq {A E} (a b: A): @Ok E A a = Ok b -> a = b.
+Proof.
+  inversion 1.
+  reflexivity.
+Qed.

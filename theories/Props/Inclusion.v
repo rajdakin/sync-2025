@@ -126,3 +126,45 @@ Proof.
   apply in_map.
   tauto.
 Qed.
+
+Lemma in_map_inv {A B: Type} (f: A -> B) (b: B) (l: list A) :
+  In b (map f l) -> exists (a: A), In a l /\ f a = b.
+Proof.
+  induction l.
+  1: contradiction.
+  rewrite map_cons.
+  simpl.
+  intros [iseq | isin].
+  1: exists a; tauto.
+  destruct (IHl isin) as [a' IH].
+  exists a'.
+  tauto.
+Defined.
+
+Lemma in_fst_inv {A B: Type} (a: A) (l: list (A * B)) :
+  In a (map fst l) -> exists (b: B), In (a, b) l.
+Proof.
+  induction l as [|[a' b'] l IH].
+  1: contradiction.
+  rewrite map_cons.
+  simpl.
+  intros [iseq | isin]; subst.
+  1: exists b'; left; reflexivity.
+  destruct (IH isin) as [b].
+  exists b.
+  right; assumption.
+Defined.
+
+Lemma in_snd_inv {A B: Type} (b: B) (l: list (A * B)) :
+  In b (map snd l) -> exists (a: A), In (a, b) l.
+Proof.
+  induction l as [|[a' b'] l IH].
+  1: contradiction.
+  rewrite map_cons.
+  simpl.
+  intros [iseq | isin]; subst.
+  1: exists a'; left; reflexivity.
+  destruct (IH isin) as [a].
+  exists a.
+  right; assumption.
+Defined.

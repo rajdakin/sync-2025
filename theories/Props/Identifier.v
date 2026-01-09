@@ -24,3 +24,5 @@ Proof.
     specialize (s n).
     lia.
 Qed.
+
+Definition ident_dec (x y: ident) : {x = y} + {x <> y} := (PeanoNat.Nat.eq_dec x y).

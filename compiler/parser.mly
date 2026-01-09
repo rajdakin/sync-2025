@@ -22,7 +22,7 @@
 %token TRUE FALSE
 %token SEMI_COLON COLON COMMA
 %token NODE RETURNS VAR
-%token BOOL INT VOID
+%token BOOL INT
 %token LET TEL EOF
 %token IF THEN ELSE
 %token PRE ARROW FBY
@@ -59,7 +59,6 @@ file:
 typ:
   | BOOL { (TBool, (extent_of_len 4 $endpos)) }
   | INT  { (TInt, (extent_of_len 3 $endpos)) }
-  | VOID { (TVoid, (extent_of_len 4 $endpos)) }
 
 local_vars:
   | id=ident COLON typ=typ SEMI_COLON
@@ -135,7 +134,6 @@ const:
   | LT    { Bop_lt }
   | EQ    { Bop_eq }
   | NEQ   { Bop_neq }
-  | FBY   { Bop_fby }
   | ARROW { Bop_arrow }
 
 expr:
@@ -144,5 +142,6 @@ expr:
   | v=var                   { (EVar (loc_of_ext (snd v), fst v), snd v) }
   | o=unop e1=expr          { let p = extend_to_ext (snd o) (snd e1) in (EUnop (loc_of_ext p, fst o, fst e1), p) }
   | e1=expr o=binop e2=expr { let p = extend_to_ext (snd e1) (snd e2) in (EBinop (loc_of_ext p, o, fst e1, fst e2), p) }
+  | e1=expr FBY e2=expr     { let p = extend_to_ext (snd e1) (snd e2) in (EBinop (loc_of_ext p, Bop_arrow, fst e1, EUnop (loc_of_ext p, Uop_pre, fst e2)), p) }
   | IF cond=expr THEN e1=expr ELSE e2=expr { let p = extend_to_ext (extent_of_len 2 $endpos($1)) (snd e2) in (EIfte (loc_of_ext p, fst cond, fst e1, fst e2), p) }
 ;
