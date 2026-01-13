@@ -1,8 +1,9 @@
 open Extracted.Imp
 open Extracted.Semantics
+open Extracted.Types
 open Format
 
-let pp_return fmt ident = fprintf fmt "ret_%i" ident
+let pp_return fmt ident = fprintf fmt "ret_%i" ident.binder_id
 let pp_ident fmt ident = fprintf fmt "var_%i" ident
 let pp_fun_name fmt ident = fprintf fmt "fun_%s" ident
 
@@ -16,7 +17,7 @@ let pp_typ fmt typ =
   | TBool -> fprintf fmt "char"
   | TInt -> fprintf fmt "int"
 
-let pp_var fmt v = fprintf fmt "%a" pp_ident (fst v)
+let pp_var fmt v = pp_ident fmt v.binder_id
 
 let pp_unop fmt op =
   match op with Uop_not -> fprintf fmt "~" | Uop_neg -> fprintf fmt "-"
@@ -143,16 +144,16 @@ let rec pp_expr parent_op (env : binder list) fmt exp =
 let is_empty_sassign stmt = ignore stmt; false
 
 let get_var_typ (env : binder list) var =
-  List.find_opt (fun (name, _) -> name = var) env |> Option.map snd
+  List.find_opt (fun { binder_id = name; _ } -> name = var.binder_id) env |> Option.map (fun b -> b.binder_ty)
 
 let rec pp_stmt env fmt stmt =
   match stmt with
-  | SAssign ((x, _), e) -> begin match get_var_typ env x with
+  | SAssign (b, e) -> begin match get_var_typ env b with
     | Some ty ->
-      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ ty pp_ident x
+      fprintf fmt "@[<hv2>%a %a =@ %a;@]" pp_typ ty pp_var b
         (pp_expr None env) e
     | None ->
-      fprintf fmt "@[<hv2>this->%a =@ %a;@]" pp_ident x
+      fprintf fmt "@[<hv2>this->%a =@ %a;@]" pp_var b
         (pp_expr None env) e
     end
   | SSeq (s1, s2) when is_empty_sassign s1 -> pp_stmt env fmt s2
@@ -160,8 +161,7 @@ let rec pp_stmt env fmt stmt =
   | SSeq (s1, s2) -> fprintf fmt "%a@\n%a" (pp_stmt env) s1 (pp_stmt env) s2
   | SNop -> fprintf fmt ""
 
-let pp_binder fmt binder = fprintf fmt "%a" pp_ident (fst binder)
-let pp_arg fmt arg = fprintf fmt "%a %a" pp_typ (snd arg) pp_binder arg
+let pp_arg fmt arg = fprintf fmt "%a %a" pp_typ arg.binder_ty pp_var arg
 
 let pp_args fmt (args : binder list) =
   match args with
@@ -176,7 +176,7 @@ let pp_args fmt (args : binder list) =
 let pp_struct_typ fmt (args : binder list) =
   pp_print_list
     ~pp_sep:(fun _fmt () -> ())
-    (fun fmt (argn, argt : binder) -> fprintf fmt "@\n%a %a;" pp_typ argt pp_return argn)
+    (fun fmt b -> fprintf fmt "@\n%a %a;" pp_typ b.binder_ty pp_return b)
     fmt args
 
 let pp_struct_val sname fmt (args : binder list) =
@@ -184,7 +184,7 @@ let pp_struct_val sname fmt (args : binder list) =
     sname
     (pp_print_list
       ~pp_sep:(fun fmt () -> fprintf fmt ";@ ")
-      (fun fmt (argn, _argt : binder) -> fprintf fmt ".%a = %a" pp_return argn pp_ident argn)) args
+      (fun fmt b -> fprintf fmt ".%a = %a" pp_return b pp_var b)) args
 
 let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
   | [] -> (* Warning, no output! *)
@@ -195,7 +195,7 @@ let pp_coq_method fmt (fname, sname, bin, bout, blocals, body) = match bout with
         (pp_stmt blocals) body
   | [m_out] ->
       fprintf fmt "@[@[<v4>%a %a(struct %s *this%a) {%a@\nreturn @[%a@];@]@\n}@\n@]"
-        pp_typ (snd m_out)
+        pp_typ m_out.binder_ty
         pp_fun_name fname
         sname
         pp_args bin
@@ -218,7 +218,7 @@ let pp_coq_method_pair {fprintf} cm =
   let sname = "s_" ^ m_name cm in
   let pp_locals fmt locs =
     pp_print_list ~pp_sep:(fun _ () -> ())
-      (fun fmt loc -> Format.fprintf fmt "@\n%a %a;" pp_typ (snd loc) pp_ident (fst loc))
+      (fun fmt loc -> Format.fprintf fmt "@\n%a %a;" pp_typ loc.binder_ty pp_var loc)
       fmt locs in
   let locvars = m_in cm @ m_out cm in
   fprintf "@[@[<v4>struct %s {%a@]@\n};@\n@\n%a@\n%a@]"

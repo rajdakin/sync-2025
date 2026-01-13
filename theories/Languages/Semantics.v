@@ -1,99 +1,57 @@
 Set Default Goal Selector "!".
 
-From Stdlib Require Import ZArith.
-From Stdlib Require Import Nat.
+From Stdlib Require Import String Nat ZArith.
 From Reactive.Datatypes Require Dict Stream.
 From Reactive.Props Require Import Identifier Sigma.
+From Reactive.Languages Require Export Types.
 
-Inductive type : Set :=
-  | TBool
-  | TInt
-.
-
-Definition binder := prod ident type.
-Definition binder_ty (b : binder) : type := snd b.
-
-Lemma type_dec (x y: type): {x = y} + {x <> y}.
-Proof.
-  destruct x, y; try solve [left; reflexivity]; right; discriminate.
-Defined.
+Record binder := {
+  binder_name: string;
+  binder_id: ident;
+  binder_ty: type;
+}.
 
 Lemma binder_dec (x y: binder) : {x = y} + {x <> y}.
 Proof.
-  destruct x as [i1 ty1], y as [i2 ty2].
+  destruct x as [n1 i1 ty1], y as [n2 i2 ty2].
+  
+  pose proof (string_dec n1 n2).
+  destruct H.
+  2: {
+    right.
+    injection as eqn _ _.
+    contradiction.
+  }
   
   pose proof (PeanoNat.Nat.eq_dec i1 i2).
   destruct H.
   2: {
     right.
-    injection as eqi _.
+    injection as _ eqi _.
     contradiction.
   }
-
+  
   destruct (type_dec ty1 ty2).
   2: {
     right.
-    injection as _ eqt.
+    injection as _ _ eqt.
     contradiction.
   }
-
+  
   left.
   f_equal.
   all: assumption.
 Defined.
 
-Definition sig2T_eq_type := @sig2T_eq _ type_dec.
-Arguments sig2T_eq_type {_ _ _ _}.
-
-Ltac simpl_exist_type := repeat match goal with H : @existT type _ _ _ = existT _ _ _ |- _ => apply sig2T_eq_type in H end.
-
-Lemma type_dec_same : forall ty, type_dec ty ty = left eq_refl.
-Proof using.
-  intros ty.
-  destruct (type_dec ty ty) as [ e | n ]; [ | contradiction (n eq_refl) ].
-  f_equal.
-  apply Eqdep_dec.UIP_dec.
-  exact type_dec.
-Qed.
-
-Lemma forall_type_dec : forall (P : type -> Prop), (forall ty, {P ty} + {~P ty}) -> {forall ty, P ty} + {exists ty, ~ P ty}.
-Proof using.
-  intros P dec.
-  destruct (dec TBool) as [Pbool | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  destruct (dec TInt)  as [Pint  | nP]; [|right; exact (ex_intro (fun ty => ~ P ty) _ nP)].
-  left; intros []; assumption.
-Defined.
-
-Definition type_eqb (x y: type): bool :=
-  match x, y with
-    | TBool, TBool => true
-    | TInt, TInt => true
-    | _, _ => false
-  end.
-
-Lemma type_eqb_eq (x y: type):
-  type_eqb x y = true <-> x = y.
-Proof.
-  destruct x, y.
-  all: firstorder.
-  all: discriminate.
-Qed.
-
-Lemma type_eqb_refl (t: type):
-  type_eqb t t = true.
-Proof.
-  destruct t; reflexivity.
-Qed.
-
 Definition binder_eqb (x y: binder): bool :=
-  andb (fst x =? fst y) (type_eqb (snd x) (snd y)).
+  andb (binder_name x =? binder_name y)%string (andb (binder_id x =? binder_id y) (type_eqb (binder_ty x) (binder_ty y))).
 
   Lemma binder_eqb_refl (b: binder):
   binder_eqb b b = true.
 Proof.
-  destruct b as (i, t).
-  apply andb_true_intro.
-  split.
+  destruct b as [n i t].
+  repeat (apply andb_true_intro; split).
+  - apply eqb_refl.
   - apply PeanoNat.Nat.eqb_refl.
   - apply type_eqb_refl.
 Qed.
@@ -101,11 +59,12 @@ Qed.
 Lemma binder_eqb_to_eq (x y : binder): binder_eqb x y = true -> x = y.
 Proof.
   unfold binder_eqb, andb.
-  destruct (fst x =? fst y) eqn:Heq; [| discriminate ].
+  destruct (binder_name x =? binder_name y)%string eqn:Heqn; [| discriminate ].
+  destruct (binder_id x =? binder_id y) eqn:Heqi; [| discriminate ].
 
-  rewrite PeanoNat.Nat.eqb_eq in Heq.
-  destruct x, y; simpl in Heq |- *.
-  rewrite Heq.
+  rewrite eqb_eq in Heqn; rewrite PeanoNat.Nat.eqb_eq in Heqi.
+  destruct x as [? ? t], y as [? ? t0]; simpl in *.
+  subst.
 
   intros H.
   now destruct t, t0.

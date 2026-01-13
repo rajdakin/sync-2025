@@ -1,11 +1,10 @@
 Set Default Goal Selector "!".
 
+From Stdlib Require Import List Nat String.
 From Reactive.Datatypes Require Ordered.
 From Reactive.Languages Require LustreOrdered Imp.
 From Reactive.Languages Require Import Semantics.
 From Reactive.Props Require Import Axioms Identifier.
-
-From Stdlib Require Import List Nat.
 
 
 Module Source := LustreOrdered.
@@ -55,20 +54,21 @@ Fixpoint translate_exp {ty} (e: Source.exp ty): Target.exp ty :=
   end.
 
 Definition translate_equation (eq: Source.equation): Target.stmt :=
-  Target.SAssign (fst eq, projT1 (snd eq)) (translate_exp (projT2 (snd eq))).
+  Target.SAssign {| binder_name := fst (fst eq); binder_id := snd (fst eq); binder_ty := projT1 (snd eq) |} (translate_exp (projT2 (snd eq))).
 
 Definition translate_node_body (stmt: Target.stmt) (body: list Source.equation): Target.stmt :=
   fold_right (fun x acc => Target.SSeq acc (translate_equation x)) stmt body.
 
 Definition translate_node_init (init: list Source.equation): Target.stmt := translate_node_body Target.SNop init.
 
-Definition translate_node_step (pre: list (binder * ident)) (step: list Source.equation): Target.stmt :=
-  translate_node_body (fold_right (fun x acc => Target.SSeq acc (Target.SAssign (fst x) (Target.EVar (snd x, snd (fst x))))) Target.SNop pre) step.
+Definition translate_node_step (pre: list (binder * (string * ident))) (step: list Source.equation): Target.stmt :=
+  translate_node_body (
+    fold_right (fun x acc => Target.SSeq acc (Target.SAssign (fst x) (Target.EVar {| binder_name := fst (snd x); binder_id := snd (snd x); binder_ty := binder_ty (fst x) |}))) Target.SNop pre) step.
 
-Lemma lustre_assignment_is_substmt (name: ident) (ty: type) (exp: Source.exp ty):
+Lemma lustre_assignment_is_substmt (b: binder) (exp: Source.exp (binder_ty b)):
   forall stmt body,
-  In (name, existT Source.exp ty exp) body ->
-  Target.is_substmt (Target.SAssign (name, ty) (translate_exp exp)) (translate_node_body stmt body) = true.
+  In ((binder_name b, binder_id b), existT Source.exp _ exp) body ->
+  Target.is_substmt (Target.SAssign b (translate_exp exp)) (translate_node_body stmt body) = true.
 Proof.
   intros stmt n_body Hin.
   induction n_body as [ | (eq_left, (ty', eq_right)) body IH ]; [ inversion Hin | ].
@@ -80,7 +80,8 @@ Proof.
     simpl_exist_type.
     subst.
     right.
-    rewrite PeanoNat.Nat.eqb_refl.
+    destruct b as [n i t]; cbn.
+    rewrite binder_eqb_refl.
     rewrite Target.exp_eqb_refl.
     reflexivity.
   - left.
@@ -89,14 +90,14 @@ Qed.
 
 Lemma in_map_fstsnd y xs:
   In y (List.map Source.Source.equation_dest xs) ->
-    exists ys, In (fst y, existT Source.exp (snd y) ys) xs.
+    exists ys, In ((binder_name y, binder_id y), existT Source.exp (binder_ty y) ys) xs.
 Proof.
   induction xs as [| x xs IHxs ].
   { intros []. }
 
   intros [ Heq | HIn ].
   - subst.
-    destruct x as [ a [ b c ] ].
+    destruct x as [ [ ? ? ] [ b c ] ].
     cbn in *.
     exists c.
     left.
@@ -132,7 +133,7 @@ Proof.
   2: specialize (Permutation.Permutation_in _ (Permutation.Permutation_sym n_step_vars_all_assigned) (in_or_app _ _ _ (or_introl Hb)))
     as b_assigned.
   all: apply in_map_iff in b_assigned.
-  all: destruct b_assigned as [ [ i [ ty' exp ] ] [ <- Hexp ] ].
+  all: destruct b_assigned as [ [ [ n i ] [ ty' exp ] ] [ <- Hexp ] ].
   all: exists (translate_exp exp).
   1: replace n_init with (Source.Source.n_init (Source.node_ordered_is_node n')); [ | reflexivity ].
   2: replace n_step with (Source.Source.n_step (Source.node_ordered_is_node n')); [ | reflexivity ].

@@ -1,9 +1,9 @@
 Set Default Goal Selector "!".
 
 From Reactive.Datatypes Require Dict Stream.
+From Reactive.Props Require Import Identifier Sublist.
 From Reactive.Languages Require LustreAst.
-From Reactive.Languages Require Import Semantics.
-From Reactive.Props Require Import Freshness Identifier Sublist.
+From Reactive.Languages Require Import Freshness Semantics.
 
 From Stdlib Require Import Nat List Permutation String.
 
@@ -261,10 +261,9 @@ Proof.
     contradiction (n eq_refl).
   - intros e2; destruct (exp_inv e2) as [ loc2 [ [ [ [
       (c' & ->) | (b' & H) ] | (tin & op & e1' & ->) ] | (ty1 & ty2 & op & e1' & e2' & ->) ] | (eb & et & ef & ->) ] ].
-    2: destruct b as [n1 ty1], b' as [n2 ty2].
-    2: destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|n]; [left; cbn in H; destruct H as [<- ->]; exact EeqVar|].
+    2: destruct (binder_dec b b') as [<-|n]; [left; cbn in H; destruct H as [H ->]; rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl); exact EeqVar|].
     all: right.
-    2: cbn in H; destruct H as [<- ->].
+    2: cbn in H; destruct b, b'; cbn in H; destruct H as [<- ->]; cbn.
     all: intros f; inversion f; simpl_exist_type; try discriminate; subst.
     contradiction (n eq_refl).
   - intros e2; destruct (exp_inv e2) as [ loc2 [ [ [ [
@@ -298,8 +297,8 @@ Proof.
     all: intros f; inversion f; simpl_exist_type; try discriminate; subst; contradiction.
 Defined.
 
-Definition equation : Type := ident * { ty : type & exp ty }.
-Definition equation_dest (eq : equation) : ident * type := (fst eq, projT1 (snd eq)).
+Definition equation : Type := string * ident * { ty : type & exp ty }.
+Definition equation_dest (eq : equation) : binder := {| binder_name := fst (fst eq); binder_id := snd (fst eq); binder_ty := projT1 (snd eq) |}.
 
 Definition equation_eq (eq1 eq2 : equation) : Prop :=
   fst eq1 = fst eq2 /\
@@ -308,19 +307,20 @@ Definition equation_eq (eq1 eq2 : equation) : Prop :=
 
 Lemma equation_dec (e1 e2: equation) : {equation_eq e1 e2} + {~ equation_eq e1 e2}.
 Proof.
-  destruct e1 as [n1 [ty1 e1]].
-  destruct e2 as [n2 [ty2 e2]].
-  destruct (PeanoNat.Nat.eq_dec n1 n2) as [<-|ne]; [|right; cbn; intros [f _]; exact (ne f)].
+  destruct e1 as [[n1 i1] [ty1 e1]].
+  destruct e2 as [[n2 i2] [ty2 e2]].
+  destruct (string_dec n1 n2) as [<-|ne]; [|right; cbn; intros [[=f _] _]; exact (ne f)].
+  destruct (PeanoNat.Nat.eq_dec i1 i2) as [<-|ne]; [|right; cbn; intros [[=f] _]; exact (ne f)].
   destruct (type_dec ty1 ty2) as [<-|ne]; [|right; cbn; intros [_ [f _]]; exact (ne f)].
   destruct (exp_dec e1 e2) as [e|ne]; [|right; cbn; intros [_ [He f]]; refine (ne _)].
   2: rewrite (Eqdep_dec.UIP_dec type_dec _ eq_refl) in f; exact f.
   left; split; [exact eq_refl|exists eq_refl; exact e].
 Defined.
 
-Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list binder): list binder :=
   match e with
     | EConst _ _ => acc
-    | EVar _ (name, ty) => (name, ty) :: acc
+    | EVar _ b => b :: acc
     | EUnop _ _ e => var_of_exp_aux e acc
     | EBinop _ _ e1 e2 =>
       var_of_exp_aux e1 (var_of_exp_aux e2 acc)
@@ -328,7 +328,7 @@ Fixpoint var_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident
       var_of_exp_aux e1 (var_of_exp_aux e2 (var_of_exp_aux e3 acc))
   end.
 
-Definition var_of_exp {ty} (e: exp ty): list (ident * type) :=
+Definition var_of_exp {ty} (e: exp ty): list binder :=
   var_of_exp_aux e [].
 
 Record node := mk_node {
@@ -345,9 +345,9 @@ Record node := mk_node {
   n_all_vars_exist: Forall (fun eq => incl (var_of_exp (projT2 (snd eq))) n_vars) n_body;
 
   n_vars_all_assigned: Permutation n_assigned_vars (n_out ++ n_locals);
-  n_vars_unique: NoDup (map fst n_vars);
+  n_vars_unique: NoDup (map binder_id n_vars);
   
-  n_seed: ident;
+  n_seed: seed_ty;
   n_seed_always_fresh: freshness n_seed n_vars;
 }.
 
@@ -396,7 +396,7 @@ Inductive sem_exp (h: history) | : nat -> forall {ty}, exp ty -> value ty -> Pro
     forall l, sem_exp t (EIfte l e1 e2 e3) (vifte v1 v2 v3)
 
   | SeVar (t: nat) (b: binder) (v: Stream.t (value (binder_ty b))):
-      Dict.maps_to (fst b) (existT _ _ v) h ->
+      Dict.maps_to (binder_id b) (existT _ _ v) h ->
       forall l, sem_exp t (EVar l b) (Stream.nth t v)
 
   | SePre {ty} (t: nat) (e: exp ty) (v: value ty):
@@ -410,11 +410,12 @@ Inductive sem_exp (h: history) | : nat -> forall {ty}, exp ty -> value ty -> Pro
 .
 
 Definition sem_node (n: node) (h: history) : Prop :=
-  forall (i: ident) (ty: type),
-  In (i, ty) n.(n_vars) ->
-    exists (s: Stream.t (value ty)),
-    h_maps_to i s h /\
-    (forall (e: exp ty), In (i, existT _ _ e) n.(n_body) -> forall n, sem_exp h n e (Stream.nth n s)).
+  forall b: binder,
+  In b n.(n_vars) ->
+    exists (s: Stream.t (value (binder_ty b))),
+    h_maps_to (binder_id b) s h /\
+    (forall (e: exp (binder_ty b)),
+     In (binder_name b, binder_id b, existT _ _ e) n.(n_body) -> forall n, sem_exp h n e (Stream.nth n s)).
 
 
 (** ** Properties *)
@@ -422,7 +423,7 @@ Definition sem_node (n: node) (h: history) : Prop :=
 Fixpoint eval_exp (h: history) (t: nat) {ty} (e: exp ty): option (value ty) :=
   match e with
     | EConst _ c => Some (const_to_value c)
-    | EVar _ (name, typ) => match Dict.find name h with None => None | Some (existT _ ty' s) => extract_stream _ t s end
+    | EVar _ b => match Dict.find (binder_id b) h with None => None | Some (existT _ ty' s) => extract_stream _ t s end
     | EUnop _ op e => match op, e with
       | Uop_not, e => option_map (fun v => vnot v) (eval_exp h t e)
       | Uop_neg, e => option_map (fun v => vneg v) (eval_exp h t e)
@@ -499,10 +500,10 @@ Definition is_evaluable (h: history) (t: nat) {ty} (e: exp ty): Prop :=
   exists v: value ty, eval_exp h t e = Some v.
 
 
-Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (ident * type) :=
+Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list binder): list binder :=
   match e with
     | EConst _ _ => acc
-    | EVar _ (name, ty) => (name, ty) :: acc
+    | EVar _ b => b :: acc
     | EUnop _ Uop_pre e => acc
     | EUnop _ _ e => deps_of_exp_aux e acc
     | EBinop _ _ e1 e2 =>
@@ -511,7 +512,7 @@ Fixpoint deps_of_exp_aux {ty} (e: exp ty) (acc: list (ident * type)): list (iden
       deps_of_exp_aux e1 (deps_of_exp_aux e2 (deps_of_exp_aux e3 acc))
   end.
 
-Definition deps_of_exp {ty} (e: exp ty): list (ident * type) :=
+Definition deps_of_exp {ty} (e: exp ty): list binder :=
   deps_of_exp_aux e [].
 
 (** ** Lemmas *)
@@ -522,13 +523,13 @@ Proof.
   split.
   - intros H.
     revert v H.
-    induction e as [ l ty c | l (i, ty) | l ty tout op e IH | l ty1 ty2 tout op e1 IH1 e2 IH2 | l ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
+    induction e as [ l ty c | l [bn bi bt] | l ty tout op e IH | l ty1 ty2 tout op e1 IH1 e2 IH2 | l ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
     + inversion H.
       apply SeConst.
     + cbn in H.
-      destruct (Dict.find i h) as [ [ ty' s ] | ] eqn: Heq; [ | discriminate H ].
+      destruct (Dict.find bi h) as [ [ ty' s ] | ] eqn: Heq; [ | discriminate H ].
       unfold extract_stream in H.
-      destruct (type_dec ty' ty) as [ -> | n ]; [ | discriminate H ].
+      destruct (type_dec ty' bt) as [ -> | n ]; [ | discriminate H ].
       injection H as <-.
       apply SeVar.
       assumption.
@@ -578,7 +579,7 @@ Proof.
       apply SeIfte; assumption.
   - intros H.
     revert v H.
-    induction e as [l ty c | l (i, ty) | l ty tout op e IH | l ty1 ty2 tout op e1 IH1 e2 IH2 | l ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
+    induction e as [l ty c | l b | l ty tout op e IH | l ty1 ty2 tout op e1 IH1 e2 IH2 | l ty e1 IH1 e2 IH2 e3 IH3 ] in t |- *; intros v H.
     + inversion H.
       apply sig2T_eq_type in H4, H5.
       subst.
@@ -647,11 +648,11 @@ Proof.
       reflexivity.
 Qed.
 
-Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
+Lemma var_of_exp_aux_eq {ty} (e: exp ty) (l: list binder):
   var_of_exp_aux e l = var_of_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  induction e as [ loc ty c | loc b | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
   - reflexivity.
   - reflexivity.
   - apply IH.
@@ -667,7 +668,7 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma var_of_exp_aux_empty {ty} (e: exp ty) (l: list (ident * type)):
+Lemma var_of_exp_aux_empty {ty} (e: exp ty) (l: list binder):
   var_of_exp_aux e l = [] -> l = [].
 Proof.
   intros H.
@@ -676,7 +677,7 @@ Proof.
   assumption.
 Qed.
 
-Lemma var_of_exp_aux_incl {ty} (e: exp ty) (l1 l2: list (ident * type)):
+Lemma var_of_exp_aux_incl {ty} (e: exp ty) (l1 l2: list binder):
   incl l1 l2 -> incl (var_of_exp_aux e l1) (var_of_exp_aux e l2).
 Proof.
   intros H i Hi.
@@ -685,16 +686,16 @@ Proof.
   apply in_app_or in Hi as [ Hin | Hin ]; auto.
 Qed.
 
-Lemma var_of_exp_aux_in_exp {ty tyv} (e: exp ty) (l: list (ident * type)) (x: ident):
-  In (x, tyv) (var_of_exp e) -> In (x, tyv) (var_of_exp_aux e l).
+Lemma var_of_exp_aux_in_exp {ty} (e: exp ty) (l: list binder) (b: binder):
+  In b (var_of_exp e) -> In b (var_of_exp_aux e l).
 Proof.
   apply var_of_exp_aux_incl with (l1 := []).
   intros a Hin.
   destruct Hin.
 Qed.
 
-Lemma var_of_exp_aux_in_acc {ty tyv} (e: exp ty) (l: list (ident * type)) (x: ident):
-  In (x, tyv) l -> In (x, tyv) (var_of_exp_aux e l).
+Lemma var_of_exp_aux_in_acc {ty} (e: exp ty) (l: list binder) (b: binder):
+  In b l -> In b (var_of_exp_aux e l).
 Proof.
   intros H.
   rewrite var_of_exp_aux_eq.
@@ -720,48 +721,48 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma var_of_exp_not_in_binop loc {ty1 ty2 ty} (exp1 exp2: exp _) (x: ident) (b: binop ty1 ty2 ty):
-  (forall tyv, ~ In (x, tyv) (var_of_exp (EBinop loc b exp1 exp2))) ->
-  forall tyv, (~ In (x, tyv) (var_of_exp exp1) /\ ~ In (x, tyv) (var_of_exp exp2)).
+Lemma var_of_exp_not_in_binop loc {ty1 ty2 ty} (exp1 exp2: exp _) (b: binder) (op: binop ty1 ty2 ty):
+  ~ In b (var_of_exp (EBinop loc op exp1 exp2)) ->
+  ~ In b (var_of_exp exp1) /\ ~ In b (var_of_exp exp2).
 Proof.
   intros Hnin.
   split.
   - intros Hin1.
-    apply (Hnin tyv).
+    apply Hnin.
     unfold var_of_exp.
     simpl.
     apply var_of_exp_aux_in_exp.
     assumption.
   - intros Hin1.
-    apply (Hnin tyv).
+    apply Hnin.
     unfold var_of_exp.
     simpl.
     apply var_of_exp_aux_in_acc.
     assumption.
 Qed.
 
-Lemma var_of_exp_not_in_ifte loc {ty} (e1: exp TBool) (e2 e3: exp ty) (x: ident):
-  (forall tyv, ~ In (x, tyv) (var_of_exp (EIfte loc e1 e2 e3))) ->
-  forall tyv, (~ In (x, tyv) (var_of_exp e1) /\ ~ In (x, tyv) (var_of_exp e2) /\ ~ In (x, tyv) (var_of_exp e3)).
+Lemma var_of_exp_not_in_ifte loc {ty} (e1: exp TBool) (e2 e3: exp ty) (b: binder):
+  ~ In b (var_of_exp (EIfte loc e1 e2 e3)) ->
+  ~ In b (var_of_exp e1) /\ ~ In b (var_of_exp e2) /\ ~ In b (var_of_exp e3).
 Proof.
   intros Hnin.
   split.
   - intros Hin.
-    apply (Hnin tyv).
+    apply Hnin.
     unfold var_of_exp.
     simpl.
     apply var_of_exp_aux_in_exp.
     assumption.
   - split.
     + intros Hin.
-      apply (Hnin tyv).
+      apply Hnin.
       unfold var_of_exp.
       simpl.
       apply var_of_exp_aux_in_acc.
       apply var_of_exp_aux_in_exp.
       assumption.
     + intros Hin.
-      apply (Hnin tyv).
+      apply Hnin.
       unfold var_of_exp.
       simpl.
       apply var_of_exp_aux_in_acc.
@@ -769,61 +770,13 @@ Proof.
       assumption.
 Qed.
 
-(* This is false with pre... *)
-(*Lemma exp_with_evaluable_vars_is_evaluable (h: history) {ty} (e: exp ty):
-  Forall (in_history h) (var_of_exp e) ->
-  forall n, is_evaluable h n e.
-Proof.
-  intros H.
-  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ].
-  all: intro n.
-  - exists (const_to_value c).
-    reflexivity.
-  - apply Forall_inv, in_history_iff in H.
-    destruct H as [ s Hs ].
-    exists (Stream.nth n s).
-    simpl.
-    rewrite Hs.
-    exact (extract_stream_eqty _ n).
-  - unfold var_of_exp in H.
-    simpl in H.
-    unfold var_of_exp in IH.
-    specialize (IH H).
-    destruct op.
-    1: exists (vnot v).
-    2: exists (vneg v).
-    3: exists
-    exists (VUnop op v).
-    simpl.
-    rewrite Hv.
-    reflexivity.
-  - rewrite var_of_exp_binop_eq in H.
-    apply Forall_app in H as [ H1 H2 ].
-    specialize (IH1 H1) as [ v1 Hv1 ].
-    specialize (IH2 H2) as [ v2 Hv2 ].
-    exists (VBinop op v1 v2).
-    simpl.
-    rewrite Hv1, Hv2.
-    reflexivity.
-  - rewrite var_of_exp_ifte_eq in H.
-    apply Forall_app in H as [ H1 H2 ].
-    apply Forall_app in H2 as [ H2 H3 ].
-    apply IH1 in H1 as [ v1 Hv1 ].
-    apply IH2 in H2 as [ v2 Hv2 ].
-    apply IH3 in H3 as [ v3 Hv3 ].
-    exists (VIfte v1 v2 v3).
-    simpl.
-    rewrite Hv1, Hv2, Hv3.
-    reflexivity.
-Qed.
-
-Lemma exp_evaluable_have_evaluable_vars (h: history) {ty} (e: exp ty) (v: value ty):
+(* Lemma exp_evaluable_have_evaluable_vars (h: history) {ty} (e: exp ty) (v: value ty):
   eval_exp h e = Some v ->
   Forall (in_history h) (var_of_exp e).
 Proof.
   intros H.
   revert v H.
-  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
+  induction e as [ loc ty c | loc b | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros v H.
   - constructor.
   - constructor; [ | constructor ].
     apply in_history_iff.
@@ -864,11 +817,11 @@ Proof.
 Qed.
 *)
 
-Lemma deps_of_exp_aux_eq {ty} (e: exp ty) (l: list (ident * type)):
+Lemma deps_of_exp_aux_eq {ty} (e: exp ty) (l: list binder):
   deps_of_exp_aux e l = deps_of_exp e ++ l.
 Proof.
   revert l.
-  induction e as [ loc ty c | loc (i, ty) | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
+  induction e as [ loc ty c | loc b | loc ty tout op e IH | loc ty1 ty2 tout op e1 IH1 e2 IH2 | loc ty e1 IH1 e2 IH2 e3 IH3 ]; intros l.
   - reflexivity.
   - reflexivity.
   - destruct op.
@@ -905,7 +858,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma sub_deps_of_exp_aux_gen {ty} (e: exp ty) (l1 l2: list (ident * type)):
+Lemma sub_deps_of_exp_aux_gen {ty} (e: exp ty) (l1 l2: list binder):
   Sublist l1 l2 -> Sublist l1 (deps_of_exp_aux e l2).
 Proof.
   revert l1 l2.
@@ -935,14 +888,14 @@ Proof.
     assumption.
 Qed.
 
-Lemma sub_deps_of_exp_aux {ty} (e: exp ty) (aux: list (ident * type)):
+Lemma sub_deps_of_exp_aux {ty} (e: exp ty) (aux: list binder):
   Sublist aux (deps_of_exp_aux e aux).
 Proof.
   apply sub_deps_of_exp_aux_gen.
   apply sublist_refl.
 Qed.
 
-Lemma deps_var_aux_sublist {ty} (e: exp ty) (lexp: list (ident * type)) (ldeps: list (ident * type)):
+Lemma deps_var_aux_sublist {ty} (e: exp ty) (lexp: list binder) (ldeps: list binder):
   Sublist ldeps lexp -> Sublist (deps_of_exp_aux e ldeps) (var_of_exp_aux e lexp).
 Proof.
   revert lexp.

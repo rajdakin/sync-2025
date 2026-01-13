@@ -1,5 +1,5 @@
 %{
-    open Extracted.Semantics
+    open Extracted.Types
     open Extracted.LustreAst
     open LocationInfo
 

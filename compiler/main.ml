@@ -42,11 +42,11 @@ let parse_file filename : (Extracted.LustreAst.node, string) result =
   | e ->
     Result.Error (Format.sprintf "%s@\n" (Printexc.to_string e))
 
-let pp_type fmt (t: Extracted.Semantics.coq_type) = match t with
+let pp_type fmt (t: Extracted.Types.coq_type) = match t with
   | TBool -> fprintf fmt "bool"
   | TInt -> fprintf fmt "int"
 
-let pp_error fn (namemap: (int, string) Hashtbl.t) fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
+let pp_error fn fmt ((l, e): (Extracted.Result.location * 'a Extracted.Result.r)) =
   fprintf fmt "@[%a: " LocationInfo.pp_extent (LocationInfo.extent_of_loc fn l);
   let open Extracted.Result in
   match e with
@@ -80,7 +80,7 @@ let pp_error fn (namemap: (int, string) Hashtbl.t) fmt ((l, e): (Extracted.Resul
   | CyclicDependency vs ->
       fprintf fmt "there is a cyclic dependency:@ @[<hov>%a@]@]"
         (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt " depends on@ ")
-          (fun fmt i -> pp_print_string fmt (match Hashtbl.find_opt namemap i with Some v -> v | None -> "?(" ^ (string_of_int i) ^ ")")))
+          (fun fmt (n, i) -> pp_print_string fmt (n ^ "(" ^ (string_of_int i) ^ ")")))
         vs
   | InternalError e -> fprintf fmt "internal error: %s@]" e
 
@@ -126,13 +126,13 @@ let () =
         exit 1
     in
 
-  let var_names, checked_node =
+  let checked_node =
     match Extracted.LustreAstToLustre.check_node_prop node with
     | Ok m -> m
     | Err x ->
         output output_err "@[Error%s when node properties have been checked:@\n%a@]@."
           (match x with [] | [_] -> "" | _ :: _ :: _ -> "s")
-          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename (Hashtbl.create 0))) x;
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename)) x;
         exit 1
   in
 
@@ -142,7 +142,7 @@ let () =
     | Err x ->
         output output_err "@[Error%s when node is timed:@\n%a@]@."
           (match x with [] | [_] -> "" | _ :: _ :: _ -> "s")
-          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename (Hashtbl.create 0))) x;
+          (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename)) x;
         exit 1
   in
 
@@ -152,4 +152,4 @@ let () =
       Generation.pp_coq_method_pair Generation.{fprintf = output} (Extracted.LustreOrderedToImp.translate_node m)
   | Err x ->
       output output_err "@[Error lustre ordering translate:@\n%a@]@."
-        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename var_names)) x
+        (pp_print_list ~pp_sep:(fun fmt () -> fprintf fmt "@\n") (pp_error filename)) x

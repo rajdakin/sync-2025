@@ -29,7 +29,7 @@ Inductive r {type: Set} | : Set :=
   | MultipleAssignment (vname: string) (vid: ident) (vtype: type): r
   | AssignToInput (vname: string) (vid: ident) (vtype: type): r
   | InvalidTiming (vname: string) (vid: ident) (vtype: type): r
-  | CyclicDependency (loop: list ident): r
+  | CyclicDependency (loop: list (string * ident)): r
   | InternalError (msg: string): r
 .
 Arguments r _ : clear implicits.
